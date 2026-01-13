@@ -1,0 +1,67 @@
+version: "3"
+
+services:
+
+  postgres:
+    container_name: restos_postgres
+    restart: unless-stopped
+    image: postgres:18.1
+    environment:
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=restos
+    volumes:
+      - restos_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d restos -U postgres" ]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    container_name: restos_redis
+    restart: unless-stopped
+    image: redis:8.4.0
+    command: redis-server --appendonly yes
+    volumes:
+      - restos_redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  bot:
+    container_name: restos_bot
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stop_signal: SIGINT
+    build:
+      context: .
+      dockerfile: ./docker/bot/bot.Dockerfile
+    command: [ "poetry", "run", "python", "local_bot.py"]
+    restart: always
+    environment:
+      - TGBOT_TOKEN=${TGBOT_TOKEN}
+      - TGBOT_ADMIN_IDS=${TGBOT_ADMIN_IDS}
+      - TGBOT_USE_REDIS=true
+      - TGBOT_TRIGGER_MESSAGE_BUSINESS_CHAT=${TGBOT_TRIGGER_MESSAGE_BUSINESS_CHAT:-start}
+      - TGBOT_TRIGGER_AUTO_MESSAGE_BUSINESS_CHAT=${TGBOT_TRIGGER_AUTO_MESSAGE_BUSINESS_CHAT:-help}
+      - REDIS_DSN=redis://redis:6379/0
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/restos
+      - DATABASE_POOL_SIZE=${DATABASE_POOL_SIZE:-10}
+      - DATABASE_MAX_OVERFLOW=${DATABASE_MAX_OVERFLOW:-20}
+      - DATABASE_POOL_RECYCLE=${DATABASE_POOL_RECYCLE:-3600}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+
+
+volumes:
+  restos_postgres_data:
+  restos_redis_data:

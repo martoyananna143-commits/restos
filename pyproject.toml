@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.poetry]
+name = "restos"
+version = "0.0.1"
+description = "Simple Telegram bot for group monitoring"
+authors = []
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+aiogram = "^3.0.0"
+aiogram-dialog = "2.2.0b3"
+loguru = "0.7.3"
+environs = "11.0.0"
+redis = "^5.0.0"
+sqlalchemy = "^2.0.0"
+alembic = "^1.13.0"
+asyncpg = "^0.29.0"
+pytz = "^2023.3"
+buildpg = "0.4"
+orjson = "^3.11.5"
+dependency-injector = "4.48.3"
+xhtml2pdf = "^0.2.16"
+jinja2 = "^3.1.6"
+reportlab = "^4.4.6"
+openpyxl = "^3.1.2"
+pandas = "^2.3.3"
+g4f = "^6.7.4"
+
+[tool.poetry.dev-dependencies]
