@@ -11,6 +11,7 @@ from app.infra.database.models.base import Base, SoftDeleteMixin, TimestampMixin
 if TYPE_CHECKING:
     from app.infra.database.models.employee.employee import Employee
     from app.infra.database.models.evaluation.evaluation import Evaluation
+    from app.infra.database.models.evaluation.evaluation_type import EvaluationType
 
 
 class Organization(Base, TimestampMixin, SoftDeleteMixin):
@@ -33,6 +34,10 @@ class Organization(Base, TimestampMixin, SoftDeleteMixin):
 
     evaluations: Mapped[List["Evaluation"]] = relationship(
         "Evaluation", back_populates="organization", lazy="selectin"
+    )
+
+    evaluation_types: Mapped[List["EvaluationType"]] = relationship(
+        "EvaluationType", back_populates="organization", lazy="selectin"
     )
 
     def __repr__(self) -> str:

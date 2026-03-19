@@ -49,6 +49,14 @@ class OrganizationService:
         """
         return await self.repository.get_all_by_user_telegram_id(telegram_id)
 
+    async def get_all(self) -> list[OrganizationDTO]:
+        """Get all organizations.
+
+        Returns:
+            List of OrganizationDTO instances.
+        """
+        return await self.repository.get_all()
+
     async def get_by_id(self, organization_id: int) -> Optional[OrganizationDTO]:
         """Get organization by ID.
 

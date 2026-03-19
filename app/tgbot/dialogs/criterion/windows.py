@@ -5,6 +5,7 @@ from aiogram_dialog.widgets.input import MessageInput
 from aiogram_dialog.widgets.kbd import (
     Back,
     Button,
+    Cancel,
     Row,
     ScrollingGroup,
     Select,
@@ -12,13 +13,6 @@ from aiogram_dialog.widgets.kbd import (
 )
 from aiogram_dialog.widgets.text import Const, Format
 
-from app.tgbot.dialogs.common.evaluation_type import (
-    create_evaluation_type_code_input_window,
-    create_evaluation_type_confirm_window,
-    create_evaluation_type_description_input_window,
-    create_evaluation_type_name_input_window,
-    create_evaluation_type_select_window,
-)
 from app.tgbot.dialogs.common.organization import create_organization_select_window
 from app.tgbot.dialogs.criterion.getters import (
     get_criteria_list_data,
@@ -30,26 +24,23 @@ from app.tgbot.dialogs.criterion.handlers import (
     on_add_more_yes,
     on_cancel_criterion,
     on_confirm_criterion,
-    on_confirm_evaluation_type,
     on_create_new_criterion,
     on_create_organization_from_criterion,
     on_edit_code,
     on_edit_description,
-    on_edit_evaluation_type,
+    on_edit_is_required,
     on_edit_name,
     on_edit_value_type,
     on_save_changes,
     on_select_existing_criterion,
+    on_select_is_required_no,
+    on_select_is_required_yes,
     on_select_value_type_boolean,
     on_select_value_type_number,
     on_select_value_type_string,
     on_skip_description,
-    on_skip_evaluation_type_description,
     process_code_input,
     process_description_input,
-    process_evaluation_type_code_input,
-    process_evaluation_type_description_input,
-    process_evaluation_type_name_input,
     process_name_input,
 )
 from app.tgbot.dialogs.criterion.states import CriterionDialog
@@ -91,6 +82,7 @@ def select_criterion_window():
             width=1,
             height=10,
             when="has_criteria",
+            hide_on_single_page=True,
         ),
         Row(
             Button(
@@ -99,7 +91,7 @@ def select_criterion_window():
                 on_click=on_create_new_criterion,
             ),
         ),
-        Back(Const("Назад")),
+        Cancel(Const("Назад ⬅️")),
         state=CriterionDialog.select_criterion,
         getter=get_criteria_list_data,
     )
@@ -117,8 +109,8 @@ def edit_menu_window():
             "Название: {name}\n"
             "Код: {code}\n"
             "Описание: {description}\n"
-            "Тип оценки: {evaluation_type_name}\n"
-            "Тип данных: {value_type_name}\n\n"
+            "Тип данных: {value_type_name}\n"
+            "Обязателен: {is_required_name}\n\n"
             "Что вы хотите изменить?"
         ),
         Row(
@@ -144,16 +136,16 @@ def edit_menu_window():
         ),
         Row(
             Button(
-                text=Const("Изменить тип оценки 📊"),
-                id="edit_evaluation_type",
-                on_click=on_edit_evaluation_type,
+                text=Const("Изменить тип данных 🔢"),
+                id="edit_value_type",
+                on_click=on_edit_value_type,
             ),
         ),
         Row(
             Button(
-                text=Const("Изменить тип данных 🔢"),
-                id="edit_value_type",
-                on_click=on_edit_value_type,
+                text=Const("Изменить обязательность ⚙️"),
+                id="edit_is_required",
+                on_click=on_edit_is_required,
             ),
         ),
         Row(
@@ -166,94 +158,6 @@ def edit_menu_window():
         Back(Const("Назад")),
         state=CriterionDialog.edit_menu,
         getter=get_criterion_form_data,
-    )
-
-
-def select_evaluation_type_window():
-    """Create evaluation type selection window.
-
-    Returns:
-        Window: The configured evaluation type selection window.
-    """
-    return create_evaluation_type_select_window(
-        state=CriterionDialog.select_evaluation_type,
-        message_text="Выберите тип оценки:",
-        next_state=CriterionDialog.name_input,
-        create_evaluation_type_state=CriterionDialog.evaluation_type_name_input,
-        use_scrolling=True,  # Menu selection - no pagination
-    )
-
-
-def edit_evaluation_type_window():
-    """Edit evaluation type selection window.
-
-    Returns:
-        Window: The configured evaluation type selection window.
-    """
-    return create_evaluation_type_select_window(
-        state=CriterionDialog.edit_evaluation_type,
-        message_text="Выберите тип оценки:",
-        next_state=CriterionDialog.edit_menu,
-        create_evaluation_type_state=CriterionDialog.evaluation_type_name_input,
-        use_scrolling=True,  # Menu selection - no pagination
-        switch_to=SwitchTo(
-            Const("Назад"),
-            id="back_evaluation_type_edit_window",
-            state=CriterionDialog.edit_menu,
-        ),
-    )
-
-
-def evaluation_type_name_input_window():
-    """Create evaluation type name input window.
-
-    Returns:
-        Window: The configured evaluation type name input window.
-    """
-    return create_evaluation_type_name_input_window(
-        state=CriterionDialog.evaluation_type_name_input,
-        process_name_handler=process_evaluation_type_name_input,
-        back_state=CriterionDialog.select_evaluation_type,
-    )
-
-
-def evaluation_type_code_input_window():
-    """Create evaluation type code input window.
-
-    Returns:
-        Window: The configured evaluation type code input window.
-    """
-    return create_evaluation_type_code_input_window(
-        state=CriterionDialog.evaluation_type_code_input,
-        process_code_handler=process_evaluation_type_code_input,
-        back_state=CriterionDialog.evaluation_type_name_input,
-    )
-
-
-def evaluation_type_description_input_window():
-    """Create evaluation type description input window.
-
-    Returns:
-        Window: The configured evaluation type description input window.
-    """
-    return create_evaluation_type_description_input_window(
-        state=CriterionDialog.evaluation_type_description_input,
-        process_description_handler=process_evaluation_type_description_input,
-        skip_handler=on_skip_evaluation_type_description,
-        back_state=CriterionDialog.evaluation_type_code_input,
-    )
-
-
-def evaluation_type_confirm_window():
-    """Create evaluation type confirm window.
-
-    Returns:
-        Window: The configured evaluation type confirm window.
-    """
-    return create_evaluation_type_confirm_window(
-        state=CriterionDialog.evaluation_type_confirm,
-        confirm_handler=on_confirm_evaluation_type,
-        back_state=CriterionDialog.evaluation_type_description_input,
     )
 
 
@@ -292,11 +196,52 @@ def select_value_type_window():
             state=CriterionDialog.edit_menu,
             when="is_editing",
         ),
-        Back(
+        SwitchTo(
             Const("Назад"),
+            id="back_value_type_to_select_criterion",
+            state=CriterionDialog.select_criterion,
             when=lambda data, widget, manager: not data.get("is_editing", False),
         ),
         state=CriterionDialog.select_value_type,
+        getter=is_editing,
+    )
+
+
+def select_is_required_window():
+    """Create is_required selection window.
+
+    Returns:
+        Window: The configured is_required selection window.
+    """
+    return Window(
+        Format("Критерий обязателен для заполнения?"),
+        Row(
+            Button(
+                text=Const("Да, обязателен ✅"),
+                id="is_required_yes",
+                on_click=on_select_is_required_yes,
+            ),
+        ),
+        Row(
+            Button(
+                text=Const("Нет, опционален ⚪"),
+                id="is_required_no",
+                on_click=on_select_is_required_no,
+            ),
+        ),
+        SwitchTo(
+            Const("Назад"),
+            id="back_is_required_edit_window",
+            state=CriterionDialog.edit_menu,
+            when="is_editing",
+        ),
+        SwitchTo(
+            Const("Назад"),
+            id="back_is_required_to_value_type",
+            state=CriterionDialog.select_value_type,
+            when=lambda data, widget, manager: not data.get("is_editing", False),
+        ),
+        state=CriterionDialog.select_is_required,
         getter=is_editing,
     )
 
@@ -317,7 +262,7 @@ def name_input_window():
         SwitchTo(
             Const("Назад"),
             id="back_name_input_window",
-            state=CriterionDialog.select_evaluation_type,
+            state=CriterionDialog.select_is_required,
             when=lambda data, widget, manager: not data.get("is_editing", False),
         ),
         SwitchTo(
@@ -411,7 +356,8 @@ def confirm_window():
             "Название: {name}\n"
             "Код: {code}\n"
             "Описание: {description}\n"
-            "Тип оценки: {evaluation_type_name}\n\n"
+            "Тип данных: {value_type_name}\n"
+            "Обязателен: {is_required_name}\n\n"
             "Всё верно?",
             when=lambda data, widget, manager: not data.get("is_editing", False),
         ),
@@ -420,7 +366,8 @@ def confirm_window():
             "Название: {name}\n"
             "Код: {code}\n"
             "Описание: {description}\n"
-            "Тип оценки: {evaluation_type_name}\n\n"
+            "Тип данных: {value_type_name}\n"
+            "Обязателен: {is_required_name}\n\n"
             "Сохранить изменения?",
             when="is_editing",
         ),

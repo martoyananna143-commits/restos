@@ -4,6 +4,7 @@ from aiogram_dialog import Window
 from aiogram_dialog.widgets.input import MessageInput
 from aiogram_dialog.widgets.kbd import (
     Button,
+    Cancel,
     Group,
     Row,
     ScrollingGroup,
@@ -27,6 +28,7 @@ from app.tgbot.dialogs.analytics.handlers import (
     on_ai_message,
     on_cancel_analytics,
     on_clear_ai_history,
+    on_delete_evaluation_from_analytics,
     on_export_object_excel,
     on_export_object_pdf,
     on_finish_selection,
@@ -86,11 +88,7 @@ def select_analytics_type_window():
             ),
             width=1,
         ),
-        SwitchTo(
-            Const("Назад"),
-            id="back_to_organization",
-            state=AnalyticsDialog.select_organization,
-        ),
+        Cancel(Const("Назад ⬅️")),
         state=AnalyticsDialog.select_analytics_type,
         getter=get_analytics_type_data,
     )
@@ -116,6 +114,7 @@ def select_criteria_window():
             width=1,
             height=10,
             when="has_criteria",
+            hide_on_single_page=True,
         ),
         Row(
             Button(
@@ -156,6 +155,7 @@ def select_employees_window():
             width=1,
             height=10,
             when="has_employees",
+            hide_on_single_page=True,
         ),
         Row(
             Button(
@@ -509,6 +509,14 @@ def object_detail_window():
                 text=Const("📊 Экспорт в Excel"),
                 id="export_object_excel",
                 on_click=on_export_object_excel,
+            ),
+        ),
+        Row(
+            Button(
+                text=Const("🗑️ Удалить замер"),
+                id="delete_evaluation_from_analytics",
+                on_click=on_delete_evaluation_from_analytics,
+                when="is_evaluation",
             ),
         ),
         SwitchTo(

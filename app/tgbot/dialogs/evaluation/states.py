@@ -16,6 +16,7 @@ class EvaluationDialog(StatesGroup):
     select_evaluated_employee = State()
     select_criterion_set = State()  # Опционально, если есть дефолтный набор
     combine_criterion_sets = State()  # Выбор нескольких наборов для комбинирования
+    select_evaluation_method = State()  # Выбор метода: бот или веб-форма
     question_loop = State()  # Цикл вопросов
     answer_question = State()  # Выбор Да/Нет для вопроса (boolean)
     answer_text = State()  # Ввод текста для вопроса (string)
@@ -23,4 +24,5 @@ class EvaluationDialog(StatesGroup):
     add_comment = State()  # Опциональный комментарий
     send_to_employee = State()  # Отправка результата
     generate_pdf = State()  # Генерация PDF отчета
+    select_evaluation_to_delete = State()  # Выбор замера для удаления
 

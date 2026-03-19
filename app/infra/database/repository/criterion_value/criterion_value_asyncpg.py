@@ -81,14 +81,19 @@ class CriterionValueRepositoryAsyncpg:
                 # Поддержка старого формата (value) и нового (value_json)
                 if row.get("value_json"):
                     value_data = row["value_json"]
+                    if isinstance(value_data, str):
+                        try:
+                            value_data = json.loads(value_data)
+                        except (TypeError, ValueError):
+                            value_data = {}
                     if isinstance(value_data, dict):
-                        value = value_data.get("value")
-                        # Преобразуем тип в зависимости от типа в JSON
-                        if value_data.get("type") == "boolean":
+                        value = value_data.get("value") or value_data.get("Value")
+                        # Преобразуем тип в зависимости от типа в JSON; None не превращаем в False
+                        if value_data.get("type") == "boolean" and value is not None:
                             value = bool(value)
-                        elif value_data.get("type") == "number":
+                        elif value_data.get("type") == "number" and value is not None:
                             value = float(value) if "." in str(value) else int(value)
-                        elif value_data.get("type") == "string":
+                        elif value_data.get("type") == "string" and value is not None:
                             value = str(value)
                     else:
                         value = value_data
@@ -135,19 +140,22 @@ class CriterionValueRepositoryAsyncpg:
             # Поддержка старого формата (value) и нового (value_json)
             if row.get("value_json"):
                 value_data = row["value_json"]
+                if isinstance(value_data, str):
+                    try:
+                        value_data = json.loads(value_data)
+                    except (TypeError, ValueError):
+                        value_data = {}
                 if isinstance(value_data, dict):
-                    value = value_data.get("value")
-                    # Преобразуем тип в зависимости от типа в JSON
-                    if value_data.get("type") == "boolean":
+                    value = value_data.get("value") or value_data.get("Value")
+                    if value_data.get("type") == "boolean" and value is not None:
                         value = bool(value)
-                    elif value_data.get("type") == "number":
+                    elif value_data.get("type") == "number" and value is not None:
                         value = float(value) if "." in str(value) else int(value)
-                    elif value_data.get("type") == "string":
+                    elif value_data.get("type") == "string" and value is not None:
                         value = str(value)
                 else:
                     value = value_data
             else:
-                # Обратная совместимость со старым форматом
                 value = row["value"]
 
             return CriterionValueDTO(

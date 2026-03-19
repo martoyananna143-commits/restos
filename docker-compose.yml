@@ -17,6 +17,9 @@ services:
       interval: 5s
       timeout: 10s
       retries: 5
+    # Removed exposed ports - only internal network access
+    networks:
+      - restos_internal
 
   redis:
     container_name: restos_redis
@@ -30,6 +33,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    # Removed exposed ports - only internal network access
+    networks:
+      - restos_internal
 
   bot:
     container_name: restos_bot
@@ -44,6 +50,9 @@ services:
       dockerfile: ./docker/bot/bot.Dockerfile
     command: [ "poetry", "run", "python", "local_bot.py"]
     restart: always
+    # Only expose port 8000 for webhook/API (change to internal only in production)
+    ports:
+      - "8000:8000"
     environment:
       - TGBOT_TOKEN=${TGBOT_TOKEN}
       - TGBOT_ADMIN_IDS=${TGBOT_ADMIN_IDS}
@@ -55,6 +64,27 @@ services:
       - DATABASE_POOL_SIZE=${DATABASE_POOL_SIZE:-10}
       - DATABASE_MAX_OVERFLOW=${DATABASE_MAX_OVERFLOW:-20}
       - DATABASE_POOL_RECYCLE=${DATABASE_POOL_RECYCLE:-3600}
+    networks:
+      - restos_internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+
+  dioxus-form:
+    container_name: restos_dioxus_form
+    build:
+      context: .
+      dockerfile: ./docker/dioxus/Dockerfile
+    restart: unless-stopped
+    # Only expose internally or through reverse proxy
+    ports:
+      - "8080:8080"
+    environment:
+      - RUST_LOG=info
+    networks:
+      - restos_internal
     logging:
       driver: "json-file"
       options:
@@ -65,3 +95,11 @@ services:
 volumes:
   restos_postgres_data:
   restos_redis_data:
+
+# Internal network for secure service communication
+networks:
+  restos_internal:
+    driver: bridge
+    internal: false  # Set to true for completely isolated network (no external access)
+
+

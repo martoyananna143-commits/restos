@@ -17,11 +17,13 @@ class UserDTO:
     chat_id: int
     is_verified: bool
     is_active: bool
+    is_bot_administrator: bool
     joined_at: datetime
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime] = None
     version: Optional[int] = None
+    current_organization_id: Optional[int] = None
 
 
 @dataclass
@@ -35,6 +37,7 @@ class CreateUserDTO:
     chat_id: int
     is_verified: bool = False
     is_active: bool = True
+    is_bot_administrator: bool = False
     joined_at: datetime = None
 
 
@@ -48,7 +51,9 @@ class UpdateUserDTO:
     last_name: Optional[str] = None
     is_verified: Optional[bool] = None
     is_active: Optional[bool] = None
+    is_bot_administrator: Optional[bool] = None
     version: Optional[int] = None
+    current_organization_id: Optional[int] = None
 
 
 @dataclass

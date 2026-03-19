@@ -30,6 +30,9 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
 
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_bot_administrator: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    current_organization_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 

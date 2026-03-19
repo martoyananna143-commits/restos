@@ -10,6 +10,7 @@ class EvaluationTypeDTO:
     """Data Transfer Object for EvaluationType."""
 
     id: int
+    organization_id: Optional[int]
     name: str
     code: str
     description: Optional[str]
@@ -24,6 +25,7 @@ class EvaluationTypeDTO:
 class CreateEvaluationTypeDTO:
     """Data Transfer Object for creating EvaluationType."""
 
+    organization_id: int
     name: str
     code: str
     description: Optional[str] = None

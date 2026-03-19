@@ -115,6 +115,11 @@ async def get_criteria_list_data(
     """
     organization_id = dialog_manager.dialog_data.get("organization_id")
     if not organization_id:
+        org = dialog_manager.middleware_data.get("organization")
+        if org:
+            organization_id = org.id
+            dialog_manager.dialog_data["organization_id"] = organization_id
+    if not organization_id:
         return {"criteria": [], "has_criteria": False}
 
     criteria = await criterion_service.get_by_organization_id(organization_id)
@@ -171,6 +176,11 @@ async def get_employees_list_data(
         Dictionary with employees list data.
     """
     organization_id = dialog_manager.dialog_data.get("organization_id")
+    if not organization_id:
+        org = dialog_manager.middleware_data.get("organization")
+        if org:
+            organization_id = org.id
+            dialog_manager.dialog_data["organization_id"] = organization_id
     if not organization_id:
         return {"employees": [], "has_employees": False}
 
@@ -633,7 +643,6 @@ def _format_criterion(criterion) -> str:
     crit_info = f"📋 {criterion.name}\n"
     crit_info += f"   ID: {criterion.id} | Код: {criterion.code}\n"
     crit_info += f"   Тип значения: {criterion.value_type}\n"
-    crit_info += f"   Тип оценки ID: {criterion.evaluation_type_id}\n"
     if criterion.category_id:
         crit_info += f"   Категория ID: {criterion.category_id}\n"
     crit_info += f"   Обязательный: {'Да' if criterion.is_required else 'Нет'}\n"
@@ -817,6 +826,262 @@ async def get_ai_view_data(
             "current_page": 0,
             "total_pages": 0,
         }
+
+
+async def _load_data_context(
+    data_type: str,
+    organization_id: int,
+    org_name: str,
+    dialog_manager,
+    analytics_service,
+    organization_service,
+    criterion_service,
+    employee_service,
+) -> str:
+    """Load data context from DB for AI assistant.
+
+    Extracted as a standalone function so it can be called both from
+    the getter and from the message handler (as a fallback).
+
+    Returns:
+        Formatted data context string.
+    """
+    context_parts: List[str] = []
+    try:
+        if data_type in ["organizations", "all"]:
+            orgs_data = await get_organizations_list_data(dialog_manager)
+            organizations = orgs_data.get("organizations", [])
+
+            context_parts.append(f"🏢 Организации ({len(organizations)}):")
+            for org in organizations[:50]:
+                o_name = getattr(org, "name", "N/A")
+                o_id = getattr(org, "id", "N/A")
+                o_code = getattr(org, "code", "N/A")
+                o_address = getattr(org, "address", None)
+                o_phone = getattr(org, "phone", None)
+                o_active = getattr(org, "is_active", True)
+                org_info = (
+                    f"  - {o_name} (ID: {o_id}, Код: {o_code}, "
+                    f"Активна: {'Да' if o_active else 'Нет'}"
+                )
+                if o_address:
+                    org_info += f", Адрес: {o_address}"
+                if o_phone:
+                    org_info += f", Телефон: {o_phone}"
+                org_info += ")"
+                context_parts.append(org_info)
+            if len(organizations) > 50:
+                context_parts.append(
+                    f"  ... и еще {len(organizations) - 50} организаций"
+                )
+            context_parts.append("")
+
+        if data_type in ["employees", "all"]:
+            employees = await employee_service.get_by_organization_id(organization_id)
+            context_parts.append(
+                f"👥 Сотрудники организации '{org_name}' ({len(employees)}):"
+            )
+            for employee in employees[:100]:
+                hire_date_str = (
+                    employee.hire_date.strftime("%Y-%m-%d")
+                    if employee.hire_date
+                    else "Не указана"
+                )
+                context_parts.append(
+                    f"  - {employee.full_name} (ID: {employee.id}, "
+                    f"Должность: {employee.position or 'Не указана'}, "
+                    f"Телефон: {employee.phone or 'Не указан'}, "
+                    f"Telegram ID: {employee.telegram_id or 'Не указан'}, "
+                    f"Username: {employee.username or 'Не указан'}, "
+                    f"Дата найма: {hire_date_str}, "
+                    f"Активен: {'Да' if employee.is_active else 'Нет'})"
+                )
+            if len(employees) > 100:
+                context_parts.append(
+                    f"  ... и еще {len(employees) - 100} сотрудников"
+                )
+            context_parts.append("")
+
+        if data_type in ["evaluations", "all"]:
+            evaluations_data = (
+                await analytics_service.evaluation_repository.get_analytics_data(
+                    organization_id=organization_id,
+                    criterion_ids=None,
+                    employee_ids=None,
+                    date_from=None,
+                    date_to=None,
+                    evaluation_type_id=None,
+                )
+            )
+
+            employee_ids_set = set()
+            for eval_data in evaluations_data:
+                filled_by_id = eval_data.get("filled_by_employee_id")
+                evaluated_id = eval_data.get("evaluated_employee_id")
+                if filled_by_id:
+                    employee_ids_set.add(filled_by_id)
+                if evaluated_id:
+                    employee_ids_set.add(evaluated_id)
+
+            employee_names_map = {}
+            if employee_ids_set:
+                employees_list = await employee_service.get_by_organization_id(
+                    organization_id
+                )
+                for emp in employees_list:
+                    if emp.id in employee_ids_set:
+                        employee_names_map[emp.id] = emp.full_name
+
+            criterion_ids_set = set()
+            for eval_data in evaluations_data:
+                criterion_values = eval_data.get("criterion_values", [])
+                for cv in criterion_values:
+                    criterion_id = cv.get("criterion_id")
+                    if criterion_id:
+                        criterion_ids_set.add(criterion_id)
+
+            criterion_names_map = {}
+            if criterion_ids_set:
+                criteria_list = await criterion_service.get_by_organization_id(
+                    organization_id
+                )
+                for crit in criteria_list:
+                    if crit.id in criterion_ids_set:
+                        criterion_names_map[crit.id] = crit.name
+
+            context_parts.append(
+                f"📊 Замеры организации '{org_name}' ({len(evaluations_data)}):"
+            )
+
+            date_stats: Dict[str, int] = defaultdict(int)
+            employee_eval_stats: Dict[int, int] = defaultdict(int)
+
+            for eval_data in evaluations_data[:100]:
+                eval_id = eval_data.get("id")
+                eval_date = eval_data.get("evaluation_date")
+                filled_by_id = eval_data.get("filled_by_employee_id")
+                evaluated_id = eval_data.get("evaluated_employee_id")
+                eval_type_id = eval_data.get("evaluation_type_id")
+                score = eval_data.get("score_percentage", 0.0)
+                total_criteria = eval_data.get("total_criteria", 0)
+                passed_criteria = eval_data.get("passed_criteria", 0)
+                failed_criteria = eval_data.get("failed_criteria", 0)
+                comment = eval_data.get("comment")
+                status = eval_data.get("status", "unknown")
+                criterion_values = eval_data.get("criterion_values", [])
+
+                if eval_date:
+                    date_stats[eval_date.strftime("%Y-%m-%d")] += 1
+                if evaluated_id:
+                    employee_eval_stats[evaluated_id] += 1
+
+                filled_by_name = (
+                    employee_names_map.get(filled_by_id, f"ID {filled_by_id}")
+                    if filled_by_id and isinstance(filled_by_id, int)
+                    else "Не указан"
+                )
+                evaluated_name = (
+                    employee_names_map.get(evaluated_id, f"ID {evaluated_id}")
+                    if evaluated_id and isinstance(evaluated_id, int)
+                    else (
+                        "Самозаполнение"
+                        if not evaluated_id
+                        else f"ID {evaluated_id}"
+                    )
+                )
+
+                eval_info = (
+                    f"  - Замер #{eval_id}: "
+                    f"Дата: {eval_date.strftime('%Y-%m-%d %H:%M') if eval_date else 'N/A'}, "
+                    f"Тип замера ID: {eval_type_id}, "
+                    f"Заполнил: {filled_by_name}, "
+                    f"Оцениваемый: {evaluated_name}, "
+                    f"Балл: {score:.1f}%, "
+                    f"Всего критериев: {total_criteria}, "
+                    f"Прошло: {passed_criteria}, "
+                    f"Не прошло: {failed_criteria}, "
+                    f"Статус: {status}"
+                )
+                if comment:
+                    eval_info += f", Комментарий: {comment[:100]}"
+                context_parts.append(eval_info)
+
+                if criterion_values:
+                    context_parts.append(
+                        f"    Значения критериев ({len(criterion_values)}):"
+                    )
+                    for cv in criterion_values[:10]:
+                        criterion_id = cv.get("criterion_id")
+                        criterion_name = criterion_names_map.get(
+                            criterion_id, f"Критерий ID {criterion_id}"
+                        )
+                        value = cv.get("value")
+                        value_type = cv.get("value_type", "boolean")
+                        notes = cv.get("notes")
+                        cv_info = f"      - {criterion_name}: "
+                        if value_type == "boolean":
+                            cv_info += f"{'Да' if value else 'Нет'}"
+                        elif value_type == "number":
+                            cv_info += f"{value}"
+                        elif value_type == "string":
+                            cv_info += f"'{value}'"
+                        else:
+                            cv_info += f"{value}"
+                        if notes:
+                            cv_info += f" (Примечание: {notes[:50]})"
+                        context_parts.append(cv_info)
+                    if len(criterion_values) > 10:
+                        context_parts.append(
+                            f"      ... и еще {len(criterion_values) - 10} значений"
+                        )
+
+            if len(evaluations_data) > 100:
+                context_parts.append(
+                    f"  ... и еще {len(evaluations_data) - 100} замеров"
+                )
+            context_parts.extend(
+                [
+                    "",
+                    f"  Статистика: Замеров по дням: {len(date_stats)} уникальных дней, "
+                    f"Сотрудников с замерами: {len(employee_eval_stats)}",
+                    "",
+                ]
+            )
+
+        if data_type in ["criteria", "all"]:
+            criteria = await criterion_service.get_by_organization_id(organization_id)
+            context_parts.append(
+                f"📋 Критерии организации '{org_name}' ({len(criteria)}):"
+            )
+            for criterion in criteria[:100]:
+                context_parts.append(
+                    f"  - {criterion.name} (ID: {criterion.id}, Код: {criterion.code}, "
+                    f"Тип: {criterion.value_type}, "
+                    f"Категория ID: {criterion.category_id or 'Нет'}, "
+                    f"Обязательный: {'Да' if criterion.is_required else 'Нет'}, "
+                    f"Активен: {'Да' if criterion.is_active else 'Нет'}, "
+                    f"Порядок сортировки: {criterion.sort_order}, "
+                    f"Описание: {criterion.description or 'Нет'})"
+                )
+            if len(criteria) > 100:
+                context_parts.append(f"  ... и еще {len(criteria) - 100} критериев")
+            context_parts.append("")
+
+        if data_type == "all":
+            context_parts.insert(
+                0,
+                f"Данные для анализа организации '{org_name}' (ID: {organization_id}):",
+            )
+            context_parts.insert(1, "")
+
+        data_context = "\n".join(context_parts)
+        if not data_context.strip():
+            data_context = f"Нет данных для типа '{data_type}' в организации '{org_name}'."
+        return data_context
+
+    except Exception as e:
+        logger.error("Error loading data for AI assistant: %s", e, exc_info=True)
+        return f"❌ Ошибка при загрузке данных: {e}"
 
 
 @inject
@@ -1009,265 +1274,36 @@ async def get_ai_assistant_data(
     organization = await organization_service.get_by_id(organization_id)
     org_name = organization.name if organization else f"Организация #{organization_id}"
 
-    # Загружаем данные в зависимости от выбранного типа
-    context_parts = []
-    try:
-        if data_type in ["organizations", "all"]:
-            # Загружаем данные об организациях
-            orgs_data = await get_organizations_list_data(dialog_manager)
-            organizations = orgs_data.get("organizations", [])
-
-            context_parts.extend(
-                [
-                    f"🏢 Организации ({len(organizations)}):",
-                ]
-            )
-            for org in organizations[:50]:
-                # org это OrganizationDTO объект
-                org_name = getattr(org, "name", "N/A")
-                org_id = getattr(org, "id", "N/A")
-                org_code = getattr(org, "code", "N/A")
-                org_address = getattr(org, "address", None)
-                org_phone = getattr(org, "phone", None)
-                org_active = getattr(org, "is_active", True)
-                org_info = f"  - {org_name} (ID: {org_id}, Код: {org_code}, Активна: {'Да' if org_active else 'Нет'}"
-                if org_address:
-                    org_info += f", Адрес: {org_address}"
-                if org_phone:
-                    org_info += f", Телефон: {org_phone}"
-                org_info += ")"
-                context_parts.append(org_info)
-            if len(organizations) > 50:
-                context_parts.append(
-                    f"  ... и еще {len(organizations) - 50} организаций"
-                )
-            context_parts.append("")
-
-        if data_type in ["employees", "all"]:
-            # Загружаем данные о сотрудниках
-            employees = await employee_service.get_by_organization_id(organization_id)
-            context_parts.extend(
-                [
-                    f"👥 Сотрудники организации '{org_name}' ({len(employees)}):",
-                ]
-            )
-            for employee in employees[:100]:
-                hire_date_str = (
-                    employee.hire_date.strftime("%Y-%m-%d")
-                    if employee.hire_date
-                    else "Не указана"
-                )
-                context_parts.append(
-                    f"  - {employee.full_name} (ID: {employee.id}, "
-                    f"Должность: {employee.position or 'Не указана'}, "
-                    f"Телефон: {employee.phone or 'Не указан'}, "
-                    f"Telegram ID: {employee.telegram_id or 'Не указан'}, "
-                    f"Username: {employee.username or 'Не указан'}, "
-                    f"Дата найма: {hire_date_str}, "
-                    f"Активен: {'Да' if employee.is_active else 'Нет'})"
-                )
-            if len(employees) > 100:
-                context_parts.append(f"  ... и еще {len(employees) - 100} сотрудников")
-            context_parts.append("")
-
-        if data_type in ["evaluations", "all"]:
-            # Загружаем данные о замерах
-            evaluations_data = (
-                await analytics_service.evaluation_repository.get_analytics_data(
-                    organization_id=organization_id,
-                    criterion_ids=None,
-                    employee_ids=None,
-                    date_from=None,
-                    date_to=None,
-                    evaluation_type_id=None,
-                )
-            )
-
-            # Получаем имена сотрудников для замеров
-            employee_ids_set = set()
-            for eval_data in evaluations_data:
-                filled_by_id = eval_data.get("filled_by_employee_id")
-                evaluated_id = eval_data.get("evaluated_employee_id")
-                if filled_by_id:
-                    employee_ids_set.add(filled_by_id)
-                if evaluated_id:
-                    employee_ids_set.add(evaluated_id)
-
-            employee_names_map = {}
-            if employee_ids_set:
-                employees_list = await employee_service.get_by_organization_id(
-                    organization_id
-                )
-                for emp in employees_list:
-                    if emp.id in employee_ids_set:
-                        employee_names_map[emp.id] = emp.full_name
-
-            # Получаем имена критериев для замеров
-            criterion_ids_set = set()
-            for eval_data in evaluations_data:
-                criterion_values = eval_data.get("criterion_values", [])
-                for cv in criterion_values:
-                    criterion_id = cv.get("criterion_id")
-                    if criterion_id:
-                        criterion_ids_set.add(criterion_id)
-
-            criterion_names_map = {}
-            if criterion_ids_set:
-                criteria_list = await criterion_service.get_by_organization_id(
-                    organization_id
-                )
-                for crit in criteria_list:
-                    if crit.id in criterion_ids_set:
-                        criterion_names_map[crit.id] = crit.name
-
-            context_parts.extend(
-                [
-                    f"📊 Замеры организации '{org_name}' ({len(evaluations_data)}):",
-                ]
-            )
-
-            # Группируем по датам и сотрудникам
-            date_stats: Dict[str, int] = defaultdict(int)
-            employee_eval_stats: Dict[int, int] = defaultdict(int)
-
-            for eval_data in evaluations_data[
-                :100
-            ]:  # Уменьшили до 100, но добавим больше деталей
-                eval_id = eval_data.get("id")
-                eval_date = eval_data.get("evaluation_date")
-                filled_by_id = eval_data.get("filled_by_employee_id")
-                evaluated_id = eval_data.get("evaluated_employee_id")
-                eval_type_id = eval_data.get("evaluation_type_id")
-                score = eval_data.get("score_percentage", 0.0)
-                total_criteria = eval_data.get("total_criteria", 0)
-                passed_criteria = eval_data.get("passed_criteria", 0)
-                failed_criteria = eval_data.get("failed_criteria", 0)
-                comment = eval_data.get("comment")
-                status = eval_data.get("status", "unknown")
-                criterion_values = eval_data.get("criterion_values", [])
-
-                if eval_date:
-                    date_key = eval_date.strftime("%Y-%m-%d")
-                    date_stats[date_key] += 1
-
-                if evaluated_id:
-                    employee_eval_stats[evaluated_id] += 1
-
-                # Получаем имена сотрудников
-                filled_by_name = (
-                    employee_names_map.get(filled_by_id, f"ID {filled_by_id}")
-                    if filled_by_id and isinstance(filled_by_id, int)
-                    else "Не указан"
-                )
-                evaluated_name = (
-                    employee_names_map.get(evaluated_id, f"ID {evaluated_id}")
-                    if evaluated_id and isinstance(evaluated_id, int)
-                    else (
-                        "Самозаполнение" if not evaluated_id else f"ID {evaluated_id}"
-                    )
-                )
-
-                # Основная информация о замере
-                eval_info = (
-                    f"  - Замер #{eval_id}: "
-                    f"Дата: {eval_date.strftime('%Y-%m-%d %H:%M') if eval_date else 'N/A'}, "
-                    f"Тип замера ID: {eval_type_id}, "
-                    f"Заполнил: {filled_by_name}, "
-                    f"Оцениваемый: {evaluated_name}, "
-                    f"Балл: {score:.1f}%, "
-                    f"Всего критериев: {total_criteria}, "
-                    f"Прошло: {passed_criteria}, "
-                    f"Не прошло: {failed_criteria}, "
-                    f"Статус: {status}"
-                )
-                if comment:
-                    eval_info += f", Комментарий: {comment[:100]}"
-                context_parts.append(eval_info)
-
-                # Добавляем значения критериев для этого замера (первые 10)
-                if criterion_values:
-                    context_parts.append(
-                        f"    Значения критериев ({len(criterion_values)}):"
-                    )
-                    for cv in criterion_values[:10]:
-                        criterion_id = cv.get("criterion_id")
-                        criterion_name = criterion_names_map.get(
-                            criterion_id, f"Критерий ID {criterion_id}"
-                        )
-                        value = cv.get("value")
-                        value_type = cv.get("value_type", "boolean")
-                        notes = cv.get("notes")
-                        cv_info = f"      - {criterion_name}: "
-                        if value_type == "boolean":
-                            cv_info += f"{'Да' if value else 'Нет'}"
-                        elif value_type == "number":
-                            cv_info += f"{value}"
-                        elif value_type == "string":
-                            cv_info += f"'{value}'"
-                        else:
-                            cv_info += f"{value}"
-                        if notes:
-                            cv_info += f" (Примечание: {notes[:50]})"
-                        context_parts.append(cv_info)
-                    if len(criterion_values) > 10:
-                        context_parts.append(
-                            f"      ... и еще {len(criterion_values) - 10} значений критериев"
-                        )
-
-            if len(evaluations_data) > 100:
-                context_parts.append(
-                    f"  ... и еще {len(evaluations_data) - 100} замеров"
-                )
-
-            context_parts.extend(
-                [
-                    "",
-                    f"  Статистика: Замеров по дням: {len(date_stats)} уникальных дней, "
-                    f"Сотрудников с замерами: {len(employee_eval_stats)}",
-                    "",
-                ]
-            )
-
-        if data_type in ["criteria", "all"]:
-            # Загружаем данные о критериях
-            criteria = await criterion_service.get_by_organization_id(organization_id)
-            context_parts.extend(
-                [
-                    f"📋 Критерии организации '{org_name}' ({len(criteria)}):",
-                ]
-            )
-            for criterion in criteria[:100]:
-                context_parts.append(
-                    f"  - {criterion.name} (ID: {criterion.id}, Код: {criterion.code}, "
-                    f"Тип: {criterion.value_type}, "
-                    f"Тип оценки ID: {criterion.evaluation_type_id}, "
-                    f"Категория ID: {criterion.category_id or 'Нет'}, "
-                    f"Обязательный: {'Да' if criterion.is_required else 'Нет'}, "
-                    f"Активен: {'Да' if criterion.is_active else 'Нет'}, "
-                    f"Порядок сортировки: {criterion.sort_order}, "
-                    f"Описание: {criterion.description or 'Нет'})"
-                )
-            if len(criteria) > 100:
-                context_parts.append(f"  ... и еще {len(criteria) - 100} критериев")
-            context_parts.append("")
-
-        # Добавляем общую информацию об организации
-        if data_type == "all":
-            context_parts.insert(
-                0,
-                f"Данные для анализа организации '{org_name}' (ID: {organization_id}):",
-            )
-            context_parts.insert(1, "")
-
-        data_context = "\n".join(context_parts)
-        
-        # Cache data_context in dialog_data to avoid recalculating in handlers
+    # ──────────────────────────────────────────────────────────────
+    # CACHE-FIRST: если data_context уже загружен и валиден,
+    # НЕ перезагружаем из БД (предотвращает потерю данных при
+    # bg.update() ре-рендере и убирает избыточные DB запросы).
+    # ──────────────────────────────────────────────────────────────
+    cached_context = dialog_manager.dialog_data.get("ai_data_context", "")
+    if cached_context and not cached_context.startswith("❌"):
+        data_context = cached_context
+        logger.debug(
+            "Using cached data_context (%d chars) for data_type=%s",
+            len(data_context), data_type,
+        )
+    else:
+        # Загружаем данные в зависимости от выбранного типа
+        data_context = await _load_data_context(
+            data_type=data_type,
+            organization_id=organization_id,
+            org_name=org_name,
+            dialog_manager=dialog_manager,
+            analytics_service=analytics_service,
+            organization_service=organization_service,
+            criterion_service=criterion_service,
+            employee_service=employee_service,
+        )
+        # Cache data_context in dialog_data
         dialog_manager.dialog_data["ai_data_context"] = data_context
-
-    except Exception as e:
-        logger.error(f"Error loading data for AI assistant: {e}", exc_info=True)
-        data_context = f"❌ Ошибка при загрузке данных: {str(e)}"
-        dialog_manager.dialog_data["ai_data_context"] = data_context
+        logger.info(
+            "Loaded and cached data_context (%d chars) for data_type=%s",
+            len(data_context), data_type,
+        )
 
     # Проверяем последний ответ
     last_response = dialog_manager.dialog_data.get("ai_last_response")
@@ -1289,19 +1325,31 @@ async def get_ai_assistant_data(
             f"is_error={is_error_message}, has_data={bool(data_context)}"
         )
 
+    # Telegram message limit is 4096 chars, keep some buffer
+    MAX_MESSAGE_LEN = 3800
+    MAX_RESPONSE_LEN = 3000
+    
     if processing_message:
         # Показываем сообщение о том, что запрос обрабатывается (приоритет)
         assistant_message = processing_message
     elif last_response:
         # Если есть ответ, показываем его автоматически (если не обрабатывается запрос)
         # Это нужно для случая, когда ответ приходит через bg.update()
-        # Показываем ответ ПЕРЕД данными
+        # Обрезаем ответ если слишком длинный
+        truncated_response = last_response
+        if len(last_response) > MAX_RESPONSE_LEN:
+            truncated_response = last_response[:MAX_RESPONSE_LEN] + "\n\n... (ответ обрезан из-за ограничений Telegram)"
+        
+        # Показываем ответ БЕЗ полного data_context (он уже в system message)
         assistant_message = (
             "🤖 Последний ответ ассистента:\n\n"
-            f"{last_response}\n\n"
-            "💬 Задайте следующий вопрос:\n\n"
-            f"📊 Данные для анализа:\n{data_context}"
+            f"{truncated_response}\n\n"
+            "💬 Задайте следующий вопрос:"
         )
+        
+        # Проверяем общую длину и обрезаем если нужно
+        if len(assistant_message) > MAX_MESSAGE_LEN:
+            assistant_message = assistant_message[:MAX_MESSAGE_LEN] + "..."
     elif not conversation_history:
         data_type_names = {
             "organizations": "организаций",
@@ -1331,12 +1379,13 @@ async def get_ai_assistant_data(
 
         assistant_message += "\nИли задайте любой другой вопрос по данным!"
     else:
+        # Продолжение разговора - данные уже в system message
         assistant_message = (
             "💬 Продолжаем разговор. Задайте следующий вопрос:\n\n"
-            f"📊 Данные для анализа:\n{data_context[:500]}..."
-            if len(data_context) > 500
-            else f"📊 Данные для анализа:\n{data_context}"
+            f"📊 Данные загружены ({len(data_context)} символов)"
         )
+        if len(assistant_message) > MAX_MESSAGE_LEN:
+            assistant_message = assistant_message[:MAX_MESSAGE_LEN] + "..."
 
     # Определяем, находимся ли мы на окне AI-чата
     is_on_ai_chat_window = False

@@ -5,6 +5,7 @@ from aiogram_dialog.widgets.input import MessageInput
 from aiogram_dialog.widgets.kbd import (
     Back,
     Button,
+    Cancel,
     Row,
     ScrollingGroup,
     Select,
@@ -12,7 +13,6 @@ from aiogram_dialog.widgets.kbd import (
 )
 from aiogram_dialog.widgets.text import Const, Format
 
-from app.tgbot.dialogs.common.criterion_set import create_criterion_set_select_window
 from app.tgbot.dialogs.common.organization import create_organization_select_window
 from app.tgbot.dialogs.criterion_set.getters import (
     get_criteria_list_data,
@@ -30,6 +30,7 @@ from app.tgbot.dialogs.criterion_set.handlers import (
     on_edit_description,
     on_edit_name,
     on_finish_criteria_selection,
+    on_open_criteria_select_webapp,
     on_save_changes,
     on_select_existing_set,
     on_set_default_no,
@@ -78,13 +79,13 @@ def select_set_window():
             width=1,
             height=10,
             when="has_criterion_sets",
+            hide_on_single_page=True,
         ),
         Row(
             Button(
                 text=Const("Создать новый набор ➕"),
                 id="create_new_set",
                 on_click=on_create_new_set,
-                when="no_criterion_sets",
             ),
         ),
         Row(
@@ -94,11 +95,7 @@ def select_set_window():
                 on_click=on_upload_excel_clicked,
             ),
         ),
-        SwitchTo(
-            Const("Назад"),
-            id="back_criterion_set",
-            state=CriterionSetDialog.select_organization,
-        ),
+        Cancel(Const("Назад ⬅️")),
         state=CriterionSetDialog.select_set,
         getter=get_criterion_sets_list_data,
     )
@@ -138,6 +135,13 @@ def edit_menu_window():
                 text=Const("Изменить критерии 📋"),
                 id="edit_criteria",
                 on_click=on_edit_criteria,
+            ),
+        ),
+        Row(
+            Button(
+                text=Const("📱 Выбрать критерии (Mini App)"),
+                id="criteria_webapp",
+                on_click=on_open_criteria_select_webapp,
             ),
         ),
         Row(
@@ -269,7 +273,7 @@ def select_criteria_window():
         ),
         ScrollingGroup(
             Select(
-                Format("{item[name]} {item[selected_marker]}"),
+                Format("{item[selected_marker]}{item[name]}"),
                 item_id_getter=lambda c: c["id"] if isinstance(c, dict) else c.id,
                 items="criteria",
                 id="toggle_criterion",
@@ -279,6 +283,7 @@ def select_criteria_window():
             width=1,
             height=10,
             when="has_criteria",
+            hide_on_single_page=True,
         ),
         Row(
             Button(
@@ -411,14 +416,17 @@ def upload_excel_window():
     return Window(
         Const(
             "Загрузите Excel файл с критериями и наборами.\n\n"
-            "Формат файла:\n"
-            "• Колонка 1: Название набора критериев\n"
-            "• Колонка 2: Вопрос критерия\n"
-            "• Колонка 3: Тип критерия (bool, str, num)\n\n"
+            "Формат файла (4 колонки):\n"
+            "• Колонка 1: Название объединённого набора\n"
+            "• Колонка 2: Название субнабора критериев\n"
+            "• Колонка 3: Вопрос критерия\n"
+            "• Колонка 4: Тип критерия (bool, str, num)\n\n"
             "Пример:\n"
-            "Набор 1 | Вопрос 1? | bool\n"
-            "Набор 1 | Вопрос 2? | str\n"
-            "Набор 2 | Вопрос 3? | num\n\n"
+            "Набор объединяющий | СубНабор 1 | Вопрос 1? | bool\n"
+            "Набор объединяющий | СубНабор 1 | Вопрос 2? | str\n"
+            "Набор объединяющий | СубНабор 2 | Вопрос 3? | num\n\n"
+            "Субнаборы создаются автоматически.\n"
+            "Объединённый набор объединяет все вопросы субнаборов в порядке файла.\n\n"
             "Отправьте Excel файл (.xlsx):"
         ),
         MessageInput(process_excel_upload),

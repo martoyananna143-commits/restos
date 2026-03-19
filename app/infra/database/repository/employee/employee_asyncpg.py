@@ -44,6 +44,45 @@ class EmployeeRepositoryAsyncpg:
             return meta_raw
         return {}
 
+    async def get_all(self) -> list[EmployeeDTO]:
+        """Get all employees across all organizations.
+
+        Returns:
+            List of EmployeeDTO instances.
+        """
+        async with get_connection(self._pool) as conn:
+            rows = await conn.fetch_b(
+                """
+                SELECT
+                    id, telegram_id, employee_type_id, organization_id,
+                    full_name, username, phone, position, hire_date,
+                    is_active, meta, created_at, updated_at, deleted_at
+                FROM employees
+                WHERE deleted_at IS NULL
+                ORDER BY organization_id ASC, created_at DESC
+                """,
+            )
+
+            return [
+                EmployeeDTO(
+                    id=row["id"],
+                    telegram_id=row["telegram_id"],
+                    employee_type_id=row["employee_type_id"],
+                    organization_id=row["organization_id"],
+                    full_name=row["full_name"],
+                    username=row["username"],
+                    phone=row["phone"],
+                    position=row["position"],
+                    hire_date=row["hire_date"],
+                    is_active=row["is_active"],
+                    meta=self._normalize_meta(row["meta"]),
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                    deleted_at=row["deleted_at"],
+                )
+                for row in rows
+            ]
+
     async def get_by_organization_id(self, organization_id: int) -> list[EmployeeDTO]:
         """Get all employees by organization ID.
 
@@ -457,14 +496,7 @@ class EmployeeRepositoryAsyncpg:
     async def get_by_organization_id_with_deleted(
         self, organization_id: int
     ) -> list[EmployeeDTO]:
-        """Get all employees by organization ID including deleted ones.
-
-        Args:
-            organization_id: Organization ID.
-
-        Returns:
-            List of EmployeeDTO instances (including deleted).
-        """
+        """Get all employees by organization ID including deleted ones."""
         async with get_connection(self._pool) as conn:
             rows = await conn.fetch_b(
                 """
@@ -478,7 +510,6 @@ class EmployeeRepositoryAsyncpg:
                 """,
                 organization_id=organization_id,
             )
-
             return [
                 EmployeeDTO(
                     id=row["id"],
@@ -498,3 +529,59 @@ class EmployeeRepositoryAsyncpg:
                 )
                 for row in rows
             ]
+
+    async def get_by_web_login(self, login: str) -> Optional[EmployeeDTO]:
+        """Get employee by web_login stored in meta JSONB."""
+        async with get_connection(self._pool) as conn:
+            row = await conn.fetchrow_b(
+                """
+                SELECT
+                    id, telegram_id, employee_type_id, organization_id,
+                    full_name, username, phone, position, hire_date,
+                    is_active, meta, created_at, updated_at, deleted_at
+                FROM employees
+                WHERE meta->>'web_login' = :login AND deleted_at IS NULL
+                LIMIT 1
+                """,
+                login=login,
+            )
+            if not row:
+                return None
+            return EmployeeDTO(
+                id=row["id"],
+                telegram_id=row["telegram_id"],
+                employee_type_id=row["employee_type_id"],
+                organization_id=row["organization_id"],
+                full_name=row["full_name"],
+                username=row["username"],
+                phone=row["phone"],
+                position=row["position"],
+                hire_date=row["hire_date"],
+                is_active=row["is_active"],
+                meta=self._normalize_meta(row["meta"]),
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+                deleted_at=row["deleted_at"],
+            )
+
+    async def update_meta(self, employee_id: int, meta: dict) -> bool:
+        """Update employee meta JSONB field."""
+        async with get_connection(self._pool) as conn:
+            result = await conn.execute_b(
+                """
+                UPDATE employees
+                SET meta = :meta::jsonb, updated_at = NOW()
+                WHERE id = :employee_id AND deleted_at IS NULL
+                """,
+                meta=json.dumps(meta),
+                employee_id=employee_id,
+            )
+            return result and "UPDATE 1" in str(result)
+
+    async def get_employee_types(self) -> list[dict]:
+        """Get all available employee types."""
+        async with get_connection(self._pool) as conn:
+            rows = await conn.fetch(
+                "SELECT id, name, code, is_administrator FROM employee_types ORDER BY id"
+            )
+            return [dict(row) for row in rows]

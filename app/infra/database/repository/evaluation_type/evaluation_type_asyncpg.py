@@ -11,6 +11,7 @@ from app.infra.database.connection.postgresql.connection import (
 from app.infra.database.repository.evaluation_type.dto import (
     CreateEvaluationTypeDTO,
     EvaluationTypeDTO,
+    UpdateEvaluationTypeDTO,
 )
 
 
@@ -49,28 +50,46 @@ class EvaluationTypeRepositoryAsyncpg:
                 raise TypeError(f"Cannot resolve pool: {type(self._pool)}")
         return self._resolved_pool
 
-    async def get_all(self) -> list[EvaluationTypeDTO]:
+    async def get_all(self, organization_id: int | None = None) -> list[EvaluationTypeDTO]:
         """Get all active evaluation types.
+
+        Args:
+            organization_id: Optional organization ID to filter by.
 
         Returns:
             List of EvaluationTypeDTO instances.
         """
         pool = await self._get_pool()
         async with get_connection(pool) as conn:
-            rows = await conn.fetch_b(
-                """
-                SELECT
-                    id, name, code, description, is_active, config,
-                    created_at, updated_at, deleted_at
-                FROM evaluation_types
-                WHERE deleted_at IS NULL AND is_active = TRUE
-                ORDER BY name ASC
-                """
-            )
+            if organization_id is not None:
+                rows = await conn.fetch_b(
+                    """
+                    SELECT
+                        id, organization_id, name, code, description, is_active, config,
+                        created_at, updated_at, deleted_at
+                    FROM evaluation_types
+                    WHERE deleted_at IS NULL AND is_active = TRUE
+                        AND organization_id = :organization_id
+                    ORDER BY name ASC
+                    """,
+                    organization_id=organization_id,
+                )
+            else:
+                rows = await conn.fetch_b(
+                    """
+                    SELECT
+                        id, organization_id, name, code, description, is_active, config,
+                        created_at, updated_at, deleted_at
+                    FROM evaluation_types
+                    WHERE deleted_at IS NULL AND is_active = TRUE
+                    ORDER BY name ASC
+                    """
+                )
 
             return [
                 EvaluationTypeDTO(
                     id=row["id"],
+                    organization_id=row["organization_id"],
                     name=row["name"],
                     code=row["code"],
                     description=row["description"],
@@ -97,7 +116,7 @@ class EvaluationTypeRepositoryAsyncpg:
             row = await conn.fetchrow_b(
                 """
                 SELECT
-                    id, name, code, description, is_active, config,
+                    id, organization_id, name, code, description, is_active, config,
                     created_at, updated_at, deleted_at
                 FROM evaluation_types
                 WHERE id = :evaluation_type_id AND deleted_at IS NULL
@@ -110,6 +129,7 @@ class EvaluationTypeRepositoryAsyncpg:
 
             return EvaluationTypeDTO(
                 id=row["id"],
+                organization_id=row["organization_id"],
                 name=row["name"],
                 code=row["code"],
                 description=row["description"],
@@ -134,15 +154,16 @@ class EvaluationTypeRepositoryAsyncpg:
             row = await conn.fetchrow_b(
                 """
                 INSERT INTO evaluation_types (
-                    name, code, description, is_active, config
+                    organization_id, name, code, description, is_active, config
                 )
                 VALUES (
-                    :name, :code, :description, :is_active, :config
+                    :organization_id, :name, :code, :description, :is_active, :config
                 )
                 RETURNING
-                    id, name, code, description, is_active, config,
+                    id, organization_id, name, code, description, is_active, config,
                     created_at, updated_at, deleted_at
                 """,
+                organization_id=dto.organization_id,
                 name=dto.name,
                 code=dto.code,
                 description=dto.description,
@@ -152,6 +173,60 @@ class EvaluationTypeRepositoryAsyncpg:
 
             return EvaluationTypeDTO(
                 id=row["id"],
+                organization_id=row["organization_id"],
+                name=row["name"],
+                code=row["code"],
+                description=row["description"],
+                is_active=row["is_active"],
+                config=row["config"] or {},
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+                deleted_at=row["deleted_at"],
+            )
+
+    async def update(
+        self, evaluation_type_id: int, dto: UpdateEvaluationTypeDTO
+    ) -> Optional[EvaluationTypeDTO]:
+        """Update evaluation type."""
+        pool = await self._get_pool()
+        async with get_connection(pool) as conn:
+            updates = []
+            params = {"evaluation_type_id": evaluation_type_id}
+            if dto.name is not None:
+                updates.append("name = :name")
+                params["name"] = dto.name
+            if dto.code is not None:
+                updates.append("code = :code")
+                params["code"] = dto.code
+            if dto.description is not None:
+                updates.append("description = :description")
+                params["description"] = dto.description
+            if dto.is_active is not None:
+                updates.append("is_active = :is_active")
+                params["is_active"] = dto.is_active
+            if dto.config is not None:
+                updates.append("config = :config")
+                params["config"] = dto.config
+
+            if not updates:
+                return await self.get_by_id(evaluation_type_id)
+
+            updates.append("updated_at = NOW()")
+            query = f"""
+                UPDATE evaluation_types
+                SET {", ".join(updates)}
+                WHERE id = :evaluation_type_id AND deleted_at IS NULL
+                RETURNING
+                    id, organization_id, name, code, description, is_active, config,
+                    created_at, updated_at, deleted_at
+            """
+            row = await conn.fetchrow_b(query, **params)
+            if not row:
+                return None
+
+            return EvaluationTypeDTO(
+                id=row["id"],
+                organization_id=row["organization_id"],
                 name=row["name"],
                 code=row["code"],
                 description=row["description"],

@@ -5,6 +5,7 @@ from aiogram_dialog.widgets.input import MessageInput
 from aiogram_dialog.widgets.kbd import (
     Back,
     Button,
+    Cancel,
     Row,
     ScrollingGroup,
     Select,
@@ -18,6 +19,7 @@ from app.tgbot.dialogs.employee.getters import (
     get_employees_list_data_for_edit,
 )
 from app.tgbot.dialogs.employee.handlers import (
+    get_roles_data,
     on_add_more_no,
     on_add_more_yes,
     on_cancel_employee,
@@ -26,8 +28,10 @@ from app.tgbot.dialogs.employee.handlers import (
     on_edit_employee_full_name,
     on_edit_employee_phone,
     on_edit_employee_position,
+    on_edit_employee_role,
     on_save_employee_changes,
     on_select_employee_to_edit,
+    on_select_role,
     on_skip_phone,
     on_skip_position,
     process_full_name_input,
@@ -96,8 +100,9 @@ def select_employee_to_edit_window():
             width=1,
             height=10,
             when="has_employees",
+            hide_on_single_page=True,
         ),
-        Back(Const("Назад")),
+        Cancel(Const("Назад ⬅️")),
         state=EmployeeDialog.select_employee_to_edit,
         getter=get_employees_list_data_for_edit,
     )
@@ -114,7 +119,8 @@ def edit_menu_window():
             "Редактирование сотрудника:\n\n"
             "ФИО: {full_name}\n"
             "Должность: {position}\n"
-            "Телефон: {phone}\n\n"
+            "Телефон: {phone}\n"
+            "Роль: {employee_type_name}\n\n"
             "Что вы хотите изменить?"
         ),
         Row(
@@ -136,6 +142,13 @@ def edit_menu_window():
                 text=Const("Изменить телефон 📞"),
                 id="edit_phone",
                 on_click=on_edit_employee_phone,
+            ),
+        ),
+        Row(
+            Button(
+                text=Const("Настройка роли 🔑"),
+                id="edit_role",
+                on_click=on_edit_employee_role,
             ),
         ),
         Row(
@@ -170,10 +183,8 @@ def full_name_input_window():
             state=EmployeeDialog.edit_menu,
             when="is_editing",
         ),
-        SwitchTo(
-            Const("Назад"),
-            id="back_create_full_name_input_window",
-            state=EmployeeDialog.select_organization,
+        Cancel(
+            Const("Назад ⬅️"),
             when=lambda data, widget, manager: not data.get("is_editing", False),
         ),
         state=EmployeeDialog.full_name_input,
@@ -268,7 +279,8 @@ def confirm_window():
             "Проверьте данные сотрудника:\n\n"
             "ФИО: {full_name}\n"
             "Должность: {position}\n"
-            "Телефон: {phone}\n\n"
+            "Телефон: {phone}\n"
+            "Роль: {employee_type_name}\n\n"
             "Всё верно?",
             when=lambda data, widget, manager: not data.get("is_editing", False),
         ),
@@ -276,7 +288,8 @@ def confirm_window():
             "Проверьте изменения сотрудника:\n\n"
             "ФИО: {full_name}\n"
             "Должность: {position}\n"
-            "Телефон: {phone}\n\n"
+            "Телефон: {phone}\n"
+            "Роль: {employee_type_name}\n\n"
             "Сохранить изменения?",
             when="is_editing",
         ),
@@ -299,6 +312,27 @@ def confirm_window():
         ),
         state=EmployeeDialog.confirm,
         getter=get_employee_form_data,
+    )
+
+
+def select_role_window():
+    """Select employee role (employee_type)."""
+    return Window(
+        Const("Выберите роль для сотрудника 🔑\n"),
+        Select(
+            Format("{item[display]}"),
+            item_id_getter=lambda role: role["id"],
+            items="roles",
+            id="select_role",
+            on_click=on_select_role,
+        ),
+        SwitchTo(
+            Const("Назад ⬅️"),
+            id="back_from_select_role",
+            state=EmployeeDialog.edit_menu,
+        ),
+        state=EmployeeDialog.select_role,
+        getter=get_roles_data,
     )
 
 

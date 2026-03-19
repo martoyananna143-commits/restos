@@ -60,6 +60,12 @@ async def on_select_employee_to_edit(
         dialog_manager.dialog_data["full_name"] = employee.full_name
         dialog_manager.dialog_data["position"] = employee.position
         dialog_manager.dialog_data["phone"] = employee.phone
+        dialog_manager.dialog_data["employee_type_id"] = employee.employee_type_id
+        type_name = next(
+            (r["name"] for r in ROLE_MAP.values() if r["id"] == employee.employee_type_id),
+            "Не назначена",
+        )
+        dialog_manager.dialog_data["employee_type_name"] = type_name
         await dialog_manager.switch_to(EmployeeDialog.edit_menu)
     else:
         from aiogram.types import Message as MessageType
@@ -152,11 +158,10 @@ async def on_skip_phone(
     """
     dialog_manager.dialog_data["phone"] = None
 
-    # Если редактируем существующего сотрудника, возвращаемся в меню редактирования
     if dialog_manager.dialog_data.get("employee_id"):
         await dialog_manager.switch_to(EmployeeDialog.edit_menu)
     else:
-        await dialog_manager.switch_to(EmployeeDialog.confirm)
+        await dialog_manager.switch_to(EmployeeDialog.select_role)
 
 
 async def on_cancel_employee(
@@ -237,11 +242,11 @@ async def on_confirm_employee(
     employee_id = data.get("employee_id")
 
     if employee_id:
-        # Обновляем существующего сотрудника
         update_dto = UpdateEmployeeDTO(
             full_name=data["full_name"],
             position=data.get("position"),
             phone=data.get("phone"),
+            employee_type_id=data.get("employee_type_id"),
         )
         employee = await employee_service.update(employee_id, update_dto)
         if employee:
@@ -251,10 +256,9 @@ async def on_confirm_employee(
             await dialog_manager.done()
             return
     else:
-        # Создаем нового сотрудника
         employee_dto = CreateEmployeeDTO(
             organization_id=organization.id,
-            employee_type_id=1,  # TODO: Get default employee type or allow selection
+            employee_type_id=data.get("employee_type_id", 1),
             full_name=data["full_name"],
             position=data.get("position"),
             phone=data.get("phone"),
@@ -372,8 +376,56 @@ async def process_phone_input(
     phone = message.text.strip() if message.text else None
     dialog_manager.dialog_data["phone"] = phone if phone else None
 
-    # Если редактируем существующего сотрудника, возвращаемся в меню редактирования
+    if dialog_manager.dialog_data.get("employee_id"):
+        await dialog_manager.switch_to(EmployeeDialog.edit_menu)
+    else:
+        await dialog_manager.switch_to(EmployeeDialog.select_role)
+
+
+# =============================================================================
+# Role (employee_type) management
+# =============================================================================
+
+ROLE_MAP = {
+    "1": {"id": 1, "code": "employee", "name": "Сотрудник"},
+    "2": {"id": 2, "code": "manager", "name": "Менеджер"},
+    "3": {"id": 3, "code": "administrator", "name": "Администратор"},
+}
+
+
+async def on_edit_employee_role(
+    callback: CallbackQuery, button: Button, dialog_manager: DialogManager
+):
+    """Switch to role selection screen."""
+    await dialog_manager.switch_to(EmployeeDialog.select_role)
+
+
+async def on_select_role(
+    callback: CallbackQuery,
+    widget,
+    dialog_manager: DialogManager,
+    item_id: str,
+):
+    """Handle role selection — save to dialog_data, return to edit_menu or confirm."""
+    role = ROLE_MAP.get(item_id)
+    if role:
+        dialog_manager.dialog_data["employee_type_id"] = role["id"]
+        dialog_manager.dialog_data["employee_type_name"] = role["name"]
+
     if dialog_manager.dialog_data.get("employee_id"):
         await dialog_manager.switch_to(EmployeeDialog.edit_menu)
     else:
         await dialog_manager.switch_to(EmployeeDialog.confirm)
+
+
+async def get_roles_data(dialog_manager, *args, **kwargs):
+    """Get available roles list for the select_role window."""
+    current_type_id = dialog_manager.dialog_data.get("employee_type_id")
+    roles = []
+    for key, role in ROLE_MAP.items():
+        marker = "✓ " if role["id"] == current_type_id else "◻ "
+        roles.append({
+            "id": key,
+            "display": f"{marker}{role['name']}",
+        })
+    return {"roles": roles}

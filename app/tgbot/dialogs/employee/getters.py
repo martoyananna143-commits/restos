@@ -26,11 +26,14 @@ async def get_employee_form_data(
     """
     data = dialog_manager.dialog_data
     is_editing = bool(data.get("employee_id"))
-    
+
+    employee_type_name = data.get("employee_type_name", "Не назначена")
+
     return {
         "full_name": get_form_value(data, "full_name", ""),
         "position": get_form_value(data, "position", "Не указана"),
         "phone": get_form_value(data, "phone", "Не указан"),
+        "employee_type_name": employee_type_name,
         "is_editing": is_editing,
     }
 

@@ -6,6 +6,7 @@ from dependency_injector.wiring import Provide, inject
 from app.internal import Container
 from app.internal.usecases.criterion_set_service import CriterionSetService
 from app.internal.usecases.employee_service import EmployeeService
+from app.internal.usecases.evaluation_service import EvaluationService
 from app.internal.usecases.evaluation_type_service import EvaluationTypeService
 from app.internal.usecases.organization_service import OrganizationService
 
@@ -16,21 +17,61 @@ async def get_evaluation_types_list_data(
     evaluation_type_service: EvaluationTypeService = Provide[
         Container.evaluation_type_service
     ],
+    organization_service: OrganizationService = Provide[Container.organization_service],
     *args,
     **kwargs,
 ):
     """Get data for evaluation types list window.
+    
+    Gets evaluation types from ALL organizations where user is a member.
 
     Args:
         dialog_manager: Dialog manager instance.
         evaluation_type_service: EvaluationType service instance (injected).
+        organization_service: Organization service instance (injected).
         *args: Variable length argument list.
         **kwargs: Arbitrary keyword arguments.
 
     Returns:
         Dictionary with evaluation types list data.
     """
-    evaluation_types = await evaluation_type_service.get_all()
+    # Get all organizations where user is a member
+    telegram_id = None
+    if dialog_manager.event and hasattr(dialog_manager.event, "from_user") and dialog_manager.event.from_user:
+        telegram_id = dialog_manager.event.from_user.id
+    
+    if not telegram_id:
+        return {
+            "evaluation_types": [],
+            "has_evaluation_types": False,
+            "no_evaluation_types": True,
+        }
+    
+    # Get all organizations where user is a member
+    user_organizations = await organization_service.get_all_by_user_telegram_id(telegram_id)
+    
+    if not user_organizations:
+        return {
+            "evaluation_types": [],
+            "has_evaluation_types": False,
+            "no_evaluation_types": True,
+        }
+    
+    # Get evaluation types from all user's organizations
+    all_evaluation_types = []
+    organization_ids = []
+    for org in user_organizations:
+        organization_ids.append(org.id)
+        org_evaluation_types = await evaluation_type_service.get_all(organization_id=org.id)
+        all_evaluation_types.extend(org_evaluation_types)
+    
+    # Update dialog_data and middleware_data with first organization (for compatibility)
+    if user_organizations:
+        dialog_manager.dialog_data["organization_id"] = user_organizations[0].id
+        dialog_manager.middleware_data["organization"] = user_organizations[0]
+        dialog_manager.dialog_data["user_organization_ids"] = organization_ids
+
+    evaluation_types = all_evaluation_types
 
     return {
         "evaluation_types": evaluation_types,
@@ -68,7 +109,7 @@ async def get_employees_list_data(
             dialog_manager.dialog_data["organization_id"] = organization_id
         else:
             telegram_id = None
-            if dialog_manager.event and dialog_manager.event.from_user:
+            if dialog_manager.event and hasattr(dialog_manager.event, "from_user") and dialog_manager.event.from_user:
                 telegram_id = dialog_manager.event.from_user.id
             if telegram_id:
                 organization = await organization_service.get_by_user_telegram_id(
@@ -91,7 +132,7 @@ async def get_employees_list_data(
     if not filled_by_employee_id:
         # For non-administrators: automatically set current user as filled_by_employee
         telegram_id = None
-        if dialog_manager.event and dialog_manager.event.from_user:
+        if dialog_manager.event and hasattr(dialog_manager.event, "from_user") and dialog_manager.event.from_user:
             telegram_id = dialog_manager.event.from_user.id
 
         if telegram_id and organization_id:
@@ -131,30 +172,64 @@ async def get_criterion_sets_list_data(
     criterion_set_service: CriterionSetService = Provide[
         Container.criterion_set_service
     ],
+    organization_service: OrganizationService = Provide[Container.organization_service],
     *args,
     **kwargs,
 ):
     """Get data for criterion sets list window.
+    
+    Gets criterion sets from ALL organizations where user is a member.
 
     Args:
         dialog_manager: Dialog manager instance.
         criterion_set_service: CriterionSet service instance (injected).
+        organization_service: Organization service instance (injected).
         *args: Variable length argument list.
         **kwargs: Arbitrary keyword arguments.
 
     Returns:
         Dictionary with criterion sets list data.
     """
-    organization_id = dialog_manager.dialog_data.get("organization_id")
-    if not organization_id:
+    # Get all organizations where user is a member
+    telegram_id = None
+    if dialog_manager.event and hasattr(dialog_manager.event, "from_user") and dialog_manager.event.from_user:
+        telegram_id = dialog_manager.event.from_user.id
+    
+    if not telegram_id:
         return {
             "criterion_sets": [],
             "has_criterion_sets": False,
             "no_criterion_sets": True,
             "has_default_set": False,
         }
+    
+    # Get all organizations where user is a member
+    user_organizations = await organization_service.get_all_by_user_telegram_id(telegram_id)
+    
+    if not user_organizations:
+        return {
+            "criterion_sets": [],
+            "has_criterion_sets": False,
+            "no_criterion_sets": True,
+            "has_default_set": False,
+        }
+    
+    # Get criterion sets from all user's organizations
+    all_criterion_sets = []
+    organization_ids = []
+    for org in user_organizations:
+        organization_ids.append(org.id)
+        org_criterion_sets = await criterion_set_service.get_by_organization_id(org.id)
+        all_criterion_sets.extend(org_criterion_sets)
+    
+    # Update dialog_data and middleware_data with first organization (for compatibility)
+    if user_organizations:
+        dialog_manager.dialog_data["organization_id"] = user_organizations[0].id
+        dialog_manager.middleware_data["organization"] = user_organizations[0]
+        # Store all organization IDs for validation
+        dialog_manager.dialog_data["user_organization_ids"] = organization_ids
 
-    criterion_sets = await criterion_set_service.get_by_organization_id(organization_id)
+    criterion_sets = all_criterion_sets
 
     # Проверяем наличие дефолтного набора
     default_set = next((cs for cs in criterion_sets if cs.is_default), None)
@@ -305,12 +380,32 @@ async def get_report_generation_data(
         Dictionary with report generation status data.
     """
     data = dialog_manager.dialog_data
+    
+    # If started from web form, copy start_data to dialog_data
+    start_data = dialog_manager.start_data or {}
+    if start_data.get("from_web_form") and not data.get("evaluation_id"):
+        # Copy all data from start_data to dialog_data
+        for key, value in start_data.items():
+            data[key] = value
+    
     pdf_generated = data.get("pdf_generated", False)
     excel_generated = data.get("excel_generated", False)
     both_generated = pdf_generated and excel_generated
+    
+    # Check if from web form
+    from_web_form = data.get("from_web_form", False)
+    score_percentage = data.get("score_percentage", 0.0)
+    evaluation_id = data.get("evaluation_id")
 
     # Формируем текст сообщения
-    if both_generated:
+    if from_web_form and not pdf_generated and not excel_generated:
+        message_text = (
+            f"✅ <b>Оценка успешно сохранена!</b>\n\n"
+            f"📊 Результат: <b>{score_percentage:.1f}%</b>\n"
+            f"🆔 ID оценки: {evaluation_id}\n\n"
+            f"Выберите формат для экспорта отчета:"
+        )
+    elif both_generated:
         message_text = (
             "Оценка успешно создана! ✅\n\n"
             "Оба отчета сгенерированы:\n"
@@ -340,4 +435,71 @@ async def get_report_generation_data(
         "show_pdf_button": not pdf_generated,
         "show_excel_button": not excel_generated,
         "show_skip_button": not both_generated,
+    }
+
+
+@inject
+async def get_evaluations_list_data_for_deletion(
+    dialog_manager: DialogManager,
+    evaluation_service: EvaluationService = Provide[Container.evaluation_service],
+    organization_service: OrganizationService = Provide[Container.organization_service],
+    employee_service: EmployeeService = Provide[Container.employee_service],
+    *args,
+    **kwargs,
+):
+    """Get data for evaluations list window for deletion.
+
+    Args:
+        dialog_manager: Dialog manager instance.
+        evaluation_service: Evaluation service instance (injected).
+        organization_service: Organization service instance (injected).
+        employee_service: Employee service instance (injected).
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+
+    Returns:
+        Dictionary with evaluations list data.
+    """
+    # Get organization from middleware_data or load by user
+    organization = dialog_manager.middleware_data.get("organization")
+    
+    if not organization:
+        user_data = dialog_manager.middleware_data.get("user_data", {})
+        telegram_id = user_data.get("telegram_id")
+        if telegram_id:
+            organization = await organization_service.get_by_user_telegram_id(telegram_id)
+            if organization:
+                dialog_manager.middleware_data["organization"] = organization
+    
+    if not organization:
+        return {
+            "evaluations": [],
+            "has_evaluations": False,
+        }
+    
+    evaluations = await evaluation_service.get_by_organization_id(organization.id)
+    
+    # Get employee names for display
+    employees = await employee_service.get_by_organization_id(organization.id)
+    employee_names = {emp.id: emp.full_name for emp in employees}
+    
+    # Format evaluations for display
+    evaluations_list = []
+    for eval_item in evaluations:
+        filled_by_name = employee_names.get(eval_item.filled_by_employee_id, f"ID {eval_item.filled_by_employee_id}")
+        evaluated_name = (
+            employee_names.get(eval_item.evaluated_employee_id, f"ID {eval_item.evaluated_employee_id}")
+            if eval_item.evaluated_employee_id
+            else "Самозаполнение"
+        )
+        eval_date = eval_item.evaluation_date.strftime('%Y-%m-%d %H:%M') if eval_item.evaluation_date else 'N/A'
+        
+        evaluations_list.append({
+            "id": eval_item.id,
+            "display": f"📊 Замер #{eval_item.id}\n   Дата: {eval_date} | Балл: {eval_item.score_percentage:.1f}%\n   Заполнил: {filled_by_name} | Оцениваемый: {evaluated_name}",
+        })
+    
+    return {
+        "evaluations": evaluations_list,
+        "has_evaluations": len(evaluations_list) > 0,
     }

@@ -11,21 +11,6 @@ from dependency_injector.wiring import Provide, inject
 from app.internal import Container
 from app.internal.usecases.criterion_service import CriterionService
 from app.internal.usecases.organization_service import OrganizationService
-from app.tgbot.dialogs.common.evaluation_type import (
-    confirm_evaluation_type,
-)
-from app.tgbot.dialogs.common.evaluation_type import (
-    process_evaluation_type_code_input as common_process_code,
-)
-from app.tgbot.dialogs.common.evaluation_type import (
-    process_evaluation_type_description_input as common_process_description,
-)
-from app.tgbot.dialogs.common.evaluation_type import (
-    process_evaluation_type_name_input as common_process_name,
-)
-from app.tgbot.dialogs.common.evaluation_type import (
-    skip_evaluation_type_description as common_skip_description,
-)
 from app.tgbot.dialogs.criterion.states import CriterionDialog
 from app.tgbot.dialogs.greeting.states import GreetingDialog
 from app.tgbot.dialogs.organization.states import OrganizationDialog
@@ -64,7 +49,8 @@ async def _handle_value_type_selection(
     if dialog_manager.dialog_data.get("criterion_id"):
         await dialog_manager.switch_to(CriterionDialog.edit_menu)
     else:
-        await dialog_manager.switch_to(CriterionDialog.select_evaluation_type)
+        # Переходим к выбору обязательности
+        await dialog_manager.switch_to(CriterionDialog.select_is_required)
 
 
 async def on_select_value_type(
@@ -129,6 +115,72 @@ async def on_select_value_type_number(
     await _handle_value_type_selection(callback, button, dialog_manager, "number")
 
 
+# is_required handlers
+async def _handle_is_required_selection(
+    callback: CallbackQuery,
+    button: Button,
+    dialog_manager: DialogManager,
+    is_required: bool,
+):
+    """Internal handler for is_required selection.
+
+    Args:
+        callback: Callback query.
+        button: Button widget.
+        dialog_manager: Dialog manager.
+        is_required: Selected is_required value.
+    """
+    dialog_manager.dialog_data["is_required"] = is_required
+
+    if dialog_manager.dialog_data.get("criterion_id"):
+        await dialog_manager.switch_to(CriterionDialog.edit_menu)
+    else:
+        await dialog_manager.switch_to(CriterionDialog.name_input)
+
+
+async def on_select_is_required_yes(
+    callback: CallbackQuery,
+    button: Button,
+    dialog_manager: DialogManager,
+):
+    """Handle is_required=True selection.
+
+    Args:
+        callback: Callback query.
+        button: Button widget.
+        dialog_manager: Dialog manager.
+    """
+    await _handle_is_required_selection(callback, button, dialog_manager, True)
+
+
+async def on_select_is_required_no(
+    callback: CallbackQuery,
+    button: Button,
+    dialog_manager: DialogManager,
+):
+    """Handle is_required=False selection.
+
+    Args:
+        callback: Callback query.
+        button: Button widget.
+        dialog_manager: Dialog manager.
+    """
+    await _handle_is_required_selection(callback, button, dialog_manager, False)
+
+
+async def on_edit_is_required(
+    callback: CallbackQuery, button: Button, dialog_manager: DialogManager
+):
+    """Handle edit is_required button click.
+
+    Args:
+        callback: Callback query.
+        button: Button widget.
+        dialog_manager: Dialog manager.
+    """
+    await dialog_manager.switch_to(CriterionDialog.select_is_required)
+
+
 async def on_create_organization_from_criterion(
     callback: CallbackQuery, button: Button, dialog_manager: DialogManager
 ):
@@ -142,112 +194,6 @@ async def on_create_organization_from_criterion(
     await dialog_manager.start(
         OrganizationDialog.name_input,
         mode=StartMode.RESET_STACK,
-    )
-
-
-async def on_select_evaluation_type(
-    callback: CallbackQuery,
-    widget,
-    dialog_manager: DialogManager,
-    item_id: str,
-):
-    """Handle evaluation type selection.
-
-    Args:
-        callback: Callback query.
-        widget: Widget instance.
-        dialog_manager: Dialog manager.
-        item_id: Selected evaluation type ID.
-    """
-    evaluation_type_id = int(item_id)
-
-    dialog_manager.dialog_data["evaluation_type_id"] = evaluation_type_id
-
-    # Если редактируем существующий критерий, возвращаемся в меню редактирования
-    if dialog_manager.dialog_data.get("criterion_id"):
-        await dialog_manager.switch_to(CriterionDialog.edit_menu)
-    else:
-        await dialog_manager.switch_to(CriterionDialog.select_value_type)
-
-
-# Wrapper handlers for evaluation type creation using common functions
-async def process_evaluation_type_name_input(
-    message: Message, widget: MessageInput, dialog_manager: DialogManager
-):
-    """Process evaluation type name input.
-
-    Args:
-        message: Message object.
-        widget: MessageInput widget.
-        dialog_manager: Dialog manager.
-    """
-    await common_process_name(
-        message, widget, dialog_manager, CriterionDialog.evaluation_type_code_input
-    )
-
-
-async def process_evaluation_type_code_input(
-    message: Message, widget: MessageInput, dialog_manager: DialogManager
-):
-    """Process evaluation type code input.
-
-    Args:
-        message: Message object.
-        widget: MessageInput widget.
-        dialog_manager: Dialog manager.
-    """
-    await common_process_code(
-        message,
-        widget,
-        dialog_manager,
-        CriterionDialog.evaluation_type_description_input,
-    )
-
-
-async def process_evaluation_type_description_input(
-    message: Message, widget: MessageInput, dialog_manager: DialogManager
-):
-    """Process evaluation type description input.
-
-    Args:
-        message: Message object.
-        widget: MessageInput widget.
-        dialog_manager: Dialog manager.
-    """
-    await common_process_description(
-        message, widget, dialog_manager, CriterionDialog.evaluation_type_confirm
-    )
-
-
-async def on_skip_evaluation_type_description(
-    callback: CallbackQuery, button: Button, dialog_manager: DialogManager
-):
-    """Handle skip evaluation type description button click.
-
-    Args:
-        callback: Callback query.
-        button: Button widget.
-        dialog_manager: Dialog manager.
-    """
-    await common_skip_description(
-        callback, button, dialog_manager, CriterionDialog.evaluation_type_confirm
-    )
-
-
-async def on_confirm_evaluation_type(
-    callback: CallbackQuery,
-    button: Button,
-    dialog_manager: DialogManager,
-):
-    """Handle confirm evaluation type button click.
-
-    Args:
-        callback: Callback query.
-        button: Button widget.
-        dialog_manager: Dialog manager.
-    """
-    await confirm_evaluation_type(
-        callback, button, dialog_manager, CriterionDialog.select_evaluation_type
     )
 
 
@@ -330,19 +276,6 @@ async def on_confirm_criterion(
         )
         return
 
-    # Получаем evaluation_type_id из dialog_data
-    evaluation_type_id = data.get("evaluation_type_id")
-    if not evaluation_type_id:
-        from aiogram.types import Message as MessageType
-
-        if callback.message and isinstance(callback.message, MessageType):
-            await callback.message.answer("Ошибка: тип оценки не выбран")
-        await dialog_manager.start(
-            GreetingDialog.greeting,
-            mode=StartMode.RESET_STACK,
-        )
-        return
-
     # Проверяем наличие обязательных полей
     name: str = data.get("name", "")
     code: str = data.get("code", "")
@@ -363,14 +296,15 @@ async def on_confirm_criterion(
 
     # Получаем value_type из dialog_data (по умолчанию 'boolean' для обратной совместимости)
     value_type = data.get("value_type", "boolean")
+    is_required = data.get("is_required", True)
 
     criterion_dto = CreateCriterionDTO(
         organization_id=organization_id,
-        evaluation_type_id=evaluation_type_id,
         name=name,
         code=code,
         description=data.get("description"),
         value_type=value_type,
+        is_required=is_required,
     )
 
     criterion_id = data.get("criterion_id")
@@ -380,15 +314,16 @@ async def on_confirm_criterion(
             # Обновляем существующий критерий
             from app.infra.database.repository.criterion.dto import UpdateCriterionDTO
 
-            # Получаем value_type из dialog_data (если не указан, не обновляем)
+            # Получаем value_type и is_required из dialog_data
             value_type = data.get("value_type")
+            is_required = data.get("is_required")
 
             update_dto = UpdateCriterionDTO(
                 name=name,
                 code=code,
                 description=data.get("description"),
-                evaluation_type_id=evaluation_type_id,
                 value_type=value_type,
+                is_required=is_required,
             )
             criterion = await criterion_service.update(criterion_id, update_dto)
             if criterion:
@@ -525,26 +460,12 @@ async def on_add_more_yes(
     dialog_manager.dialog_data.pop("name", None)
     dialog_manager.dialog_data.pop("code", None)
     dialog_manager.dialog_data.pop("description", None)
+    dialog_manager.dialog_data.pop("value_type", None)
+    dialog_manager.dialog_data.pop("is_required", None)
 
+    # Start from selecting value type
     await dialog_manager.switch_to(
-        CriterionDialog.name_input,
-    )
-
-
-async def on_add_more_no(
-    callback: CallbackQuery, button: Button, dialog_manager: DialogManager
-):
-    """Handle add more no button click.
-
-    Args:
-        callback: Callback query.
-        button: Button widget.
-        dialog_manager: Dialog manager.
-    """
-
-    await dialog_manager.start(
-        GreetingDialog.greeting,
-        mode=StartMode.RESET_STACK,
+        CriterionDialog.select_value_type,
     )
 
 
@@ -574,9 +495,11 @@ async def on_select_existing_criterion(
         dialog_manager.dialog_data["name"] = criterion.name
         dialog_manager.dialog_data["code"] = criterion.code
         dialog_manager.dialog_data["description"] = criterion.description
-        dialog_manager.dialog_data["evaluation_type_id"] = criterion.evaluation_type_id
         dialog_manager.dialog_data["value_type"] = getattr(
             criterion, "value_type", "boolean"
+        )
+        dialog_manager.dialog_data["is_required"] = getattr(
+            criterion, "is_required", True
         )
         await dialog_manager.switch_to(CriterionDialog.edit_menu)
     else:
@@ -602,6 +525,7 @@ async def on_create_new_criterion(
     dialog_manager.dialog_data.pop("code", None)
     dialog_manager.dialog_data.pop("description", None)
     dialog_manager.dialog_data.pop("value_type", None)
+    dialog_manager.dialog_data.pop("is_required", None)
     # Сначала выбираем тип данных для критерия
     await dialog_manager.switch_to(CriterionDialog.select_value_type)
 
@@ -643,19 +567,6 @@ async def on_edit_description(
         dialog_manager: Dialog manager.
     """
     await dialog_manager.switch_to(CriterionDialog.description_input)
-
-
-async def on_edit_evaluation_type(
-    callback: CallbackQuery, button: Button, dialog_manager: DialogManager
-):
-    """Handle edit evaluation type button click.
-
-    Args:
-        callback: Callback query.
-        button: Button widget.
-        dialog_manager: Dialog manager.
-    """
-    await dialog_manager.switch_to(CriterionDialog.edit_evaluation_type)
 
 
 async def on_save_changes(

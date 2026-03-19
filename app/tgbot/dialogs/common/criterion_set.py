@@ -179,21 +179,21 @@ def create_criterion_set_select_window(
             width=1,
             height=10,
             when="has_criterion_sets",
+            hide_on_single_page=True,
         )
     else:
         final_select_widget = select_widget
 
     widgets.append(final_select_widget)
 
-    # Кнопка создания нового набора
-    if on_create_new_handler and show_create_when_empty:
+    # Кнопка создания нового набора (всегда видна)
+    if on_create_new_handler:
         widgets.append(
             Row(
                 Button(
                     text=Const("Создать новый набор ➕"),
                     id="create_new_set",
                     on_click=on_create_new_handler,
-                    when="no_criterion_sets",
                 ),
             )
         )

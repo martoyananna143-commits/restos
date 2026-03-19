@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from app.infra.database.models.evaluation.category import Category
     from app.infra.database.models.evaluation.criterion_set import CriterionSet
     from app.infra.database.models.evaluation.criterion_value import CriterionValue
-    from app.infra.database.models.evaluation.evaluation_type import EvaluationType
 
 
 class Criterion(Base, TimestampMixin, SoftDeleteMixin):
@@ -26,9 +25,6 @@ class Criterion(Base, TimestampMixin, SoftDeleteMixin):
     category_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=True
     )
-    evaluation_type_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("evaluation_types.id", ondelete="CASCADE"), nullable=False
-    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     code: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -40,13 +36,6 @@ class Criterion(Base, TimestampMixin, SoftDeleteMixin):
     # Relationships
     category: Mapped[Optional["Category"]] = relationship(
         "Category", back_populates="criteria", lazy="joined"
-    )
-
-    evaluation_type: Mapped["EvaluationType"] = relationship(
-        "EvaluationType",
-        foreign_keys=[evaluation_type_id],
-        back_populates="criteria",
-        lazy="joined",
     )
 
     criterion_values: Mapped[List["CriterionValue"]] = relationship(

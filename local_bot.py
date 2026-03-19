@@ -31,6 +31,7 @@ Functions:
 import asyncio
 from typing import List
 
+import uvicorn
 from loguru import logger
 
 from aiogram import Bot, Dispatcher
@@ -53,7 +54,10 @@ from app.internal import Container
 from app.settings import config
 from app.tgbot.dialogs import all_dialogs
 from app.tgbot.handlers import routers_list
+from app.tgbot.media_storage import RedisMediaIdStorage
+from aiogram.exceptions import TelegramNetworkError
 from app.tgbot.handlers.start import (
+    on_network_error,
     on_unknown_intent,
     on_unknown_state,
     on_unregistered_window,
@@ -175,12 +179,32 @@ def get_storage(config):
         return MemoryStorage()
 
 
+async def run_api_server(container: Container, bot: Bot):
+    """Run FastAPI server with uvicorn, sharing container and bot with API."""
+    from app.api.main import app as fastapi_app, set_shared_container, set_shared_bot
+    
+    # Share container and bot with API
+    set_shared_container(container)
+    set_shared_bot(bot)
+    
+    config_uvicorn = uvicorn.Config(
+        fastapi_app,
+        host="0.0.0.0",
+        port=8000,
+        log_level="info",
+    )
+    server = uvicorn.Server(config_uvicorn)
+    logger.info("Starting FastAPI server on http://0.0.0.0:8000")
+    await server.serve()
+
+
 async def main():
     """
     Main entry point for the bot application.
 
     This function sets up logging, initializes the bot and dispatcher,
     registers global middlewares, and starts polling.
+    Also runs FastAPI server concurrently.
 
     Returns:
         None
@@ -203,6 +227,7 @@ async def main():
             "app.tgbot.dialogs.criterion_set.getters",
             "app.tgbot.dialogs.evaluation.handlers",
             "app.tgbot.dialogs.evaluation.getters",
+            "app.tgbot.dialogs.export.handlers",
             "app.tgbot.dialogs.analytics.handlers",
             "app.tgbot.dialogs.analytics.getters",
             "app.tgbot.dialogs.analytics.getters_objects",
@@ -211,10 +236,14 @@ async def main():
             "app.tgbot.dialogs.common.criterion_set",
             "app.internal.usecases.pdf_report_service",
             "app.tgbot.dialogs.greeting.handlers",
+            "app.tgbot.dialogs.greeting.getters",
             "app.tgbot.dialogs.greeting.windows",
             "app.tgbot.dialogs.help.handlers",
             "app.tgbot.dialogs.help.getters",
             "app.tgbot.filters.administrator",
+            # API modules - only webapp (other routers not needed for bot)
+            "app.api.deps",
+            "app.api.routers.webapp",
         ]
     )
 
@@ -229,7 +258,8 @@ async def main():
 
     dp = Dispatcher(storage=storage)
 
-    setup_dialogs(dp)
+    media_storage = RedisMediaIdStorage(config.REDIS_DSN)
+    setup_dialogs(dp, media_id_storage=media_storage)
     dp.include_routers(*routers_list, *all_dialogs())
 
     register_global_middlewares(dp, config, storage)
@@ -245,10 +275,19 @@ async def main():
         on_unregistered_window,
         ExceptionTypeFilter(UnregisteredWindowError),
     )
+    dp.errors.register(
+        on_network_error,
+        ExceptionTypeFilter(TelegramNetworkError),
+    )
 
     await on_startup(bot, config.TGBOT_ADMIN_IDS)
+    
+    # Run bot and API server concurrently
     try:
-        await dp.start_polling(bot)
+        await asyncio.gather(
+            dp.start_polling(bot),
+            run_api_server(container, bot),
+        )
     except (KeyboardInterrupt, SystemExit):
         logger.info("Received shutdown signal, cancelling AI tasks...")
     finally:

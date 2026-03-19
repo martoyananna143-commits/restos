@@ -12,7 +12,6 @@ class CriterionDTO:
     id: int
     organization_id: int
     category_id: Optional[int]
-    evaluation_type_id: int
     name: str
     code: str
     description: Optional[str]
@@ -30,7 +29,6 @@ class CreateCriterionDTO:
     """Data Transfer Object for creating Criterion."""
 
     organization_id: int
-    evaluation_type_id: int
     name: str
     code: str
     category_id: Optional[int] = None
@@ -47,7 +45,6 @@ class UpdateCriterionDTO:
 
     organization_id: Optional[int] = None
     category_id: Optional[int] = None
-    evaluation_type_id: Optional[int] = None
     name: Optional[str] = None
     code: Optional[str] = None
     description: Optional[str] = None

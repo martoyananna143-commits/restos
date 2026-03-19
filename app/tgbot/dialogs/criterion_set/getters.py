@@ -124,7 +124,7 @@ async def get_criteria_list_data(
             "id": criterion.id,
             "name": criterion.name,
             "code": criterion.code,
-            "selected_marker": "✓" if criterion.id in selected_criterion_ids else "",
+            "selected_marker": "✓ " if criterion.id in selected_criterion_ids else "◻ ",
         }
         criteria_with_markers.append(criterion_dict)
     

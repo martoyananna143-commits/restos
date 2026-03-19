@@ -1,11 +1,10 @@
 """Windows for evaluation dialog."""
 
-from aiogram_dialog import DialogManager, Window
-from aiogram_dialog.widgets.common import Whenable
-from aiogram_dialog.widgets.input import MessageInput
+from aiogram_dialog import Window
 from aiogram_dialog.widgets.kbd import (
     Back,
     Button,
+    Cancel,
     Row,
     ScrollingGroup,
     Select,
@@ -23,42 +22,28 @@ from app.tgbot.dialogs.common.evaluation_type import (
 )
 from app.tgbot.dialogs.common.organization import create_organization_select_window
 from app.tgbot.dialogs.evaluation.getters import (
-    get_add_comment_data,
     get_criterion_sets_list_data,
-    get_current_question_data,
     get_employees_list_data,
-    get_report_generation_data,
+    get_evaluations_list_data_for_deletion,
 )
 from app.tgbot.dialogs.evaluation.handlers import (
     _on_evaluation_type_selected,
-    on_answer_no,
-    on_answer_yes,
-    on_back_to_last_question,
     on_cancel_evaluation,
     on_combine_criterion_sets,
     on_confirm_evaluation_type,
     on_create_new_criterion_set_from_evaluation,
     on_finish_combining_sets,
-    on_generate_excel,
-    on_generate_pdf,
-    on_next_question,
     on_organization_window_start,
-    on_prev_question,
     on_select_criterion_set,
     on_select_evaluated_employee,
+    on_select_evaluation_to_delete,
     on_select_filled_by_employee,
-    on_send_to_employee,
-    on_skip_comment,
     on_skip_evaluation_type_description,
-    on_skip_pdf,
     on_toggle_criterion_set_for_combine,
     on_use_default_criterion_set,
-    process_comment_input,
     process_evaluation_type_code_input,
     process_evaluation_type_description_input,
     process_evaluation_type_name_input,
-    process_number_input,
-    process_text_input,
 )
 from app.tgbot.dialogs.evaluation.states import EvaluationDialog
 
@@ -157,8 +142,13 @@ def select_filled_by_employee_window():
             width=1,
             height=10,
             when=lambda data, widget, manager: data.get("has_employees", False) and not data.get("filled_by_employee_id"),
+            hide_on_single_page=True,
         ),
-        Back(Const("Назад")),
+        SwitchTo(
+            Const("Назад"),
+            id="back_from_filled_by_employee",
+            state=EvaluationDialog.select_evaluation_type,
+        ),
         state=EvaluationDialog.select_filled_by_employee,
         getter=get_employees_list_data,
     )
@@ -184,8 +174,13 @@ def select_evaluated_employee_window():
             width=1,
             height=10,
             when="has_employees",
+            hide_on_single_page=True,
         ),
-        Back(Const("Назад")),
+        SwitchTo(
+            Const("Назад"),
+            id="back_from_evaluated_employee",
+            state=EvaluationDialog.select_evaluation_type,
+        ),
         state=EvaluationDialog.select_evaluated_employee,
         getter=get_employees_list_data,
     )
@@ -233,6 +228,7 @@ def combine_criterion_sets_window():
             width=1,
             height=10,
             when="has_criterion_sets",
+            hide_on_single_page=True,
         ),
         Row(
             Button(
@@ -248,212 +244,36 @@ def combine_criterion_sets_window():
     )
 
 
-def is_first(data: dict, widget: Whenable, manager: DialogManager):
-    return data.get("current_question_index") == 0
-
-
-def question_loop_window():
-    """Create question loop window.
+def select_evaluation_to_delete_window():
+    """Create evaluation selection window for deletion.
 
     Returns:
-        Window: The configured question loop window.
+        Window: The configured evaluation selection window.
     """
     return Window(
-        Format("{question_text}"),
-        Row(
-            Button(
-                text=Const("Ответить ➡️"),
-                id="answer_question",
-                on_click=on_next_question,
+        Format("Выберите замер для удаления:"),
+        ScrollingGroup(
+            Select(
+                Format("{item[display]}"),
+                item_id_getter=lambda eval_item: str(eval_item["id"]),
+                items="evaluations",
+                id="select_evaluation_to_delete",
+                on_click=on_select_evaluation_to_delete,
             ),
+            id="scrolling_evaluations",
+            width=1,
+            height=10,
+            when="has_evaluations",
+            hide_on_single_page=True,
         ),
-        SwitchTo(
-            Const("Назад"),
-            id="back_qloop",
-            state=EvaluationDialog.select_criterion_set,
-            when=is_first,
-        ),
-        Button(
-            Const("Назад"),
-            id="back_qloop_not_first",
-            on_click=on_prev_question,
-            when="current_question_index",
-        ),
-        state=EvaluationDialog.question_loop,
-        getter=get_current_question_data,
-    )
-
-
-def answer_question_window():
-    """Create answer question window for boolean type.
-
-    Returns:
-        Window: The configured answer question window.
-    """
-    return Window(
-        Format("{question_text}\n\nВыберите ответ:"),
-        Row(
-            Button(
-                text=Const("Да ✅"),
-                id="answer_yes",
-                on_click=on_answer_yes,
-            ),
-            Button(
-                text=Const("Нет ❌"),
-                id="answer_no",
-                on_click=on_answer_no,
-            ),
-        ),
-        SwitchTo(
-            Const("Назад"),
-            id="back_question_window",
-            state=EvaluationDialog.question_loop,
-        ),
-        state=EvaluationDialog.answer_question,
-        getter=get_current_question_data,
-    )
-
-
-def answer_text_window():
-    """Create answer text input window for string type.
-
-    Returns:
-        Window: The configured answer text input window.
-    """
-    return Window(
-        Format("{question_text}\n\nВведите текст:"),
-        MessageInput(process_text_input),
-        SwitchTo(
-            Const("Назад"),
-            id="back_answer_text_window",
-            state=EvaluationDialog.question_loop,
-        ),
-        state=EvaluationDialog.answer_text,
-        getter=get_current_question_data,
-    )
-
-
-def answer_number_window():
-    """Create answer number input window for number type.
-
-    Returns:
-        Window: The configured answer number input window.
-    """
-    return Window(
-        Format("{question_text}\n\nВведите число:"),
-        MessageInput(process_number_input),
-        SwitchTo(
-            Const("Назад"),
-            id="back_answer_number_window",
-            state=EvaluationDialog.question_loop,
-        ),
-        state=EvaluationDialog.answer_number,
-        getter=get_current_question_data,
-    )
-
-
-def add_comment_window():
-    """Create add comment window.
-
-    Returns:
-        Window: The configured add comment window.
-    """
-    return Window(
-        Format("Оставить комментарий к ответу? (или нажмите 'Пропустить'):"),
-        MessageInput(process_comment_input),
-        Row(
-            Button(
-                text=Const("Пропустить ⏭️"),
-                id="skip_comment",
-                on_click=on_skip_comment,
-            ),
-        ),
-        SwitchTo(
-            Const("Назад"),
-            id="back_to_answer_question",
-            state=EvaluationDialog.answer_question,
-            when="is_boolean_question",
-        ),
-        SwitchTo(
-            Const("Назад"),
-            id="back_to_answer_text",
-            state=EvaluationDialog.answer_text,
-            when="is_string_question",
-        ),
-        SwitchTo(
-            Const("Назад"),
-            id="back_to_answer_number",
-            state=EvaluationDialog.answer_number,
-            when="is_number_question",
-        ),
-        state=EvaluationDialog.add_comment,
-        getter=get_add_comment_data,
-    )
-
-
-def send_to_employee_window():
-    """Create send to employee window.
-
-    Returns:
-        Window: The configured send to employee window.
-    """
-    return Window(
         Format(
-            "Все вопросы пройдены!\n\n"
-            "Нажмите 'Отправить сотруднику' для завершения замера и отправки результатов."
+            "Нет замеров для удаления.",
+            when=lambda data, widget, manager: not data.get("has_evaluations", False),
         ),
-        Row(
-            Button(
-                text=Const("Отправить сотруднику 📤"),
-                id="send_to_employee",
-                on_click=on_send_to_employee,
-            ),
-        ),
-        Button(
+        Cancel(
             Const("Назад"),
-            id="back_to_last_question",
-            on_click=on_back_to_last_question,
+            id="back_to_evaluations_menu",
         ),
-        state=EvaluationDialog.send_to_employee,
-    )
-
-
-def generate_pdf_window():
-    """Create generate PDF/Excel window.
-
-    Returns:
-        Window: The configured generate PDF/Excel window.
-    """
-    return Window(
-        Format("{message_text}"),
-        Row(
-            Button(
-                text=Const("Сгенерировать PDF 📄"),
-                id="generate_pdf",
-                on_click=on_generate_pdf,
-                when="show_pdf_button",
-            ),
-            Button(
-                text=Const("Сгенерировать Excel 📊"),
-                id="generate_excel",
-                on_click=on_generate_excel,
-                when="show_excel_button",
-            ),
-        ),
-        Row(
-            Button(
-                text=Const("Завершить ✅"),
-                id="skip_pdf",
-                on_click=on_skip_pdf,
-                when="both_generated",
-            ),
-            Button(
-                text=Const("Пропустить ⏭️"),
-                id="skip_pdf",
-                on_click=on_skip_pdf,
-                when="show_skip_button",
-            ),
-        ),
-        state=EvaluationDialog.generate_pdf,
-        getter=get_report_generation_data,
+        state=EvaluationDialog.select_evaluation_to_delete,
+        getter=get_evaluations_list_data_for_deletion,
     )

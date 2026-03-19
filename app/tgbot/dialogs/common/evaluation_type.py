@@ -20,6 +20,7 @@ from dependency_injector.wiring import Provide, inject
 
 from app.internal import Container
 from app.internal.usecases.evaluation_type_service import EvaluationTypeService
+from app.internal.usecases.organization_service import OrganizationService
 
 
 @inject
@@ -28,21 +29,63 @@ async def get_evaluation_types_list_data(
     evaluation_type_service: EvaluationTypeService = Provide[
         Container.evaluation_type_service
     ],
+    organization_service: OrganizationService = Provide[Container.organization_service],
     *args,
     **kwargs,
 ):
     """Get data for evaluation types list window.
+    
+    Gets evaluation types from ALL organizations where user is a member.
 
     Args:
         dialog_manager: Dialog manager instance.
         evaluation_type_service: EvaluationType service instance (injected).
+        organization_service: Organization service instance (injected).
         *args: Variable length argument list.
         **kwargs: Arbitrary keyword arguments.
 
     Returns:
         Dictionary with evaluation types list data.
     """
-    evaluation_types = await evaluation_type_service.get_all()
+    # Get all organizations where user is a member
+    telegram_id = None
+    if dialog_manager.event and hasattr(dialog_manager.event, "from_user") and dialog_manager.event.from_user:
+        telegram_id = dialog_manager.event.from_user.id
+    
+    if not telegram_id:
+        return {
+            "evaluation_types": [],
+            "has_evaluation_types": False,
+            "evaluation_types_count": 0,
+            "no_evaluation_types": True,
+        }
+    
+    # Get all organizations where user is a member
+    user_organizations = await organization_service.get_all_by_user_telegram_id(telegram_id)
+    
+    if not user_organizations:
+        return {
+            "evaluation_types": [],
+            "has_evaluation_types": False,
+            "evaluation_types_count": 0,
+            "no_evaluation_types": True,
+        }
+    
+    # Get evaluation types from all user's organizations
+    all_evaluation_types = []
+    organization_ids = []
+    for org in user_organizations:
+        organization_ids.append(org.id)
+        org_evaluation_types = await evaluation_type_service.get_all(organization_id=org.id)
+        all_evaluation_types.extend(org_evaluation_types)
+    
+    # Update dialog_data and middleware_data with first organization (for compatibility)
+    if user_organizations:
+        dialog_manager.dialog_data["organization_id"] = user_organizations[0].id
+        dialog_manager.middleware_data["organization"] = user_organizations[0]
+        dialog_manager.dialog_data["user_organization_ids"] = organization_ids
+
+    evaluation_types = all_evaluation_types
 
     return {
         "evaluation_types": evaluation_types,
@@ -103,6 +146,7 @@ async def _handle_evaluation_type_select(
     evaluation_type_service: EvaluationTypeService = Provide[
         Container.evaluation_type_service
     ],
+    organization_service: OrganizationService = Provide[Container.organization_service],
 ):
     """Internal handler for evaluation type selection.
 
@@ -113,6 +157,7 @@ async def _handle_evaluation_type_select(
         item_id: Selected evaluation type ID.
         handler_id: Handler configuration ID.
         evaluation_type_service: EvaluationType service instance (injected).
+        organization_service: Organization service instance (injected).
     """
     evaluation_type_id = int(item_id)
 
@@ -122,18 +167,44 @@ async def _handle_evaluation_type_select(
     on_success_callback = config.get("on_success_callback")
 
     evaluation_type = await evaluation_type_service.get_by_id(evaluation_type_id)
-    if evaluation_type:
-        dialog_manager.dialog_data["evaluation_type_id"] = evaluation_type_id
-        if on_success_callback:
-            await on_success_callback(evaluation_type, dialog_manager)
-        if next_state:
-            await dialog_manager.switch_to(next_state)
-    else:
+    if not evaluation_type:
         error_msg = on_error_message or "Ошибка: тип оценки не найден"
         from aiogram.types import Message as MessageType
 
         if callback.message and isinstance(callback.message, MessageType):
             await callback.message.answer(error_msg)
+        return
+    
+    # Check if evaluation type belongs to user's organizations
+    telegram_id = None
+    if callback.from_user:
+        telegram_id = callback.from_user.id
+    
+    user_organization_ids = dialog_manager.dialog_data.get("user_organization_ids")
+    if not user_organization_ids and telegram_id:
+        # Get all organizations where user is a member
+        user_organizations = await organization_service.get_all_by_user_telegram_id(telegram_id)
+        user_organization_ids = [org.id for org in user_organizations]
+        dialog_manager.dialog_data["user_organization_ids"] = user_organization_ids
+    
+    # Check if evaluation type belongs to one of user's organizations
+    if user_organization_ids and evaluation_type.organization_id:
+        if evaluation_type.organization_id not in user_organization_ids:
+            from aiogram.types import Message as MessageType
+            error_msg = "Ошибка: выбранный тип оценки не принадлежит вашей организации."
+            if callback.message and isinstance(callback.message, MessageType):
+                await callback.message.answer(error_msg)
+            return
+    
+    # Evaluation type is valid, proceed with selection
+    dialog_manager.dialog_data["evaluation_type_id"] = evaluation_type_id
+    if on_success_callback:
+        result = await on_success_callback(evaluation_type, dialog_manager)
+        # If callback returned True it already did its own switch_to — don't override.
+        if result is True:
+            return
+    if next_state:
+        await dialog_manager.switch_to(next_state)
 
 
 def create_evaluation_type_select_window(
@@ -184,6 +255,7 @@ def create_evaluation_type_select_window(
             width=1,
             height=10,
             when="has_evaluation_types",
+            hide_on_single_page=True,
         )
     else:
         final_select_widget = Group(select_widget, width=1)
@@ -341,10 +413,11 @@ async def get_evaluation_type_form_data(
         Dictionary with evaluation type form data.
     """
     data = dialog_manager.dialog_data
+    description = data.get("evaluation_type_description")
     return {
         "name": data.get("evaluation_type_name", ""),
         "code": data.get("evaluation_type_code", ""),
-        "description": data.get("evaluation_type_description", "Не указано"),
+        "description": description if description else "Не указано",
     }
 
 
@@ -504,6 +577,9 @@ async def confirm_evaluation_type(
     evaluation_type_service: EvaluationTypeService = Provide[
         Container.evaluation_type_service
     ],
+    organization_service: OrganizationService = Provide[
+        Container.organization_service
+    ],
 ):
     """Handle confirm evaluation type button click.
 
@@ -513,11 +589,13 @@ async def confirm_evaluation_type(
         dialog_manager: Dialog manager.
         next_state: State to switch to after confirmation.
         evaluation_type_service: EvaluationType service instance (injected).
+        organization_service: Organization service instance (injected).
     """
     data = dialog_manager.dialog_data
 
     name: str = data.get("evaluation_type_name", "")
     code: str = data.get("evaluation_type_code", "")
+    organization_id = data.get("organization_id")
 
     if not name or not code:
         from aiogram.types import Message as MessageType
@@ -528,12 +606,34 @@ async def confirm_evaluation_type(
             )
         return
 
+    # If organization_id is not set, try to get from user's organization
+    if not organization_id:
+        telegram_id = None
+        if callback.from_user:
+            telegram_id = callback.from_user.id
+        
+        if telegram_id:
+            organization = await organization_service.get_by_user_telegram_id(telegram_id)
+            if organization:
+                organization_id = organization.id
+                data["organization_id"] = organization_id
+
+    if not organization_id:
+        from aiogram.types import Message as MessageType
+
+        if callback.message and isinstance(callback.message, MessageType):
+            await callback.message.answer(
+                "Ошибка: организация не выбрана. Сначала создайте или выберите организацию."
+            )
+        return
+
     # Создаем тип оценки
     from app.infra.database.repository.evaluation_type.dto import (
         CreateEvaluationTypeDTO,
     )
 
     evaluation_type_dto = CreateEvaluationTypeDTO(
+        organization_id=organization_id,
         name=name,
         code=code,
         description=data.get("evaluation_type_description"),

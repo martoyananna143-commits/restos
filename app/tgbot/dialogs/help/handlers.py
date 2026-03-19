@@ -221,6 +221,33 @@ async def on_cancel_help(
 
 
 @inject
+async def on_skip_tutorial(
+    callback: CallbackQuery,
+    button: Button,
+    dialog_manager: DialogManager,
+    organization_service: OrganizationService = Provide[Container.organization_service],
+):
+    """Skip tutorial and go to main menu or organization creation."""
+    telegram_id = None
+    if callback.from_user:
+        telegram_id = callback.from_user.id
+    elif dialog_manager.event and hasattr(dialog_manager.event, "from_user") and dialog_manager.event.from_user:
+        telegram_id = dialog_manager.event.from_user.id
+    else:
+        user_data = dialog_manager.middleware_data.get("user_data", {})
+        telegram_id = user_data.get("telegram_id")
+
+    if telegram_id:
+        organization = await organization_service.get_by_user_telegram_id(telegram_id)
+        if not organization:
+            await dialog_manager.done()
+            await dialog_manager.start(OrganizationDialog.check_organization)
+            return
+
+    await dialog_manager.done()
+
+
+@inject
 async def on_finish_tutorial(
     callback: CallbackQuery,
     button: Button,

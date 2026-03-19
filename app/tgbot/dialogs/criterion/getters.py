@@ -5,38 +5,7 @@ from dependency_injector.wiring import Provide, inject
 
 from app.internal import Container
 from app.internal.usecases.criterion_service import CriterionService
-from app.internal.usecases.evaluation_type_service import EvaluationTypeService
 from app.tgbot.dialogs.common.utils import get_form_value
-
-
-@inject
-async def get_evaluation_types_list_data(
-    dialog_manager: DialogManager,
-    evaluation_type_service: EvaluationTypeService = Provide[
-        Container.evaluation_type_service
-    ],
-    *args,
-    **kwargs,
-):
-    """Get data for evaluation types list window.
-
-    Args:
-        dialog_manager: Dialog manager instance.
-        evaluation_type_service: EvaluationType service instance (injected).
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
-
-    Returns:
-        Dictionary with evaluation types list data.
-    """
-    evaluation_types = await evaluation_type_service.get_all()
-
-    return {
-        "evaluation_types": evaluation_types,
-        "has_evaluation_types": len(evaluation_types) > 0,
-        "evaluation_types_count": len(evaluation_types),
-        "no_evaluation_types": len(evaluation_types) == 0,
-    }
 
 
 async def is_editing(
@@ -49,12 +18,8 @@ async def is_editing(
     }
 
 
-@inject
 async def get_criterion_form_data(
     dialog_manager: DialogManager,
-    evaluation_type_service: EvaluationTypeService = Provide[
-        Container.evaluation_type_service
-    ],
     *args,
     **kwargs,
 ):
@@ -62,7 +27,6 @@ async def get_criterion_form_data(
 
     Args:
         dialog_manager: Dialog manager instance.
-        evaluation_type_service: EvaluationType service instance (injected).
         *args: Variable length argument list.
         **kwargs: Arbitrary keyword arguments.
 
@@ -72,6 +36,7 @@ async def get_criterion_form_data(
     data = dialog_manager.dialog_data
     is_editing = bool(data.get("criterion_id"))
     value_type = data.get("value_type", "boolean")
+    is_required = data.get("is_required", True)
 
     value_type_names = {
         "boolean": "Да/Нет",
@@ -79,14 +44,7 @@ async def get_criterion_form_data(
         "number": "Число",
     }
     value_type_name = value_type_names.get(value_type, value_type)
-
-    # Получаем название типа оценки
-    evaluation_type_name = "Не указано"
-    evaluation_type_id = data.get("evaluation_type_id")
-    if evaluation_type_id:
-        evaluation_type = await evaluation_type_service.get_by_id(evaluation_type_id)
-        if evaluation_type:
-            evaluation_type_name = evaluation_type.name
+    is_required_name = "Да" if is_required else "Нет"
 
     return {
         "name": get_form_value(data, "name", ""),
@@ -94,7 +52,8 @@ async def get_criterion_form_data(
         "description": get_form_value(data, "description", "Не указано"),
         "value_type": value_type,
         "value_type_name": value_type_name,
-        "evaluation_type_name": evaluation_type_name,
+        "is_required": is_required,
+        "is_required_name": is_required_name,
         "is_editing": is_editing,
     }
 
@@ -118,6 +77,11 @@ async def get_criteria_list_data(
         Dictionary with criteria list data.
     """
     organization_id = dialog_manager.dialog_data.get("organization_id")
+    if not organization_id:
+        org = dialog_manager.middleware_data.get("organization")
+        if org:
+            organization_id = org.id
+            dialog_manager.dialog_data["organization_id"] = organization_id
     if not organization_id:
         return {
             "criteria": [],
@@ -147,25 +111,3 @@ async def get_criteria_list_data(
     }
 
 
-async def get_evaluation_type_form_data(
-    dialog_manager: DialogManager,
-    *args,
-    **kwargs,
-):
-    """Get data for evaluation type form window.
-
-    Args:
-        dialog_manager: Dialog manager instance.
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
-
-    Returns:
-        Dictionary with evaluation type form data.
-    """
-    data = dialog_manager.dialog_data
-    
-    return {
-        "name": get_form_value(data, "evaluation_type_name", ""),
-        "code": get_form_value(data, "evaluation_type_code", ""),
-        "description": get_form_value(data, "evaluation_type_description", "Не указано"),
-    }

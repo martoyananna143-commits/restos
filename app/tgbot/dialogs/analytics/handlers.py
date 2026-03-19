@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Set
@@ -28,6 +29,9 @@ from app.internal.usecases.pdf_report_service import PDFReportService
 from app.tgbot.dialogs.analytics.states import AnalyticsDialog
 from app.tgbot.dialogs.greeting.states import GreetingDialog
 from app.tgbot.services import broadcaster
+
+# Per-user asyncio locks to prevent concurrent bg.update() calls
+_update_locks: dict[int, asyncio.Lock] = {}
 
 logger = logging.getLogger(__name__)
 
@@ -332,7 +336,7 @@ async def _handle_ai_success_response(
             "ai_last_user_message": user_text,
             "show_last_response": True,
             "ai_processing_message": None,  # Remove processing message
-        }, "AI response")
+        }, "AI response", user_id)
     else:
         logger.info("AI response saved, but user is not on AI chat window")
 
@@ -376,22 +380,30 @@ async def _handle_ai_error_response(
             "ai_last_user_message": user_text,
             "show_last_response": True,
             "ai_processing_message": None,  # Remove processing message
-        }, "error message")
+        }, "error message", user_id)
 
 
-async def _update_ai_window(bg, data: dict, update_type: str):
-    """Update AI chat window with new data.
+async def _update_ai_window(bg, data: dict, update_type: str, user_id: int = 0):
+    """Push a UI update through ``bg.update``, serialised per-user.
 
-    Args:
-        bg: Background manager for UI updates.
-        data: Data to update.
-        update_type: Type of update for logging.
+    Rate-limiting is done by the *caller* (``_process_ai_request_stream``).
+    This function only ensures that concurrent ``bg.update()`` calls for
+    the same user are serialised (asyncio.Lock) and that Telegram flood-
+    control errors are caught gracefully.
     """
+    if user_id not in _update_locks:
+        _update_locks[user_id] = asyncio.Lock()
+
     try:
-        await bg.update(data)
-        logger.info(f"Window updated with {update_type} (user on AI chat window)")
+        async with _update_locks[user_id]:
+            await bg.update(data)
+            logger.debug("Window updated: %s", update_type)
     except Exception as e:
-        logger.error(f"Could not update window: {e}", exc_info=True)
+        err = str(e).lower()
+        if "flood control" in err or "too many requests" in err or "retry after" in err:
+            logger.warning("Telegram flood control hit, skipping UI update")
+        else:
+            logger.error("Could not update window: %s", e)
 
 
 async def _process_ai_request(
@@ -471,20 +483,17 @@ async def _process_ai_request_stream(
     dialog_manager: Optional[DialogManager] = None,
     is_on_ai_chat_window: bool = False,
 ):
-    """Process AI request with streaming in background.
+    """Try streaming first; fall back to non-streaming after 30 s.
 
-    Args:
-        ai_assistant_service: AI assistant service instance.
-        user_id: User ID.
-        chat_id: Chat ID.
-        user_text: User question text.
-        conversation_history: Current conversation history.
-        data_context: Data context for AI.
-        dialog_manager: Optional dialog manager for UI updates.
-        is_on_ai_chat_window: Whether user is on AI chat window (set before task launch).
+    Flow:
+      1. Launch ``process_ai_request_stream`` (parallel streams).
+      2. If it yields a valid ``completed`` result — great, use it.
+      3. If it yields an ``error`` (all streams failed / timeout) —
+         **don't give up** — fall back to ``process_ai_request``
+         (non-streaming parallel workers) with the same context.
+      4. If the non-streaming fallback also fails — then report error.
     """
     bg = None
-
     if dialog_manager and is_on_ai_chat_window:
         try:
             bg = dialog_manager.bg()
@@ -495,8 +504,14 @@ async def _process_ai_request_stream(
     else:
         logger.info("User is NOT on AI chat window, will show button on return")
 
+    # ------------------------------------------------------------------
+    # Phase 1: streaming
+    # ------------------------------------------------------------------
+    stream_succeeded = False
+    stream_error_msg: Optional[str] = None
     last_update_text = ""
-    sentence_endings = {'. ', '! ', '? ', '.\n', '!\n', '?\n'}
+    last_update_time = 0.0
+    _SENTENCE_ENDINGS = {". ", "! ", "? ", ".\n", "!\n", "?\n"}
 
     try:
         async for stream_data in ai_assistant_service.process_ai_request_stream(
@@ -506,22 +521,19 @@ async def _process_ai_request_stream(
             conversation_history=conversation_history,
             data_context=data_context,
         ):
-            # Check for errors
+            # --- error from stream ---
             if stream_data.get("error"):
-                error_msg = stream_data["error"]
-                await _handle_ai_error_response(
-                    ai_assistant_service, user_id, chat_id, user_text,
-                    error_msg, stream_data.get("conversation_history", conversation_history),
-                    bg, is_on_ai_chat_window
-                )
-                return
+                stream_error_msg = stream_data["error"]
+                logger.warning("Stream phase failed: %s — will try non-stream fallback", stream_error_msg)
+                break  # don't return — fall through to Phase 2
 
-            # Check if completed
+            # --- completed ---
             if stream_data.get("completed"):
                 full_text = stream_data.get("full_text", "")
-                updated_history = stream_data.get("conversation_history", conversation_history)
-                
-                # Final update
+                updated_history = stream_data.get(
+                    "conversation_history", conversation_history
+                )
+
                 if bg and is_on_ai_chat_window and full_text:
                     await _update_ai_window(bg, {
                         "ai_conversation_history": updated_history,
@@ -529,9 +541,8 @@ async def _process_ai_request_stream(
                         "ai_last_user_message": user_text,
                         "show_last_response": True,
                         "ai_processing_message": None,
-                    }, "AI stream completed")
+                    }, "AI stream completed", user_id)
 
-                # Save to Redis
                 await ai_assistant_service.save_conversation_data(
                     user_id=user_id,
                     chat_id=chat_id,
@@ -541,43 +552,96 @@ async def _process_ai_request_stream(
                     show_last_response=False,
                 )
                 logger.info("Stream conversation history saved to Redis")
-                return
+                stream_succeeded = True
+                return  # done!
 
-            # Process chunk
+            # --- intermediate chunk ---
             chunk = stream_data.get("chunk")
-            if chunk:
+            if chunk and bg and is_on_ai_chat_window:
                 full_text = stream_data.get("full_text", "")
+                text_delta = len(full_text) - len(last_update_text)
+                now = time.time()
+                time_delta = now - last_update_time
 
-                # Update UI when we have a complete sentence or every 50 characters
                 should_update = False
-                if len(full_text) - len(last_update_text) >= 50:
-                    # Update every 50 characters
+                if time_delta >= 1.0 and text_delta >= 100:
                     should_update = True
-                else:
-                    # Check for sentence endings
-                    for ending in sentence_endings:
+                elif time_delta >= 1.0:
+                    for ending in _SENTENCE_ENDINGS:
                         if ending in chunk or full_text.endswith(ending.rstrip()):
                             should_update = True
                             break
 
-                if should_update and bg and is_on_ai_chat_window:
-                    updated_history = stream_data.get("conversation_history", conversation_history)
+                if should_update:
                     await _update_ai_window(bg, {
-                        "ai_conversation_history": updated_history,
+                        "ai_conversation_history": stream_data.get(
+                            "conversation_history", conversation_history
+                        ),
                         "ai_last_response": full_text,
                         "ai_last_user_message": user_text,
                         "show_last_response": True,
                         "ai_processing_message": None,
-                    }, "AI stream chunk")
+                    }, "AI stream chunk", user_id)
                     last_update_text = full_text
+                    last_update_time = now
 
     except Exception as e:
-        logger.error(f"Error processing AI stream message: {e}", exc_info=True)
-        error_msg = f"❌ Ошибка при обработке stream запроса: {str(e)}"
+        logger.error(f"Stream phase exception: {e}", exc_info=True)
+        stream_error_msg = str(e)
 
+    if stream_succeeded:
+        return
+
+    # ------------------------------------------------------------------
+    # Phase 2: non-streaming fallback
+    # ------------------------------------------------------------------
+    logger.info(
+        "[fallback] Streaming failed (%s) — switching to non-stream request",
+        stream_error_msg or "unknown",
+    )
+
+    # Update UI to let the user know we're still trying
+    if bg and is_on_ai_chat_window:
+        try:
+            await _update_ai_window(bg, {
+                "ai_processing_message": (
+                    "🤖 Стриминг не удался, пробую другой способ...\n\n"
+                    "💡 Ожидайте, это может занять до 20 секунд."
+                ),
+            }, "fallback notice", user_id)
+        except Exception:
+            pass
+
+    try:
+        result = await ai_assistant_service.process_ai_request(
+            user_id=user_id,
+            chat_id=chat_id,
+            user_text=user_text,
+            conversation_history=conversation_history,
+            data_context=data_context,
+        )
+
+        if result["success"]:
+            logger.info("[fallback] Non-stream request succeeded")
+            await _handle_ai_success_response(
+                ai_assistant_service, user_id, chat_id, user_text,
+                result, bg, is_on_ai_chat_window,
+            )
+        else:
+            logger.warning("[fallback] Non-stream request also failed")
+            await _handle_ai_error_response(
+                ai_assistant_service, user_id, chat_id, user_text,
+                result["response"],
+                result["conversation_history"],
+                bg, is_on_ai_chat_window,
+            )
+
+    except Exception as e:
+        logger.error(f"[fallback] Non-stream exception: {e}", exc_info=True)
         await _handle_ai_error_response(
             ai_assistant_service, user_id, chat_id, user_text,
-            error_msg, conversation_history, bg, is_on_ai_chat_window
+            f"❌ Ошибка при обработке запроса: {e}",
+            conversation_history, bg, is_on_ai_chat_window,
         )
 
 
@@ -587,6 +651,10 @@ async def on_ai_message(
     widget: MessageInput,
     dialog_manager: DialogManager,
     ai_assistant_service: AIAssistantService = Provide[Container.ai_assistant_service],
+    analytics_service: AnalyticsService = Provide[Container.analytics_service],
+    organization_service: OrganizationService = Provide[Container.organization_service],
+    criterion_service: CriterionService = Provide[Container.criterion_service],
+    employee_service: EmployeeService = Provide[Container.employee_service],
 ):
     """Handle user message in AI assistant chat.
 
@@ -595,6 +663,10 @@ async def on_ai_message(
         widget: MessageInput widget.
         dialog_manager: Dialog manager.
         ai_assistant_service: AI assistant service instance (injected).
+        analytics_service: Analytics service (injected, for fallback data loading).
+        organization_service: Organization service (injected, for fallback data loading).
+        criterion_service: Criterion service (injected, for fallback data loading).
+        employee_service: Employee service (injected, for fallback data loading).
     """
 
     user_text = message.text or ""
@@ -622,14 +694,57 @@ async def on_ai_message(
         stored_data = await ai_service.load_conversation_data(user_id, chat_id)
         conversation_history = stored_data.get("ai_conversation_history", [])
 
-    # Get cached data_context from dialog_data (set by get_ai_assistant_data)
-    # If not cached, we'll get it in the background task
+    # ──────────────────────────────────────────────────────────────
+    # Get data_context with FALLBACK loading.
+    # The getter (get_ai_assistant_data) normally caches this, but
+    # in some edge cases the cache may be empty (race conditions,
+    # getter errors, dialog_data eviction).  If so, we reload here.
+    # ──────────────────────────────────────────────────────────────
     data_context = dialog_manager.dialog_data.get("ai_data_context", "")
+    data_type = dialog_manager.dialog_data.get("ai_data_type", "none")
+    organization_id = dialog_manager.dialog_data.get("organization_id")
+
+    if not data_context and data_type != "none" and organization_id:
+        logger.warning(
+            "data_context is EMPTY but data_type=%s, org_id=%s — fallback loading!",
+            data_type, organization_id,
+        )
+        try:
+            from app.tgbot.dialogs.analytics.getters import _load_data_context
+
+            org = await organization_service.get_by_id(organization_id)
+            org_name = org.name if org else f"Организация #{organization_id}"
+            data_context = await _load_data_context(
+                data_type=data_type,
+                organization_id=organization_id,
+                org_name=org_name,
+                dialog_manager=dialog_manager,
+                analytics_service=analytics_service,
+                organization_service=organization_service,
+                criterion_service=criterion_service,
+                employee_service=employee_service,
+            )
+            # Cache it so subsequent messages don't need to reload
+            dialog_manager.dialog_data["ai_data_context"] = data_context
+            logger.info(
+                "Fallback loaded data_context: %d chars", len(data_context)
+            )
+        except Exception as e:
+            logger.error("Fallback data_context loading failed: %s", e, exc_info=True)
+            data_context = ""
+
+    if data_context:
+        logger.info(
+            "AI request with data_context: %d chars, data_type=%s",
+            len(data_context), data_type,
+        )
+    else:
+        logger.info("AI request WITHOUT data_context (data_type=%s)", data_type)
 
     # Set processing message - MessageInput will automatically update the window
-    # No need to call dialog_manager.show() as MessageInput handles it
     dialog_manager.dialog_data["ai_processing_message"] = (
-        "🤖 Ассистент обрабатывает ваш запрос...\n\n💡 Вы можете перейти в другие окна и вернуться позже."
+        "🤖 Ассистент обрабатывает ваш запрос...\n\n"
+        "💡 Вы можете перейти в другие окна и вернуться позже."
     )
 
     # Check if user is on AI chat window (before launching background task)
@@ -642,7 +757,6 @@ async def on_ai_message(
             current_context
             and current_context.state == AnalyticsDialog.ai_assistant_chat
         )
-        logger.info(f"User is on AI chat window: {is_on_ai_chat}")
     except Exception as e:
         logger.warning(f"Cannot check current state: {e}")
 
@@ -660,14 +774,16 @@ async def on_ai_message(
         )
     )
     _active_ai_tasks.add(task)
-    task.add_done_callback(_active_ai_tasks.discard)  # Remove from set when done
+    task.add_done_callback(_active_ai_tasks.discard)
 
 
+@inject
 async def on_select_ai_data_type(
     callback: CallbackQuery,
     widget,
     dialog_manager: DialogManager,
     item_id: str,
+    ai_assistant_service: AIAssistantService = Provide[Container.ai_assistant_service],
 ):
     """Handle AI data type selection.
 
@@ -676,18 +792,35 @@ async def on_select_ai_data_type(
         widget: Widget instance.
         dialog_manager: Dialog manager.
         item_id: Selected data type ID.
+        ai_assistant_service: AI assistant service instance (injected).
     """
     data_type = item_id
     dialog_manager.dialog_data["ai_data_type"] = data_type
     # Очищаем историю при выборе нового типа данных
     dialog_manager.dialog_data["ai_conversation_history"] = []
+    dialog_manager.dialog_data["ai_last_response"] = None
+    dialog_manager.dialog_data["ai_data_context"] = ""
     # Сбрасываем пагинацию
     dialog_manager.dialog_data["ai_data_page"] = 0
+    
+    # Очищаем данные в Redis чтобы при загрузке использовался новый data_context
+    user_id = None
+    if callback.from_user:
+        user_id = callback.from_user.id
+    if user_id and callback.message:
+        chat_id = callback.message.chat.id
+        await ai_assistant_service.delete_conversation_data(user_id, chat_id)
+        logger.info(f"Cleared AI conversation data for user {user_id} on data type change")
+    
     await dialog_manager.switch_to(AnalyticsDialog.ai_assistant_view_data)
 
 
+@inject
 async def on_start_ai_chat_without_data(
-    callback: CallbackQuery, button: Button, dialog_manager: DialogManager
+    callback: CallbackQuery, 
+    button: Button, 
+    dialog_manager: DialogManager,
+    ai_assistant_service: AIAssistantService = Provide[Container.ai_assistant_service],
 ):
     """Start AI chat without loading data.
 
@@ -695,11 +828,24 @@ async def on_start_ai_chat_without_data(
         callback: Callback query.
         button: Button widget.
         dialog_manager: Dialog manager.
+        ai_assistant_service: AI assistant service instance (injected).
     """
     # Устанавливаем тип данных как "none" для работы без данных
     dialog_manager.dialog_data["ai_data_type"] = "none"
     # Очищаем историю
     dialog_manager.dialog_data["ai_conversation_history"] = []
+    dialog_manager.dialog_data["ai_last_response"] = None
+    dialog_manager.dialog_data["ai_data_context"] = ""
+    
+    # Очищаем данные в Redis
+    user_id = None
+    if callback.from_user:
+        user_id = callback.from_user.id
+    if user_id and callback.message:
+        chat_id = callback.message.chat.id
+        await ai_assistant_service.delete_conversation_data(user_id, chat_id)
+        logger.info(f"Cleared AI conversation data for user {user_id} on chat without data")
+    
     await dialog_manager.switch_to(AnalyticsDialog.ai_assistant_chat)
 
 
@@ -1177,7 +1323,6 @@ async def _export_criterion_pdf(
         organization_name=organization_name,
         code=criterion.code,
         value_type=criterion.value_type,
-        evaluation_type_id=criterion.evaluation_type_id,
         category_id=criterion.category_id,
         is_required=criterion.is_required,
         is_active=criterion.is_active,
@@ -1614,7 +1759,6 @@ async def _export_criterion_excel(
         organization_name=organization_name,
         code=criterion.code,
         value_type=criterion.value_type,
-        evaluation_type_id=criterion.evaluation_type_id,
         category_id=criterion.category_id,
         is_required=criterion.is_required,
         is_active=criterion.is_active,
@@ -1838,3 +1982,45 @@ async def on_export_object_excel(
     except Exception as e:
         logger.error(f"Error exporting object to Excel: {e}", exc_info=True)
         await callback.answer(f"❌ Ошибка при экспорте: {str(e)}", show_alert=True)
+
+
+@inject
+async def on_delete_evaluation_from_analytics(
+    callback: CallbackQuery,
+    button: Button,
+    dialog_manager: DialogManager,
+    evaluation_service: EvaluationService = Provide[Container.evaluation_service],
+):
+    """Handle delete evaluation button click from analytics object detail.
+
+    Args:
+        callback: Callback query.
+        button: Button widget.
+        dialog_manager: Dialog manager.
+        evaluation_service: Evaluation service instance (injected).
+    """
+    object_type = dialog_manager.dialog_data.get("object_type")
+    object_id = dialog_manager.dialog_data.get("selected_object_id")
+    
+    # Check if this is an evaluation
+    if object_type not in ("evaluations", "evaluation"):
+        await callback.answer("❌ Удаление доступно только для замеров", show_alert=True)
+        return
+    
+    if not object_id:
+        await callback.answer("❌ Замер не выбран", show_alert=True)
+        return
+    
+    try:
+        # Delete the evaluation
+        success = await evaluation_service.delete(object_id)
+        
+        if success:
+            await callback.answer("✅ Замер успешно удален", show_alert=True)
+            # Return to objects list
+            await dialog_manager.switch_to(AnalyticsDialog.objects_list)
+        else:
+            await callback.answer("❌ Не удалось удалить замер", show_alert=True)
+    except Exception as e:
+        logger.error(f"Error deleting evaluation {object_id}: {e}", exc_info=True)
+        await callback.answer(f"❌ Ошибка: {str(e)}", show_alert=True)

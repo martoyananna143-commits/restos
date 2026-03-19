@@ -40,6 +40,7 @@ from app.tgbot.dialogs.organization.handlers import (
     process_name_input,
     process_phone_input,
 )
+from app.tgbot.dialogs.greeting.states import GreetingDialog
 from app.tgbot.dialogs.organization.states import OrganizationDialog
 
 
@@ -220,6 +221,7 @@ def select_organization_to_edit_window():
             width=1,
             height=10,
             when="has_organizations",
+            hide_on_single_page=True,
         ),
         Cancel(
             Const("Назад"),
@@ -334,6 +336,7 @@ def manage_employees_window():
             width=1,
             height=10,
             when="has_employees",
+            hide_on_single_page=True,
         ),
         Format(
             "Нет сотрудников в организации.",

@@ -4,6 +4,7 @@ from . import (
     criterion_set,
     employee,
     evaluation,
+    export,
     greeting,
     help,
     organization,
@@ -19,6 +20,7 @@ def all_dialogs():
         *criterion.criterion_dialogs(),
         *criterion_set.criterion_set_dialogs(),
         evaluation.evaluation_dialog(),
+        export.export_dialog(),
         *analytics.analytics_dialogs(),
     )
     for dialog_position in range(len(all_dialogs)):

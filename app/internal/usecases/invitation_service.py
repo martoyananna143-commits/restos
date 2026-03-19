@@ -42,14 +42,18 @@ class InvitationService:
     async def create_invitation(
         self,
         inviter_telegram_id: int,
-        organization_id: int,
-        ttl: int = 86400 * 7,  # 7 days default
+        organization_id: Optional[int] = None,
+        invitation_type: str = "employee",
+        employee_type_id: Optional[int] = None,
+        ttl: int = 86400 * 7,
     ) -> str:
         """Create a new invitation code.
 
         Args:
             inviter_telegram_id: Telegram ID of the user who creates the invitation.
-            organization_id: Organization ID to invite to.
+            organization_id: Organization ID to invite to (None for admin invitations).
+            invitation_type: Type of invitation - "employee" or "admin" (default: "employee").
+            employee_type_id: Role to assign on acceptance (1=employee, 2=manager, 3=admin).
             ttl: Time to live in seconds (default: 7 days).
 
         Returns:
@@ -61,6 +65,8 @@ class InvitationService:
         invitation_data = {
             "inviter_telegram_id": inviter_telegram_id,
             "organization_id": organization_id,
+            "invitation_type": invitation_type,
+            "employee_type_id": employee_type_id,
             "used": False,
         }
 
@@ -86,10 +92,16 @@ class InvitationService:
                 if hasattr(self.storage, 'data'):
                     self.storage.data[redis_key] = invitation_data
 
-            logger.info(
-                f"Created invitation code {code} for organization {organization_id} "
-                f"by user {inviter_telegram_id}"
-            )
+            if invitation_type == "admin":
+                logger.info(
+                    f"Created admin invitation code {code} "
+                    f"by user {inviter_telegram_id}"
+                )
+            else:
+                logger.info(
+                    f"Created invitation code {code} for organization {organization_id} "
+                    f"by user {inviter_telegram_id}"
+                )
             return code
         except Exception as e:
             logger.error(f"Error creating invitation code: {e}", exc_info=True)

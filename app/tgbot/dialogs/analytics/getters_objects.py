@@ -86,6 +86,11 @@ async def get_objects_list_data(
         Dictionary with paginated objects list data.
     """
     organization_id = dialog_manager.dialog_data.get("organization_id")
+    if not organization_id:
+        org = dialog_manager.middleware_data.get("organization")
+        if org:
+            organization_id = org.id
+            dialog_manager.dialog_data["organization_id"] = organization_id
     object_type = dialog_manager.dialog_data.get("object_type")
     current_page = dialog_manager.dialog_data.get("objects_page", 0)
     items_per_page = 5
@@ -269,7 +274,7 @@ async def get_object_detail_data(
     try:
         detail_lines = []
         
-        if not object_type:
+        if not object_type: 
             return {
                 "detail_text": "❌ Тип объекта не указан.",
                 "object_type": object_type,
@@ -446,7 +451,6 @@ async def get_object_detail_data(
                 f"ID: {criterion.id}",
                 f"Код: {criterion.code}",
                 f"Тип значения: {criterion.value_type}",
-                f"Тип оценки ID: {criterion.evaluation_type_id}",
                 f"Категория ID: {criterion.category_id or 'Нет'}",
                 f"Обязательный: {'Да' if criterion.is_required else 'Нет'}",
                 f"Активен: {'Да' if criterion.is_active else 'Нет'}",
@@ -577,11 +581,13 @@ async def get_object_detail_data(
             }
         
         detail_text = "\n".join(detail_lines)
+        is_evaluation = object_type in ("evaluations", "evaluation")
         
         return {
             "detail_text": detail_text,
             "object_type": object_type,
             "object_id": object_id,
+            "is_evaluation": is_evaluation,
         }
         
     except Exception as e:
@@ -590,5 +596,6 @@ async def get_object_detail_data(
             "detail_text": f"❌ Ошибка при загрузке данных: {str(e)}",
             "object_type": object_type,
             "object_id": object_id,
+            "is_evaluation": False,
         }
 

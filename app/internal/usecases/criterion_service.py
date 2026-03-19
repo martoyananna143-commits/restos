@@ -34,6 +34,14 @@ class CriterionService:
         """
         return await self.repository.get_by_id(criterion_id)
 
+    async def get_all(self) -> list[CriterionDTO]:
+        """Get all criteria across all organizations.
+
+        Returns:
+            List of CriterionDTO instances.
+        """
+        return await self.repository.get_all()
+
     async def get_by_organization_id(
         self, organization_id: int
     ) -> list[CriterionDTO]:
@@ -46,19 +54,6 @@ class CriterionService:
             List of CriterionDTO instances.
         """
         return await self.repository.get_by_organization_id(organization_id)
-
-    async def get_by_evaluation_type_id(
-        self, evaluation_type_id: int
-    ) -> list[CriterionDTO]:
-        """Get all criteria by evaluation type ID.
-
-        Args:
-            evaluation_type_id: Evaluation type ID.
-
-        Returns:
-            List of CriterionDTO instances.
-        """
-        return await self.repository.get_by_evaluation_type_id(evaluation_type_id)
 
     async def get_by_ids(self, criterion_ids: list[int]) -> list[CriterionDTO]:
         """Get criteria by list of IDs.

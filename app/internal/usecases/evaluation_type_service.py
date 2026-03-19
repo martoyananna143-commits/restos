@@ -23,13 +23,27 @@ class EvaluationTypeService:
         """
         self.repository = repository
 
-    async def get_all(self) -> list[EvaluationTypeDTO]:
+    async def get_all(self, organization_id: int | None = None) -> list[EvaluationTypeDTO]:
         """Get all active evaluation types.
+
+        Args:
+            organization_id: Optional organization ID to filter by.
 
         Returns:
             List of EvaluationTypeDTO instances.
         """
-        return await self.repository.get_all()
+        return await self.repository.get_all(organization_id=organization_id)
+
+    async def get_by_organization(self, organization_id: int) -> list[EvaluationTypeDTO]:
+        """Get all active evaluation types for a specific organization.
+
+        Args:
+            organization_id: Organization ID to filter by.
+
+        Returns:
+            List of EvaluationTypeDTO instances.
+        """
+        return await self.repository.get_all(organization_id=organization_id)
 
     async def get_by_id(self, evaluation_type_id: int) -> Optional[EvaluationTypeDTO]:
         """Get evaluation type by ID.
@@ -67,6 +81,5 @@ class EvaluationTypeService:
         Returns:
             Updated EvaluationTypeDTO instance or None if not found.
         """
-        # TODO: Implement update method in repository if needed
-        return None
+        return await self.repository.update(evaluation_type_id, dto)
 

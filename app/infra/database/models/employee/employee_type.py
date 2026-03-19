@@ -21,6 +21,7 @@ class EmployeeType(Base, TimestampMixin):
     code: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_administrator: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     employees: Mapped[List["Employee"]] = relationship(
         "Employee", back_populates="employee_type", lazy="selectin"

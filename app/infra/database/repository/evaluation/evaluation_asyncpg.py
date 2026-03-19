@@ -418,3 +418,170 @@ class EvaluationRepositoryAsyncpg:
                         })
 
             return list(evaluations_dict.values())
+
+    async def get_all(self) -> List[EvaluationDTO]:
+        """Get all evaluations across all organizations.
+
+        Returns:
+            List of EvaluationDTO instances.
+        """
+        pool = await self._get_pool()
+        async with get_connection(pool) as conn:
+            rows = await conn.fetch_b(
+                """
+                SELECT
+                    id, evaluation_type_id, organization_id,
+                    filled_by_employee_id, evaluated_employee_id, criterion_set_id,
+                    evaluation_date, total_criteria, passed_criteria,
+                    failed_criteria, score_percentage, comment, status,
+                    meta, created_at, updated_at, deleted_at
+                FROM evaluations
+                WHERE deleted_at IS NULL
+                ORDER BY evaluation_date DESC, id DESC
+                """,
+            )
+
+            return [
+                EvaluationDTO(
+                    id=row["id"],
+                    evaluation_type_id=row["evaluation_type_id"],
+                    organization_id=row["organization_id"],
+                    filled_by_employee_id=row["filled_by_employee_id"],
+                    evaluated_employee_id=row["evaluated_employee_id"],
+                    criterion_set_id=row["criterion_set_id"],
+                    evaluation_date=row["evaluation_date"],
+                    total_criteria=row["total_criteria"],
+                    passed_criteria=row["passed_criteria"],
+                    failed_criteria=row["failed_criteria"],
+                    score_percentage=row["score_percentage"],
+                    comment=row["comment"],
+                    status=row["status"],
+                    meta=row["meta"] or {},
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                    deleted_at=row["deleted_at"],
+                )
+                for row in rows
+            ]
+
+    async def get_by_organization_id(self, organization_id: int) -> List[EvaluationDTO]:
+        """Get all evaluations by organization ID.
+
+        Args:
+            organization_id: Organization ID.
+
+        Returns:
+            List of EvaluationDTO instances.
+        """
+        pool = await self._get_pool()
+        async with get_connection(pool) as conn:
+            rows = await conn.fetch_b(
+                """
+                SELECT
+                    id, evaluation_type_id, organization_id,
+                    filled_by_employee_id, evaluated_employee_id, criterion_set_id,
+                    evaluation_date, total_criteria, passed_criteria,
+                    failed_criteria, score_percentage, comment, status,
+                    meta, created_at, updated_at, deleted_at
+                FROM evaluations
+                WHERE organization_id = :organization_id AND deleted_at IS NULL
+                ORDER BY evaluation_date DESC, id DESC
+                """,
+                organization_id=organization_id,
+            )
+
+            return [
+                EvaluationDTO(
+                    id=row["id"],
+                    evaluation_type_id=row["evaluation_type_id"],
+                    organization_id=row["organization_id"],
+                    filled_by_employee_id=row["filled_by_employee_id"],
+                    evaluated_employee_id=row["evaluated_employee_id"],
+                    criterion_set_id=row["criterion_set_id"],
+                    evaluation_date=row["evaluation_date"],
+                    total_criteria=row["total_criteria"],
+                    passed_criteria=row["passed_criteria"],
+                    failed_criteria=row["failed_criteria"],
+                    score_percentage=row["score_percentage"],
+                    comment=row["comment"],
+                    status=row["status"],
+                    meta=row["meta"] or {},
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                    deleted_at=row["deleted_at"],
+                )
+                for row in rows
+            ]
+
+    async def get_by_employee_id(self, employee_id: int) -> List[EvaluationDTO]:
+        """Get evaluations where employee participated (as filler or evaluated).
+
+        Args:
+            employee_id: Employee ID.
+
+        Returns:
+            List of EvaluationDTO instances ordered by date descending.
+        """
+        pool = await self._get_pool()
+        async with get_connection(pool) as conn:
+            rows = await conn.fetch_b(
+                """
+                SELECT
+                    id, evaluation_type_id, organization_id,
+                    filled_by_employee_id, evaluated_employee_id, criterion_set_id,
+                    evaluation_date, total_criteria, passed_criteria,
+                    failed_criteria, score_percentage, comment, status,
+                    meta, created_at, updated_at, deleted_at
+                FROM evaluations
+                WHERE (filled_by_employee_id = :employee_id
+                    OR evaluated_employee_id = :employee_id)
+                AND deleted_at IS NULL
+                ORDER BY evaluation_date DESC, id DESC
+                LIMIT 50
+                """,
+                employee_id=employee_id,
+            )
+
+            return [
+                EvaluationDTO(
+                    id=row["id"],
+                    evaluation_type_id=row["evaluation_type_id"],
+                    organization_id=row["organization_id"],
+                    filled_by_employee_id=row["filled_by_employee_id"],
+                    evaluated_employee_id=row["evaluated_employee_id"],
+                    criterion_set_id=row["criterion_set_id"],
+                    evaluation_date=row["evaluation_date"],
+                    total_criteria=row["total_criteria"],
+                    passed_criteria=row["passed_criteria"],
+                    failed_criteria=row["failed_criteria"],
+                    score_percentage=row["score_percentage"],
+                    comment=row["comment"],
+                    status=row["status"],
+                    meta=row["meta"] or {},
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                    deleted_at=row["deleted_at"],
+                )
+                for row in rows
+            ]
+
+    async def delete(self, evaluation_id: int) -> bool:
+        """Soft delete evaluation.
+
+        Args:
+            evaluation_id: Evaluation ID to delete.
+
+        Returns:
+            True if deleted, False otherwise.
+        """
+        pool = await self._get_pool()
+        async with get_connection(pool) as conn:
+            result = await conn.execute_b(
+                """
+                UPDATE evaluations
+                SET deleted_at = NOW(), updated_at = NOW()
+                WHERE id = :evaluation_id AND deleted_at IS NULL
+                """,
+                evaluation_id=evaluation_id,
+            )
+            return result == "UPDATE 1"

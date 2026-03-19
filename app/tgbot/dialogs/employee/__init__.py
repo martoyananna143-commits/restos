@@ -16,6 +16,7 @@ def employee_dialogs():
             windows.full_name_input_window(),
             windows.position_input_window(),
             windows.phone_input_window(),
+            windows.select_role_window(),
             windows.confirm_window(),
             windows.add_more_window(),
         ),

@@ -27,17 +27,19 @@ async def _check_administrator_access(
     dialog_manager: DialogManager,
     employee_service: EmployeeService,
     organization_service: OrganizationService = Provide[Container.organization_service],
+    user_service = Provide[Container.user_service],
 ) -> bool:
     """Check if user has administrator access in current organization.
 
     First checks if user is in TGBOT_ADMIN_IDS from env (this takes precedence),
-    then checks employee_type_code in organization.
+    then checks is_bot_administrator flag, then checks employee_type_code in organization.
 
     Args:
         callback: Callback query.
         dialog_manager: Dialog manager.
         employee_service: Employee service instance.
         organization_service: Organization service instance (injected).
+        user_service: User service instance (injected).
 
     Returns:
         True if user is administrator in current organization, False otherwise.
@@ -51,6 +53,17 @@ async def _check_administrator_access(
 
     # First check: if user is in TGBOT_ADMIN_IDS, they have admin access regardless of employee_type
     if telegram_id in config.TGBOT_ADMIN_IDS:
+        return True
+    
+    # Second check: check if user has is_bot_administrator flag
+    user = dialog_manager.middleware_data.get("user")
+    if not user:
+        # Get user from repository
+        user = await user_service.repository.get_by_telegram_id(telegram_id, 0)
+        if user:
+            dialog_manager.middleware_data["user"] = user
+    
+    if user and hasattr(user, 'is_bot_administrator') and user.is_bot_administrator:
         return True
 
     # Second check: check employee_type in organization
@@ -887,3 +900,5 @@ async def on_invite_employee(
             await callback.message.answer(
                 f"❌ Ошибка при создании приглашения: {str(e)}"
             )
+
+

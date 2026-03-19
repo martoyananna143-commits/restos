@@ -76,8 +76,8 @@ class UserRepositoryAsyncpg:
                 """
                 SELECT 
                     id, telegram_id, username, first_name, last_name,
-                    chat_id, is_verified, is_active, joined_at,
-                    created_at, updated_at, deleted_at, version
+                    chat_id, is_verified, is_active, is_bot_administrator, joined_at,
+                    created_at, updated_at, deleted_at, version, current_organization_id
                 FROM users
                 WHERE telegram_id = :telegram_id 
                     AND chat_id = :chat_id 
@@ -90,20 +90,61 @@ class UserRepositoryAsyncpg:
             if not row:
                 return None
 
-            return UserDTO(
-                id=row["id"],
-                telegram_id=row["telegram_id"],
-                username=row["username"],
-                first_name=row["first_name"],
-                last_name=row["last_name"],
-                chat_id=row["chat_id"],
-                is_verified=row["is_verified"],
-                is_active=row["is_active"],
-                joined_at=row["joined_at"],
-                created_at=row["created_at"],
-                updated_at=row["updated_at"],
-                deleted_at=row["deleted_at"],
-                version=row.get("version", 0),
+            return self._row_to_dto(row)
+
+    async def get_by_telegram_id_any_chat(self, telegram_id: int) -> Optional[UserDTO]:
+        """Get user by telegram_id (any chat). Use when chat_id is unknown (e.g. in getters)."""
+        pool = await self._get_pool()
+        async with get_connection(pool) as conn:
+            row = await conn.fetchrow_b(
+                """
+                SELECT
+                    id, telegram_id, username, first_name, last_name,
+                    chat_id, is_verified, is_active, is_bot_administrator, joined_at,
+                    created_at, updated_at, deleted_at, version, current_organization_id
+                FROM users
+                WHERE telegram_id = :telegram_id AND deleted_at IS NULL
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                telegram_id=telegram_id,
+            )
+            if not row:
+                return None
+            return self._row_to_dto(row)
+
+    @staticmethod
+    def _row_to_dto(row) -> UserDTO:
+        return UserDTO(
+            id=row["id"],
+            telegram_id=row["telegram_id"],
+            username=row["username"],
+            first_name=row["first_name"],
+            last_name=row["last_name"],
+            chat_id=row["chat_id"],
+            is_verified=row["is_verified"],
+            is_active=row["is_active"],
+            is_bot_administrator=row.get("is_bot_administrator", False),
+            joined_at=row["joined_at"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            deleted_at=row["deleted_at"],
+            version=row.get("version", 0),
+            current_organization_id=row.get("current_organization_id"),
+        )
+
+    async def set_current_organization(self, user_id: int, organization_id: int) -> None:
+        """Persist the user's active organization choice."""
+        pool = await self._get_pool()
+        async with get_connection(pool) as conn:
+            await conn.execute_b(
+                """
+                UPDATE users
+                SET current_organization_id = :org_id, updated_at = NOW()
+                WHERE id = :user_id
+                """,
+                org_id=organization_id,
+                user_id=user_id,
             )
 
     async def create(self, dto: CreateUserDTO) -> UserDTO:
@@ -122,16 +163,16 @@ class UserRepositoryAsyncpg:
                 """
                 INSERT INTO users (
                     telegram_id, username, first_name, last_name,
-                    chat_id, is_verified, is_active, joined_at, version
+                    chat_id, is_verified, is_active, is_bot_administrator, joined_at, version
                 )
                 VALUES (
                     :telegram_id, :username, :first_name, :last_name,
-                    :chat_id, :is_verified, :is_active, :joined_at, :version
+                    :chat_id, :is_verified, :is_active, :is_bot_administrator, :joined_at, :version
                 )
                 RETURNING 
                     id, telegram_id, username, first_name, last_name,
-                    chat_id, is_verified, is_active, joined_at,
-                    created_at, updated_at, deleted_at, version
+                    chat_id, is_verified, is_active, is_bot_administrator, joined_at,
+                    created_at, updated_at, deleted_at, version, current_organization_id
                 """,
                 telegram_id=dto.telegram_id,
                 username=dto.username,
@@ -140,25 +181,12 @@ class UserRepositoryAsyncpg:
                 chat_id=dto.chat_id,
                 is_verified=dto.is_verified,
                 is_active=dto.is_active,
+                is_bot_administrator=dto.is_bot_administrator,
                 joined_at=dto.joined_at or datetime.utcnow(),
                 version=0,
             )
 
-            return UserDTO(
-                id=row["id"],
-                telegram_id=row["telegram_id"],
-                username=row["username"],
-                first_name=row["first_name"],
-                last_name=row["last_name"],
-                chat_id=row["chat_id"],
-                is_verified=row["is_verified"],
-                is_active=row["is_active"],
-                joined_at=row["joined_at"],
-                created_at=row["created_at"],
-                updated_at=row["updated_at"],
-                deleted_at=row["deleted_at"],
-                version=row.get("version", 0),
-            )
+            return self._row_to_dto(row)
 
     async def update(self, user_id: int, dto: UpdateUserDTO) -> Optional[UserDTO]:
         """Update user data.
@@ -177,7 +205,9 @@ class UserRepositoryAsyncpg:
             dto.last_name is not None,
             dto.is_verified is not None,
             dto.is_active is not None,
+            dto.is_bot_administrator is not None,
             dto.version is not None,
+            dto.current_organization_id is not None,
         ])
 
         if not has_updates:
@@ -197,8 +227,12 @@ class UserRepositoryAsyncpg:
                 set_parts.append("is_verified = :is_verified")
             if dto.is_active is not None:
                 set_parts.append("is_active = :is_active")
+            if dto.is_bot_administrator is not None:
+                set_parts.append("is_bot_administrator = :is_bot_administrator")
             if dto.version is not None:
                 set_parts.append("version = :version")
+            if dto.current_organization_id is not None:
+                set_parts.append("current_organization_id = :current_organization_id")
             set_parts.append("updated_at = NOW()")
             
             set_clause = ", ".join(set_parts)
@@ -215,8 +249,12 @@ class UserRepositoryAsyncpg:
                 update_params["is_verified"] = dto.is_verified
             if dto.is_active is not None:
                 update_params["is_active"] = dto.is_active
+            if dto.is_bot_administrator is not None:
+                update_params["is_bot_administrator"] = dto.is_bot_administrator
             if dto.version is not None:
                 update_params["version"] = dto.version
+            if dto.current_organization_id is not None:
+                update_params["current_organization_id"] = dto.current_organization_id
             update_params["user_id"] = user_id
             
             # Use fetchrow_b with named parameters directly
@@ -227,8 +265,8 @@ class UserRepositoryAsyncpg:
                 WHERE id = :user_id AND deleted_at IS NULL
                 RETURNING 
                     id, telegram_id, username, first_name, last_name,
-                    chat_id, is_verified, is_active, joined_at,
-                    created_at, updated_at, deleted_at, version
+                    chat_id, is_verified, is_active, is_bot_administrator, joined_at,
+                    created_at, updated_at, deleted_at, version, current_organization_id
                 """,
                 **update_params,
             )
@@ -236,19 +274,5 @@ class UserRepositoryAsyncpg:
             if not row:
                 return None
 
-            return UserDTO(
-                id=row["id"],
-                telegram_id=row["telegram_id"],
-                username=row["username"],
-                first_name=row["first_name"],
-                last_name=row["last_name"],
-                chat_id=row["chat_id"],
-                is_verified=row["is_verified"],
-                is_active=row["is_active"],
-                joined_at=row["joined_at"],
-                created_at=row["created_at"],
-                updated_at=row["updated_at"],
-                deleted_at=row["deleted_at"],
-                version=row.get("version", 0),
-            )
+            return self._row_to_dto(row)
 

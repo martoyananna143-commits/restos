@@ -115,6 +115,41 @@ class OrganizationRepositoryAsyncpg:
                 for row in rows
             ]
 
+    async def get_all(self) -> list[OrganizationDTO]:
+        """Get all organizations.
+
+        Returns:
+            List of OrganizationDTO instances.
+        """
+        pool = await self._get_pool()
+        async with get_connection(pool) as conn:
+            rows = await conn.fetch_b(
+                """
+                SELECT
+                    id, name, code, address, phone,
+                    is_active, meta, created_at, updated_at, deleted_at
+                FROM organizations
+                WHERE deleted_at IS NULL
+                ORDER BY name ASC
+                """,
+            )
+
+            return [
+                OrganizationDTO(
+                    id=row["id"],
+                    name=row["name"],
+                    code=row["code"],
+                    address=row["address"],
+                    phone=row["phone"],
+                    is_active=row["is_active"],
+                    meta=row["meta"] or {},
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                    deleted_at=row["deleted_at"],
+                )
+                for row in rows
+            ]
+
     async def get_by_id(self, organization_id: int) -> Optional[OrganizationDTO]:
         """Get organization by ID.
 

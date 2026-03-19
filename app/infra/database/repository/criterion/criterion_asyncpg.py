@@ -64,7 +64,7 @@ class CriterionRepositoryAsyncpg:
             row = await conn.fetchrow_b(
                 """
                 SELECT
-                    id, organization_id, category_id, evaluation_type_id, name, code,
+                    id, organization_id, category_id, name, code,
                     description, sort_order, is_required, is_active, value_type,
                     created_at, updated_at, deleted_at
                 FROM criteria
@@ -80,7 +80,6 @@ class CriterionRepositoryAsyncpg:
                 id=row["id"],
                 organization_id=row["organization_id"],
                 category_id=row["category_id"],
-                evaluation_type_id=row["evaluation_type_id"],
                 name=row["name"],
                 code=row["code"],
                 description=row["description"],
@@ -92,6 +91,45 @@ class CriterionRepositoryAsyncpg:
                 updated_at=row["updated_at"],
                 deleted_at=row["deleted_at"],
             )
+
+    async def get_all(self) -> list[CriterionDTO]:
+        """Get all criteria across all organizations.
+
+        Returns:
+            List of CriterionDTO instances.
+        """
+        pool = await self._get_pool()
+        async with get_connection(pool) as conn:
+            rows = await conn.fetch_b(
+                """
+                SELECT
+                    id, organization_id, category_id, name, code,
+                    description, sort_order, is_required, is_active, value_type,
+                    created_at, updated_at, deleted_at
+                FROM criteria
+                WHERE deleted_at IS NULL
+                ORDER BY organization_id ASC, sort_order ASC, name ASC
+                """,
+            )
+
+            return [
+                CriterionDTO(
+                    id=row["id"],
+                    organization_id=row["organization_id"],
+                    category_id=row["category_id"],
+                    name=row["name"],
+                    code=row["code"],
+                    description=row["description"],
+                    sort_order=row["sort_order"],
+                    is_required=row["is_required"],
+                    is_active=row["is_active"],
+                    value_type=row.get("value_type", "boolean"),
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                    deleted_at=row["deleted_at"],
+                )
+                for row in rows
+            ]
 
     async def get_by_organization_id(
         self, organization_id: int
@@ -109,7 +147,7 @@ class CriterionRepositoryAsyncpg:
             rows = await conn.fetch_b(
                 """
                 SELECT
-                    id, organization_id, category_id, evaluation_type_id, name, code,
+                    id, organization_id, category_id, name, code,
                     description, sort_order, is_required, is_active, value_type,
                     created_at, updated_at, deleted_at
                 FROM criteria
@@ -125,54 +163,6 @@ class CriterionRepositoryAsyncpg:
                     id=row["id"],
                     organization_id=row["organization_id"],
                     category_id=row["category_id"],
-                    evaluation_type_id=row["evaluation_type_id"],
-                    name=row["name"],
-                    code=row["code"],
-                    description=row["description"],
-                    sort_order=row["sort_order"],
-                    is_required=row["is_required"],
-                    is_active=row["is_active"],
-                    value_type=row.get("value_type", "boolean"),  # По умолчанию boolean для обратной совместимости
-                    created_at=row["created_at"],
-                    updated_at=row["updated_at"],
-                    deleted_at=row["deleted_at"],
-                )
-                for row in rows
-            ]
-
-    async def get_by_evaluation_type_id(
-        self, evaluation_type_id: int
-    ) -> list[CriterionDTO]:
-        """Get all criteria by evaluation type ID.
-
-        Args:
-            evaluation_type_id: Evaluation type ID.
-
-        Returns:
-            List of CriterionDTO instances.
-        """
-        pool = await self._get_pool()
-        async with get_connection(pool) as conn:
-            rows = await conn.fetch_b(
-                """
-                SELECT
-                    id, organization_id, category_id, evaluation_type_id, name, code,
-                    description, sort_order, is_required, is_active, value_type,
-                    created_at, updated_at, deleted_at
-                FROM criteria
-                WHERE evaluation_type_id = :evaluation_type_id
-                    AND deleted_at IS NULL
-                ORDER BY sort_order ASC, name ASC
-                """,
-                evaluation_type_id=evaluation_type_id,
-            )
-
-            return [
-                CriterionDTO(
-                    id=row["id"],
-                    organization_id=row["organization_id"],
-                    category_id=row["category_id"],
-                    evaluation_type_id=row["evaluation_type_id"],
                     name=row["name"],
                     code=row["code"],
                     description=row["description"],
@@ -204,7 +194,7 @@ class CriterionRepositoryAsyncpg:
             rows = await conn.fetch_b(
                 """
                 SELECT
-                    id, organization_id, category_id, evaluation_type_id, name, code,
+                    id, organization_id, category_id, name, code,
                     description, sort_order, is_required, is_active, value_type,
                     created_at, updated_at, deleted_at
                 FROM criteria
@@ -220,7 +210,6 @@ class CriterionRepositoryAsyncpg:
                     id=row["id"],
                     organization_id=row["organization_id"],
                     category_id=row["category_id"],
-                    evaluation_type_id=row["evaluation_type_id"],
                     name=row["name"],
                     code=row["code"],
                     description=row["description"],
@@ -249,21 +238,20 @@ class CriterionRepositoryAsyncpg:
             row = await conn.fetchrow_b(
                 """
                 INSERT INTO criteria (
-                    organization_id, category_id, evaluation_type_id, name, code,
+                    organization_id, category_id, name, code,
                     description, sort_order, is_required, is_active, value_type
                 )
                 VALUES (
-                    :organization_id, :category_id, :evaluation_type_id, :name, :code,
+                    :organization_id, :category_id, :name, :code,
                     :description, :sort_order, :is_required, :is_active, :value_type
                 )
                 RETURNING
-                    id, organization_id, category_id, evaluation_type_id, name, code,
+                    id, organization_id, category_id, name, code,
                     description, sort_order, is_required, is_active, value_type,
                     created_at, updated_at, deleted_at
                 """,
                 organization_id=dto.organization_id,
                 category_id=dto.category_id,
-                evaluation_type_id=dto.evaluation_type_id,
                 name=dto.name,
                 code=dto.code,
                 description=dto.description,
@@ -277,7 +265,6 @@ class CriterionRepositoryAsyncpg:
                 id=row["id"],
                 organization_id=row["organization_id"],
                 category_id=row["category_id"],
-                evaluation_type_id=row["evaluation_type_id"],
                 name=row["name"],
                 code=row["code"],
                 description=row["description"],
@@ -328,9 +315,6 @@ class CriterionRepositoryAsyncpg:
                 if dto.category_id is not None:
                     updates.append("category_id = :category_id")
                     params["category_id"] = dto.category_id
-                if dto.evaluation_type_id is not None:
-                    updates.append("evaluation_type_id = :evaluation_type_id")
-                    params["evaluation_type_id"] = dto.evaluation_type_id
                 if dto.name is not None:
                     updates.append("name = :name")
                     params["name"] = dto.name
@@ -364,7 +348,7 @@ class CriterionRepositoryAsyncpg:
                     SET {', '.join(updates)}
                     WHERE id = :criterion_id AND deleted_at IS NULL
                     RETURNING
-                        id, organization_id, category_id, evaluation_type_id, name, code,
+                        id, organization_id, category_id, name, code,
                         description, sort_order, is_required, is_active, value_type,
                         created_at, updated_at, deleted_at
                 """
@@ -378,7 +362,6 @@ class CriterionRepositoryAsyncpg:
                     id=row["id"],
                     organization_id=row["organization_id"],
                     category_id=row["category_id"],
-                    evaluation_type_id=row["evaluation_type_id"],
                     name=row["name"],
                     code=row["code"],
                     description=row["description"],

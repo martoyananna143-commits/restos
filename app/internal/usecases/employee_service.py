@@ -23,6 +23,14 @@ class EmployeeService:
         """
         self.repository = repository
 
+    async def get_all(self) -> list[EmployeeDTO]:
+        """Get all employees across all organizations.
+
+        Returns:
+            List of EmployeeDTO instances.
+        """
+        return await self.repository.get_all()
+
     async def get_by_organization_id(
         self, organization_id: int
     ) -> list[EmployeeDTO]:
@@ -123,16 +131,20 @@ class EmployeeService:
     async def get_by_telegram_id_and_organization_id(
         self, telegram_id: int, organization_id: int
     ) -> Optional[EmployeeDTO]:
-        """Get employee by telegram_id and organization_id.
-
-        Args:
-            telegram_id: Telegram user ID.
-            organization_id: Organization ID.
-
-        Returns:
-            EmployeeDTO if found, None otherwise.
-        """
+        """Get employee by telegram_id and organization_id."""
         return await self.repository.get_by_telegram_id_and_organization_id(
             telegram_id, organization_id
         )
+
+    async def get_by_web_login(self, login: str) -> Optional[EmployeeDTO]:
+        """Get employee by web_login stored in meta JSONB."""
+        return await self.repository.get_by_web_login(login)
+
+    async def update_meta(self, employee_id: int, meta: dict) -> bool:
+        """Update employee meta JSONB field."""
+        return await self.repository.update_meta(employee_id, meta)
+
+    async def get_employee_types(self) -> list[dict]:
+        """Get all available employee types."""
+        return await self.repository.get_employee_types()
 

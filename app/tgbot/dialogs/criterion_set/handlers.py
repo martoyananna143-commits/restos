@@ -10,7 +10,6 @@ from app.internal import Container
 from app.internal.usecases.criterion_service import CriterionService
 from app.internal.usecases.criterion_set_service import CriterionSetService
 from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.evaluation_type_service import EvaluationTypeService
 from app.internal.usecases.organization_service import OrganizationService
 from app.tgbot.dialogs.criterion.states import CriterionDialog
 from app.tgbot.dialogs.criterion_set.states import CriterionSetDialog
@@ -205,33 +204,41 @@ async def on_create_new_criterion_from_set(
         dialog_manager.middleware_data["criterion_set_state"] = criterion_set_state
         dialog_manager.middleware_data["from_criterion_set"] = True  # Флаг для возврата
 
-        # Запускаем диалог создания критерия
+        # Пытаемся получить organization из БД, если organization_id не известен
+        if not organization_id and telegram_id:
+            from app.internal import Container as C
+            user_svc = C.user_service()
+            user = await user_svc.repository.get_by_telegram_id_any_chat(telegram_id)
+            if user and getattr(user, "current_organization_id", None):
+                org = await organization_service.get_by_id(int(user.current_organization_id))
+                if org:
+                    organization_id = org.id
+            if not organization_id:
+                org = await organization_service.get_by_user_telegram_id(telegram_id)
+                if org:
+                    organization_id = org.id
+
         if organization_id:
             organization = await organization_service.get_by_id(organization_id)
             if organization:
                 dialog_manager.middleware_data["organization"] = organization
                 dialog_manager.middleware_data["preset_organization_id"] = organization_id
-                # Запускаем диалог с окна выбора типа данных (создание нового критерия)
                 await dialog_manager.start(
                     CriterionDialog.select_value_type,
                     mode=StartMode.NORMAL,
                 )
-                # Устанавливаем organization_id в dialog_data после старта диалога
                 dialog_manager.dialog_data["organization_id"] = organization_id
-                # Очищаем данные предыдущего критерия
                 dialog_manager.dialog_data.pop("criterion_id", None)
                 dialog_manager.dialog_data.pop("name", None)
                 dialog_manager.dialog_data.pop("code", None)
                 dialog_manager.dialog_data.pop("description", None)
                 dialog_manager.dialog_data.pop("value_type", None)
             else:
-                # Если организация не найдена, запускаем с выбора организации
                 await dialog_manager.start(
                     CriterionDialog.select_organization,
                     mode=StartMode.NORMAL,
                 )
         else:
-            # Если organization_id не известен, запускаем с выбора организации
             await dialog_manager.start(
                 CriterionDialog.select_organization,
                 mode=StartMode.NORMAL,
@@ -604,40 +611,41 @@ async def process_excel_upload(
     dialog_manager: DialogManager,
     criterion_service: CriterionService = Provide[Container.criterion_service],
     criterion_set_service: CriterionSetService = Provide[Container.criterion_set_service],
-    evaluation_type_service: EvaluationTypeService = Provide[
-        Container.evaluation_type_service
-    ],
 ):
     """Process Excel file upload for importing criteria and sets.
 
-    Args:
-        message: Message object with document.
-        widget: MessageInput widget.
-        dialog_manager: Dialog manager.
-        criterion_service: Criterion service instance (injected).
-        criterion_set_service: CriterionSet service instance (injected).
-        evaluation_type_service: EvaluationType service instance (injected).
+    File format (4 columns):
+        Col 1: Combined set name
+        Col 2: Sub-set name
+        Col 3: Criterion question
+        Col 4: Criterion type (bool, str, num)
+
+    Creates sub-sets with their criteria, then a combined set that
+    contains all criteria from all sub-sets in file order.
     """
     import logging
     import tempfile
+    from collections import OrderedDict
     from pathlib import Path
-
-    from openpyxl import load_workbook  # type: ignore
 
     logger = logging.getLogger(__name__)
 
-    # Проверяем наличие документа
+    # --- Validate document ---------------------------------------------------
     if not message.document:
         await message.answer(
             "❌ Пожалуйста, отправьте Excel файл (.xlsx).\n\n"
-            "Формат файла:\n"
-            "• Колонка 1: Название набора критериев\n"
-            "• Колонка 2: Вопрос критерия\n"
-            "• Колонка 3: Тип критерия (bool, str, num)"
+            "Формат файла (4 колонки):\n"
+            "• Колонка A: Название объединённого набора\n"
+            "• Колонка B: Название субнабора критериев\n"
+            "• Колонка C: Вопрос/название критерия\n"
+            "• Колонка D: Тип данных (bool, str, num)\n\n"
+            "Поддерживаемые типы:\n"
+            "• Да/Нет, bool, boolean — для ответов Да/Нет\n"
+            "• Текст, str, string — для текстовых ответов\n"
+            "• Число, num, number, оценка — для числовых ответов"
         )
         return
 
-    # Проверяем расширение файла
     file_name = message.document.file_name or ""
     if not file_name.lower().endswith((".xlsx", ".xls")):
         await message.answer(
@@ -645,7 +653,6 @@ async def process_excel_upload(
         )
         return
 
-    # Получаем organization_id
     organization_id = dialog_manager.dialog_data.get("organization_id")
     if not organization_id:
         organization = dialog_manager.middleware_data.get("organization")
@@ -655,456 +662,282 @@ async def process_excel_upload(
             await message.answer("❌ Ошибка: организация не найдена")
             return
 
-    # Получаем все существующие evaluation_types для проверки
-    evaluation_types = await evaluation_type_service.get_all()
-    evaluation_types_by_name = {et.name: et for et in evaluation_types}
-    evaluation_types_by_code = {et.code: et for et in evaluation_types}
+    # --- Type helpers --------------------------------------------------------
+    _TYPE_MAPPING: dict[str, str] = {
+        # English
+        "boolean": "bool", "bool": "bool",
+        "string": "str", "str": "str", "text": "str",
+        "number": "num", "num": "num", "numeric": "num",
+        "integer": "num", "int": "num", "float": "num",
+        # Russian
+        "да/нет": "bool", "да нет": "bool", "логический": "bool", "булевый": "bool",
+        "текст": "str", "строка": "str", "текстовый": "str",
+        "число": "num", "числовой": "num", "цифра": "num", "оценка": "num",
+    }
+    _TYPE_TO_DB: dict[str, str] = {
+        "bool": "boolean", "str": "string", "num": "number",
+        "boolean": "boolean", "string": "string", "number": "number",
+    }
+    _VALID_TYPES = set(_TYPE_MAPPING.keys())
+    _HEADER_KW = [
+        "название", "набор", "вопрос", "критерий", "тип",
+        "name", "question", "type", "set", "категория", "раздел", "субнабор",
+    ]
 
+    NUM_COLUMNS = 4  # combined_set | sub_set | question | type
+
+    # --- Read rows -----------------------------------------------------------
     tmp_path = None
-    sets_data: dict[str, list[dict[str, str]]] = {}
+    rows_data: list[list[str]] = []
 
     try:
-        # Скачиваем файл
         bot = dialog_manager.middleware_data.get("bot")
         if not bot:
             await message.answer("❌ Ошибка: бот не найден")
             return
 
         file_info = await bot.get_file(message.document.file_id)
-        file_path = file_info.file_path
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
             tmp_path = Path(tmp_file.name)
+        await bot.download_file(file_info.file_path, str(tmp_path))
 
-        await bot.download_file(file_path, str(tmp_path))
-
-        # МЕТОД 1: Чтение напрямую из ZIP (Excel это ZIP архив)
+        # METHOD 1: raw ZIP/XML (faster, no style issues)
         try:
             import zipfile
             import xml.etree.ElementTree as ET
-            
-            logger.info("Attempting to read Excel as ZIP...")
-            
-            with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
-                # Читаем shared strings (текстовые значения)
-                shared_strings = []
+
+            logger.info("Reading Excel as ZIP…")
+            with zipfile.ZipFile(tmp_path, "r") as zf:
+                shared_strings: list[str] = []
                 try:
-                    with zip_ref.open('xl/sharedStrings.xml') as f:
+                    with zf.open("xl/sharedStrings.xml") as f:
                         tree = ET.parse(f)
-                        root = tree.getroot()
-                        ns = {'x': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
-                        for si in root.findall('.//x:si', ns):
-                            t = si.find('.//x:t', ns)
-                            if t is not None and t.text:
-                                shared_strings.append(t.text)
+                        ns = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+                        for si in tree.getroot().findall(".//x:si", ns):
+                            t = si.find(".//x:t", ns)
+                            shared_strings.append(t.text if t is not None and t.text else "")
                 except KeyError:
-                    logger.warning("No sharedStrings.xml found")
-                
-                # Читаем первый лист
-                with zip_ref.open('xl/worksheets/sheet1.xml') as f:
+                    pass
+
+                with zf.open("xl/worksheets/sheet1.xml") as f:
                     tree = ET.parse(f)
-                    root = tree.getroot()
-                    ns = {'x': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
-                    
-                    rows_data = []
-                    for row in root.findall('.//x:row', ns):
-                        # Собираем ячейки с их координатами
-                        cells_dict = {}
-                        for cell in row.findall('.//x:c', ns):
-                            cell_ref = cell.get('r')  # Например, "A1", "B1", "C1"
-                            if not cell_ref:
+                    ns = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+                    for row in tree.getroot().findall(".//x:row", ns):
+                        cells: dict[int, str] = {}
+                        for cell in row.findall(".//x:c", ns):
+                            ref = cell.get("r")
+                            if not ref:
                                 continue
-                            
-                            # Извлекаем номер колонки из координаты (A=0, B=1, C=2, ...)
-                            col_letter = ''.join([c for c in cell_ref if c.isalpha()])
                             col_num = 0
-                            for char in col_letter:
-                                col_num = col_num * 26 + (ord(char.upper()) - ord('A') + 1)
-                            col_num -= 1  # A=0, B=1, C=2, ...
-                            
-                            v = cell.find('x:v', ns)
-                            t_attr = cell.get('t')
-                            
-                            cell_value = ''
-                            if v is not None and v.text:
-                                if t_attr == 's':  # Shared string reference
-                                    idx = int(v.text)
-                                    if idx < len(shared_strings):
-                                        cell_value = shared_strings[idx]
+                            for ch in ref:
+                                if ch.isalpha():
+                                    col_num = col_num * 26 + (ord(ch.upper()) - ord("A") + 1)
                                 else:
-                                    cell_value = v.text
-                            
-                            cells_dict[col_num] = cell_value
-                        
-                        # Создаем список значений ячеек в правильном порядке (первые 3 колонки)
-                        row_data = []
-                        for col_idx in range(3):  # Нужны только первые 3 колонки
-                            row_data.append(cells_dict.get(col_idx, ''))
-                        
-                        if len(row_data) >= 3:
-                            rows_data.append(row_data)
-                    
-                    # Проверяем заголовок - более строгая проверка
-                    # Заголовок определяется как строка, где все три колонки содержат ключевые слова заголовка
-                    # ИЛИ где тип (третья колонка) не является валидным типом данных
-                    start_idx = 0
-                    if rows_data and len(rows_data[0]) >= 3:
-                        first_row = rows_data[0]
-                        first_col = str(first_row[0]).lower().strip() if first_row[0] else ""
-                        second_col = str(first_row[1]).lower().strip() if first_row[1] else ""
-                        third_col = str(first_row[2]).lower().strip() if first_row[2] else ""
-                        
-                        # Проверяем, является ли это заголовком:
-                        # 1. Все три колонки содержат ключевые слова заголовка
-                        # 2. ИЛИ третья колонка не является валидным типом (bool/str/num/boolean/string/number)
-                        header_keywords = ["название", "набор", "вопрос", "критерий", "тип", "name", "question", "type", "set"]
-                        valid_types = ["bool", "str", "num", "boolean", "string", "number"]
-                        
-                        is_header = (
-                            (any(kw in first_col for kw in header_keywords) and 
-                             any(kw in second_col for kw in header_keywords) and 
-                             any(kw in third_col for kw in header_keywords)) or
-                            (third_col and third_col not in valid_types and 
-                             any(kw in third_col for kw in header_keywords))
-                        )
-                        
-                        if is_header:
-                            start_idx = 1
-                            logger.info(f"Header row detected, skipping. First row: {first_row}")
-                        else:
-                            logger.info(f"No header detected, processing from first row. First row: {first_row}")
-                    
-                    # Парсим данные
-                    logger.info(f"Total rows read: {len(rows_data)}, start_idx: {start_idx}, will process {len(rows_data) - start_idx} rows")
-                    skipped_rows = 0
-                    processed_rows = 0
-                    for row_idx, row_data in enumerate(rows_data[start_idx:], start=start_idx + 1):
-                        logger.info(f"Processing row {row_idx}: raw_data={row_data}")
-                        
-                        if len(row_data) < 3:
-                            logger.warning(f"Row {row_idx} has less than 3 columns: {row_data}")
-                            continue
-                        
-                        set_name = str(row_data[0]).strip() if row_data[0] else ""
-                        criterion_question = str(row_data[1]).strip() if row_data[1] else ""
-                        criterion_type = str(row_data[2]).strip().lower() if row_data[2] else "bool"
-                        
-                        logger.debug(f"Row {row_idx} parsed: set_name='{set_name}', question='{criterion_question}', type='{criterion_type}'")
-                        
-                        if not set_name or not criterion_question:
-                            skipped_rows += 1
-                            logger.warning(f"Skipping empty row {row_idx}: set_name='{set_name}', question='{criterion_question}'")
-                            continue
-                        
-                        # Нормализация и валидация типа (поддерживаем старые и новые названия)
-                        type_mapping = {
-                            "boolean": "bool", "bool": "bool",
-                            "string": "str", "str": "str",
-                            "number": "num", "num": "num"
-                        }
-                        criterion_type = type_mapping.get(criterion_type, "bool")
-                        
-                        if set_name not in sets_data:
-                            sets_data[set_name] = []
-                        
-                        sets_data[set_name].append({
-                            "question": criterion_question,
-                            "type": criterion_type,
-                        })
-                        processed_rows += 1
-                        logger.debug(f"Processed row: set='{set_name}', question='{criterion_question}', type='{criterion_type}'")
-            
-            logger.info(f"Successfully loaded Excel as ZIP. Processed {processed_rows} rows, skipped {skipped_rows} empty rows, found {len(sets_data)} sets")
-            # Логируем детали для отладки
-            for set_name, criteria_list in sets_data.items():
-                logger.info(f"Set '{set_name}': {len(criteria_list)} criteria")
-                for idx, crit in enumerate(criteria_list):
-                    logger.info(f"  [{idx + 1}] {crit['question']} ({crit['type']})")
-            
-        except Exception as zip_error:
-            logger.warning(f"ZIP method failed: {zip_error}", exc_info=True)
-            
-            # МЕТОД 2: Попытка с openpyxl в read_only режиме (игнорирует стили)
+                                    break
+                            col_num -= 1
+
+                            v = cell.find("x:v", ns)
+                            val = ""
+                            if v is not None and v.text:
+                                if cell.get("t") == "s":
+                                    idx = int(v.text)
+                                    val = shared_strings[idx] if idx < len(shared_strings) else ""
+                                else:
+                                    val = v.text
+                            cells[col_num] = val
+
+                        row_vals = [cells.get(i, "") for i in range(NUM_COLUMNS)]
+                        rows_data.append(row_vals)
+
+            logger.info("ZIP method OK, %d raw rows", len(rows_data))
+
+        except Exception as zip_err:
+            logger.warning("ZIP method failed: %s", zip_err, exc_info=True)
+            # METHOD 2: openpyxl
             try:
-                logger.info("Attempting with openpyxl read_only mode...")
+                from openpyxl import load_workbook  # type: ignore
+
+                logger.info("Trying openpyxl read_only…")
                 wb = load_workbook(tmp_path, read_only=True, data_only=True)
                 ws = wb.active
-                
-                rows_list = list(ws.iter_rows(values_only=True))
-                
-                start_idx = 0
-                if rows_list and len(rows_list[0]) >= 3:
-                    first_row = rows_list[0]
-                    first_col = str(first_row[0]).lower().strip() if first_row[0] else ""
-                    second_col = str(first_row[1]).lower().strip() if first_row[1] else ""
-                    third_col = str(first_row[2]).lower().strip() if first_row[2] else ""
-                    
-                    # Проверяем, является ли это заголовком:
-                    # 1. Все три колонки содержат ключевые слова заголовка
-                    # 2. ИЛИ третья колонка не является валидным типом (bool/str/num/boolean/string/number)
-                    header_keywords = ["название", "набор", "вопрос", "критерий", "тип", "name", "question", "type", "set"]
-                    valid_types = ["bool", "str", "num", "boolean", "string", "number"]
-                    
-                    is_header = (
-                        (any(kw in first_col for kw in header_keywords) and 
-                         any(kw in second_col for kw in header_keywords) and 
-                         any(kw in third_col for kw in header_keywords)) or
-                        (third_col and third_col not in valid_types and 
-                         any(kw in third_col for kw in header_keywords))
-                    )
-                    
-                    if is_header:
-                        start_idx = 1
-                        logger.info(f"Header row detected, skipping. First row: {first_row}")
-                    else:
-                        logger.info(f"No header detected, processing from first row. First row: {first_row}")
-                
-                skipped_rows = 0
-                processed_rows = 0
-                for row_data in rows_list[start_idx:]:
-                    if len(row_data) < 3:
-                        continue
-                    
-                    set_name = str(row_data[0]).strip() if row_data[0] else ""
-                    criterion_question = str(row_data[1]).strip() if row_data[1] else ""
-                    criterion_type = str(row_data[2]).strip().lower() if row_data[2] else "bool"
-                    
-                    if not set_name or not criterion_question:
-                        skipped_rows += 1
-                        logger.debug(f"Skipping empty row: set_name='{set_name}', question='{criterion_question}'")
-                        continue
-                    
-                    # Нормализация и валидация типа (поддерживаем старые и новые названия)
-                    type_mapping = {
-                        "boolean": "bool", "bool": "bool",
-                        "string": "str", "str": "str",
-                        "number": "num", "num": "num"
-                    }
-                    criterion_type = type_mapping.get(criterion_type, "bool")
-                    
-                    if set_name not in sets_data:
-                        sets_data[set_name] = []
-                    
-                    sets_data[set_name].append({
-                        "question": criterion_question,
-                        "type": criterion_type,
-                    })
-                    processed_rows += 1
-                    logger.debug(f"Processed row: set='{set_name}', question='{criterion_question}', type='{criterion_type}'")
-                
+                for row_tuple in ws.iter_rows(values_only=True):
+                    vals = list(row_tuple) + [""] * NUM_COLUMNS
+                    rows_data.append([str(v).strip() if v else "" for v in vals[:NUM_COLUMNS]])
                 wb.close()
-                logger.info(f"Successfully loaded with openpyxl. Processed {processed_rows} rows, skipped {skipped_rows} empty rows, found {len(sets_data)} sets")
-                # Логируем детали для отладки
-                for set_name, criteria_list in sets_data.items():
-                    logger.info(f"Set '{set_name}': {len(criteria_list)} criteria")
-                    for idx, crit in enumerate(criteria_list):
-                        logger.info(f"  [{idx + 1}] {crit['question']} ({crit['type']})")
-                
-            except Exception as openpyxl_error:
-                logger.error(f"All methods failed: {openpyxl_error}", exc_info=True)
+                logger.info("openpyxl OK, %d raw rows", len(rows_data))
+            except Exception as opx_err:
+                logger.error("All read methods failed: %s", opx_err, exc_info=True)
                 await message.answer(
                     "❌ Не удалось прочитать Excel файл.\n\n"
                     "Попробуйте:\n"
                     "1. Создать новый Excel файл\n"
                     "2. Скопировать туда только данные (без форматирования)\n"
-                    "3. Сохранить как .xlsx\n"
-                    "4. ИЛИ сохранить как .csv и отправить CSV файл"
+                    "3. Сохранить как .xlsx"
                 )
-                if tmp_path and tmp_path.exists():
-                    try:
-                        tmp_path.unlink()
-                    except Exception:
-                        pass
                 return
 
-        # Проверка данных
-        if not sets_data:
+        # --- Skip header row -------------------------------------------------
+        start_idx = 0
+        if rows_data:
+            cols_lower = [str(c).lower().strip() for c in rows_data[0]]
+            last_col = cols_lower[-1] if cols_lower else ""
+            is_header = (
+                (any(kw in cols_lower[0] for kw in _HEADER_KW)
+                 and any(kw in cols_lower[1] for kw in _HEADER_KW))
+                or (last_col and last_col not in _VALID_TYPES
+                    and any(kw in last_col for kw in _HEADER_KW))
+            )
+            if is_header:
+                start_idx = 1
+                logger.info("Header detected, skipping row 1: %s", rows_data[0])
+
+        # --- Parse rows into structured data ---------------------------------
+        # combined_name -> OrderedDict[sub_name -> [(question, type_short), ...]]
+        combined_sets: OrderedDict[str, OrderedDict[str, list[dict[str, str]]]] = OrderedDict()
+        # Global ordered list of all criteria (for combined sets, preserving file order)
+        all_rows_ordered: list[dict[str, str]] = []  # {combined, sub, question, type}
+
+        skipped = 0
+        processed = 0
+        for row_idx, rv in enumerate(rows_data[start_idx:], start=start_idx + 1):
+            combined_name = str(rv[0]).strip() if rv[0] else ""
+            sub_name = str(rv[1]).strip() if rv[1] else ""
+            question = str(rv[2]).strip() if rv[2] else ""
+            raw_type = str(rv[3]).strip().lower() if rv[3] else "bool"
+
+            if not combined_name or not sub_name or not question:
+                skipped += 1
+                continue
+
+            crit_type = _TYPE_MAPPING.get(raw_type, "bool")
+
+            if combined_name not in combined_sets:
+                combined_sets[combined_name] = OrderedDict()
+            if sub_name not in combined_sets[combined_name]:
+                combined_sets[combined_name][sub_name] = []
+
+            entry = {"question": question, "type": crit_type}
+            combined_sets[combined_name][sub_name].append(entry)
+            all_rows_ordered.append({
+                "combined": combined_name, "sub": sub_name,
+                "question": question, "type": crit_type,
+            })
+            processed += 1
+
+        logger.info(
+            "Parsed %d data rows (%d skipped). Combined sets: %d",
+            processed, skipped, len(combined_sets),
+        )
+
+        if not combined_sets:
             await message.answer(
                 "❌ Файл не содержит данных или имеет неверный формат.\n\n"
-                "Формат файла (3 колонки):\n"
-                "• Колонка 1: Название набора критериев\n"
-                "• Колонка 2: Вопрос критерия\n"
-                "• Колонка 3: Тип критерия (bool, str, num)"
+                "Формат файла (4 колонки):\n"
+                "• Колонка A: Название объединённого набора\n"
+                "• Колонка B: Название субнабора критериев\n"
+                "• Колонка C: Вопрос критерия\n"
+                "• Колонка D: Тип критерия (bool, str, num)\n\n"
+                "Первая строка может быть заголовком (пропускается автоматически)."
             )
-            if tmp_path and tmp_path.exists():
-                try:
-                    tmp_path.unlink()
-                except Exception:
-                    pass
             return
 
+        # --- Create criteria & sets ------------------------------------------
+        from app.infra.database.repository.criterion.dto import CreateCriterionDTO
+        from app.infra.database.repository.criterion_set.dto import CreateCriterionSetDTO
 
-        # Создаем критерии и наборы
-        created_sets = []
+        created_sets: list[str] = []
         created_criteria_count = 0
-        failed_criteria = []
-        created_evaluation_types = []  # Для отслеживания созданных типов оценки
+        failed_criteria: list[dict] = []
+        global_sort_order = 0  # сквозной порядок по файлу
 
-        logger.info(f"Starting to create criteria from {len(sets_data)} sets")
-        for set_name, criteria_list in sets_data.items():
-            logger.info(f"Processing set '{set_name}' with {len(criteria_list)} criteria")
-            
-            # Проверяем/создаем evaluation_type на основе названия набора
-            evaluation_type_id = None
-            evaluation_type_name = set_name  # Используем название набора как название типа оценки
-            
-            # Генерируем code из name: lowercase, замена пробелов на подчеркивания, удаление спецсимволов
-            import re
-            evaluation_type_code = re.sub(r'[^a-zа-яё0-9_]', '', evaluation_type_name.lower().replace(' ', '_'))
-            # Убираем множественные подчеркивания
-            evaluation_type_code = re.sub(r'_+', '_', evaluation_type_code).strip('_')
-            # Если code пустой, используем дефолтный
-            if not evaluation_type_code:
-                evaluation_type_code = f"evaluation_type_{len(evaluation_types_by_code) + 1}"
-            
-            # Проверяем, существует ли evaluation_type с таким именем
-            if evaluation_type_name in evaluation_types_by_name:
-                evaluation_type_id = evaluation_types_by_name[evaluation_type_name].id
-                logger.info(f"Using existing evaluation_type '{evaluation_type_name}' (id={evaluation_type_id})")
-            else:
-                # Проверяем, существует ли evaluation_type с таким code
-                if evaluation_type_code in evaluation_types_by_code:
-                    # Если code уже существует, добавляем суффикс
-                    counter = 1
-                    original_code = evaluation_type_code
-                    while evaluation_type_code in evaluation_types_by_code:
-                        evaluation_type_code = f"{original_code}_{counter}"
-                        counter += 1
-                
-                # Создаем новый evaluation_type
+        for combined_name, sub_sets in combined_sets.items():
+            # All criterion IDs for the combined set (in file order)
+            combined_criterion_ids: list[int] = []
+
+            for sub_name, criteria_list in sub_sets.items():
+                sub_criterion_ids: list[int] = []
+
+                for idx, crit in enumerate(criteria_list):
+                    try:
+                        db_type = _TYPE_TO_DB.get(crit["type"], "boolean")
+                        code = (
+                            f"{sub_name.lower().replace(' ', '_')}"
+                            f"_{idx + 1}_{crit['type']}"
+                        )
+                        dto = CreateCriterionDTO(
+                            organization_id=organization_id,
+                            name=crit["question"],
+                            code=code,
+                            value_type=db_type,
+                            description=None,
+                            sort_order=global_sort_order,
+                        )
+                        criterion = await criterion_service.create(dto)
+                        sub_criterion_ids.append(criterion.id)
+                        combined_criterion_ids.append(criterion.id)
+                        created_criteria_count += 1
+                        global_sort_order += 1
+                    except Exception as e:
+                        logger.error("Criterion create error: %s", e, exc_info=True)
+                        failed_criteria.append({
+                            "set_name": sub_name,
+                            "question": crit.get("question", "?"),
+                            "error": str(e),
+                        })
+
+                # Create sub-set
+                if sub_criterion_ids:
+                    try:
+                        sub_dto = CreateCriterionSetDTO(
+                            organization_id=organization_id,
+                            name=sub_name,
+                            description=f"Субнабор из «{combined_name}»",
+                            is_default=False,
+                            criterion_ids=sub_criterion_ids,
+                        )
+                        await criterion_set_service.create(sub_dto)
+                        created_sets.append(sub_name)
+                    except Exception as e:
+                        logger.error("Sub-set create error (%s): %s", sub_name, e, exc_info=True)
+
+            # Create combined set (contains all sub-sets' criteria in file order)
+            if combined_criterion_ids:
                 try:
-                    from app.infra.database.repository.evaluation_type.dto import (
-                        CreateEvaluationTypeDTO,
-                    )
-                    
-                    create_evaluation_type_dto = CreateEvaluationTypeDTO(
-                        name=evaluation_type_name,
-                        code=evaluation_type_code,
-                        description=f"Автоматически создан при импорте набора критериев '{set_name}' из Excel",
-                    )
-                    
-                    logger.info(f"Creating evaluation_type: name='{evaluation_type_name}', code='{evaluation_type_code}'")
-                    evaluation_type = await evaluation_type_service.create(create_evaluation_type_dto)
-                    evaluation_type_id = evaluation_type.id
-                    
-                    # Обновляем кэш
-                    evaluation_types_by_name[evaluation_type_name] = evaluation_type
-                    evaluation_types_by_code[evaluation_type_code] = evaluation_type
-                    created_evaluation_types.append(evaluation_type_name)
-                    logger.info(f"Successfully created evaluation_type '{evaluation_type_name}' (id={evaluation_type_id})")
-                    
-                except Exception as e:
-                    logger.error(f"Error creating evaluation_type '{evaluation_type_name}': {e}", exc_info=True)
-                    # Если не удалось создать, используем первый доступный или пропускаем набор
-                    if evaluation_types:
-                        evaluation_type_id = evaluation_types[0].id
-                        logger.warning(f"Using fallback evaluation_type (id={evaluation_type_id})")
-                    else:
-                        logger.error(f"Cannot create evaluation_type and no fallback available. Skipping set '{set_name}'")
-                        continue
-            
-            criterion_ids = []
-
-            # Создаем критерии для этого набора
-            for idx, criterion_data in enumerate(criteria_list):
-                try:
-                    # Преобразуем сокращенный тип в полный для сохранения в базу
-                    # Принимаем: bool, str, num
-                    # Сохраняем: boolean, string, number
-                    type_to_db_mapping = {
-                        "bool": "boolean",
-                        "str": "string",
-                        "num": "number",
-                        "boolean": "boolean",  # На случай если уже полный
-                        "string": "string",
-                        "number": "number",
-                    }
-                    db_value_type = type_to_db_mapping.get(criterion_data["type"], "boolean")
-                    
-                    # Генерируем уникальный код критерия (включаем тип для различения дубликатов)
-                    # Используем тип в коде, чтобы различать критерии с одинаковыми вопросами
-                    base_code = f"{set_name.lower().replace(' ', '_')}_{idx + 1}"
-                    code = f"{base_code}_{criterion_data['type']}"
-
-                    from app.infra.database.repository.criterion.dto import (
-                        CreateCriterionDTO,
-                    )
-
-                    create_criterion_dto = CreateCriterionDTO(
+                    combined_dto = CreateCriterionSetDTO(
                         organization_id=organization_id,
-                        evaluation_type_id=evaluation_type_id,
-                        name=criterion_data["question"],
-                        code=code,
-                        value_type=db_value_type,  # Сохраняем полное название
-                        description=None,
-                        sort_order=idx,
+                        name=combined_name,
+                        description=(
+                            f"Объединённый набор из: "
+                            f"{', '.join(sub_sets.keys())}"
+                        ),
+                        is_default=False,
+                        criterion_ids=combined_criterion_ids,
+                    )
+                    await criterion_set_service.create(combined_dto)
+                    created_sets.append(combined_name)
+                except Exception as e:
+                    logger.error(
+                        "Combined set create error (%s): %s",
+                        combined_name, e, exc_info=True,
                     )
 
-                    logger.info(f"Creating criterion {idx + 1}/{len(criteria_list)} for set '{set_name}': code={code}, name={criterion_data['question']}, type={criterion_data['type']} -> {db_value_type}")
-                    criterion = await criterion_service.create(create_criterion_dto)
-                    criterion_ids.append(criterion.id)
-                    created_criteria_count += 1
-                    logger.info(f"Successfully created criterion with id={criterion.id}")
-
-                except Exception as e:
-                    error_msg = f"Error creating criterion {idx + 1} for set '{set_name}': {str(e)}"
-                    logger.error(error_msg, exc_info=True)
-                    failed_criteria.append({
-                        "set_name": set_name,
-                        "index": idx + 1,
-                        "question": criterion_data.get("question", "unknown"),
-                        "error": str(e)
-                    })
-                    continue
-            
-            logger.info(f"Set '{set_name}': created {len(criterion_ids)} out of {len(criteria_list)} criteria")
-
-            if not criterion_ids:
-                continue
-
-            # Создаем набор критериев
-            try:
-                from app.infra.database.repository.criterion_set.dto import (
-                    CreateCriterionSetDTO,
-                )
-
-                create_set_dto = CreateCriterionSetDTO(
-                    organization_id=organization_id,
-                    name=set_name,
-                    description="Импортирован из Excel файла",
-                    is_default=False,
-                    criterion_ids=criterion_ids,
-                )
-
-                criterion_set = await criterion_set_service.create(create_set_dto)
-                created_sets.append(criterion_set.name)
-
-            except Exception as e:
-                logger.error(f"Error creating criterion set: {e}", exc_info=True)
-                continue
-
-        # Формируем сообщение о результате
+        # --- Result message --------------------------------------------------
         if created_sets:
-            result_message = "✅ Импорт завершен успешно!\n\n"
-            
-            if created_evaluation_types:
-                result_message += f"Создано типов оценки: {len(created_evaluation_types)}\n"
-                for et_name in created_evaluation_types:
-                    result_message += f"  • {et_name}\n"
-                result_message += "\n"
-            
-            result_message += (
+            msg = (
+                "✅ Импорт завершён успешно!\n\n"
                 f"Создано наборов: {len(created_sets)}\n"
                 f"Создано критериев: {created_criteria_count}\n\n"
-                f"Наборы:\n"
+                "Наборы:\n"
             )
-            for set_name in created_sets:
-                result_message += f"• {set_name}\n"
-            
+            for sn in created_sets:
+                msg += f"• {sn}\n"
             if failed_criteria:
-                result_message += f"\n⚠️ Не удалось создать {len(failed_criteria)} критериев. Проверьте логи для деталей."
-
-            await message.answer(result_message)
+                msg += (
+                    f"\n⚠️ Не удалось создать {len(failed_criteria)} критериев. "
+                    "Проверьте логи для деталей."
+                )
+            await message.answer(msg)
             await dialog_manager.switch_to(CriterionSetDialog.select_set)
         else:
             await message.answer(
@@ -1113,14 +946,53 @@ async def process_excel_upload(
             )
 
     except Exception as e:
-        logger.error(f"Unexpected error: {e}", exc_info=True)
+        logger.error("Unexpected error: %s", e, exc_info=True)
         await message.answer(f"❌ Неожиданная ошибка: {str(e)}")
     finally:
-        # Cleanup
         if tmp_path and tmp_path.exists():
             try:
                 tmp_path.unlink()
-            except PermissionError:
-                logger.warning(f"Could not delete temp file: {tmp_path}")
-            except Exception as cleanup_error:
-                logger.warning(f"Could not delete temp file: {cleanup_error}")
+            except Exception as err:
+                logger.warning("Could not delete temp file: %s", err)
+
+
+@inject
+async def on_open_criteria_select_webapp(
+    callback: CallbackQuery,
+    button: Button,
+    dialog_manager: DialogManager,
+    organization_service: OrganizationService = Provide[Container.organization_service],
+):
+    """Open criteria multi-select in Telegram Mini Web App."""
+    from app.tgbot.webapp_helper import generate_page_url, send_webapp_or_link
+
+    telegram_id = callback.from_user.id if callback.from_user else None
+    if not telegram_id:
+        return
+
+    organization = dialog_manager.middleware_data.get("organization")
+    if not organization and telegram_id:
+        org_id = dialog_manager.dialog_data.get("organization_id")
+        if org_id:
+            organization = await organization_service.get_by_id(org_id)
+
+    if not organization:
+        if callback.message and isinstance(callback.message, Message):
+            await callback.message.answer("Организация не найдена.")
+        return
+
+    set_id = dialog_manager.dialog_data.get("criterion_set_id")
+    url = generate_page_url(
+        "criteria_select",
+        organization.id,
+        telegram_id,
+        extra={"criterion_set_id": set_id},
+    )
+
+    await send_webapp_or_link(
+        message=callback.message,
+        url=url,
+        text="📋 <b>Выбор критериев</b>\n\nОткройте Mini App для удобного выбора критериев с чекбоксами:",
+        button_text="📋 Выбрать критерии (Mini App)",
+    )
+    await callback.answer()
