@@ -1,48 +1,58 @@
 """Global point to cached settings."""
 
+import logging
 import os
 from pathlib import Path
-from typing import List
 from environs import Env
+
+_log = logging.getLogger(__name__)
+
+_INSECURE_JWT_KEYS = {"change-me-in-production-" + "0" * 32}
+_INSECURE_WEBAPP_KEYS = {"0" * 64}
+_INSECURE_ADMIN_PASSWORDS = {"admin123", "admin", "password", "12345678"}
 
 
 class Config:
     """Configuration class for the bot."""
-    
+
     def __init__(self):
         self.env = Env()
         self.env.read_env()
-        
+
         # Bot settings
         self.TGBOT_TOKEN = self.env.str("TGBOT_TOKEN")
         self.TGBOT_ADMIN_IDS = self.env.list("TGBOT_ADMIN_IDS", subcast=int)
         self.TGBOT_USE_REDIS = self.env.bool("TGBOT_USE_REDIS", default=True)
         self.TGBOT_TRIGGER_MESSAGE_BUSINESS_CHAT = self.env.str("TGBOT_TRIGGER_MESSAGE_BUSINESS_CHAT", default="start")
         self.TGBOT_TRIGGER_AUTO_MESSAGE_BUSINESS_CHAT = self.env.str("TGBOT_TRIGGER_AUTO_MESSAGE_BUSINESS_CHAT", default="help")
-        
+
         # Redis settings
         self.REDIS_DSN = self.env.str("REDIS_DSN", default="redis://localhost:6379/0")
-        
+
         # Database settings
-        self.DATABASE_URL = self.env.str("DATABASE_URL", default="postgresql+asyncpg://postgres:password@localhost:5432/yarbot")
+        self.DATABASE_URL = self.env.str("DATABASE_URL", default="postgresql+asyncpg://postgres:password@localhost:5432/restos")
         self.DATABASE_POOL_SIZE = self.env.int("DATABASE_POOL_SIZE", default=10)
         self.DATABASE_MAX_OVERFLOW = self.env.int("DATABASE_MAX_OVERFLOW", default=20)
         self.DATABASE_POOL_RECYCLE = self.env.int("DATABASE_POOL_RECYCLE", default=3600)
-        
+
         # Web App settings
-        # Frontend URL (Dioxus form)
         self.WEBAPP_BASE_URL = self.env.str("WEBAPP_BASE_URL", default="http://localhost:8080")
-        # API URL (FastAPI) - if different from frontend (e.g., two tunnels)
         self.WEBAPP_API_URL = self.env.str("WEBAPP_API_URL", default="")
-        # 32-byte key for ChaCha20Poly1305 (generate with: secrets.token_hex(32))
-        self.WEBAPP_SECRET_KEY = self.env.str("WEBAPP_SECRET_KEY", default="0" * 64)  # Must be 64 hex chars
-        # Token expiration in seconds (default 1 hour)
+        # 32-byte key for ChaCha20Poly1305 (generate with: python -c "import secrets; print(secrets.token_hex(32))")
+        self.WEBAPP_SECRET_KEY = self.env.str("WEBAPP_SECRET_KEY", default="0" * 64)
         self.WEBAPP_TOKEN_EXPIRY = self.env.int("WEBAPP_TOKEN_EXPIRY", default=3600)
-        
+
+        # Internal API key — required for bot→API token-mint endpoints (/webapp/token, /webapp/page-token).
+        # Generate with: python -c "import secrets; print(secrets.token_hex(32))"
+        # When empty the endpoints are open (acceptable for local dev only).
+        self.INTERNAL_API_KEY = self.env.str("INTERNAL_API_KEY", default="")
+
         # JWT settings for web auth
         self.JWT_SECRET_KEY = self.env.str("JWT_SECRET_KEY", default="change-me-in-production-" + "0" * 32)
         self.JWT_ALGORITHM = "HS256"
         self.JWT_EXPIRE_DAYS = self.env.int("JWT_EXPIRE_DAYS", default=30)
+        # Web app: second-factor PIN must be re-entered if JWT claim ``pva`` is older than this (seconds).
+        self.WEB_PIN_MAX_AGE_SECONDS = self.env.int("WEB_PIN_MAX_AGE_SECONDS", default=86400)
 
         # Default admin user (created on first startup if not exists)
         self.DEFAULT_ADMIN_LOGIN = self.env.str("DEFAULT_ADMIN_LOGIN", default="admin")
@@ -51,15 +61,51 @@ class Config:
         self.DEFAULT_ORG_NAME = self.env.str("DEFAULT_ORG_NAME", default="Моя организация")
         self.DEFAULT_ORG_CODE = self.env.str("DEFAULT_ORG_CODE", default="main")
 
+        # Superuser login — this account has cross-org access without needing
+        # an employee record in each org. Defaults to the default admin login.
+        self.SUPERUSER_LOGIN = self.env.str("SUPERUSER_LOGIN", default=self.DEFAULT_ADMIN_LOGIN)
+
         # CORS settings for API
-        # In production, set to specific origins (e.g., "https://yourdomain.com,https://webapp.yourdomain.com")
         self.CORS_ORIGINS = self.env.list("CORS_ORIGINS", default=["*"])
         self.CORS_ALLOW_CREDENTIALS = self.env.bool("CORS_ALLOW_CREDENTIALS", default=True)
-        
+
+        # Google Sheets / Drive (live criterion templates)
+        self.GOOGLE_SHEETS_FETCH_TIMEOUT = self.env.float("GOOGLE_SHEETS_FETCH_TIMEOUT", default=15.0)
+        self.GOOGLE_SHEETS_MAX_ROWS = self.env.int("GOOGLE_SHEETS_MAX_ROWS", default=500)
+        # Path to service account JSON file OR leave empty and use GOOGLE_SERVICE_ACCOUNT_JSON_DATA
+        self.GOOGLE_SERVICE_ACCOUNT_JSON = self.env.str("GOOGLE_SERVICE_ACCOUNT_JSON", default="")
+        self.GOOGLE_SERVICE_ACCOUNT_JSON_DATA = self.env.str("GOOGLE_SERVICE_ACCOUNT_JSON_DATA", default="")
+
+        # Deployment environment: "development" or "production"
+        self.APP_ENV = self.env.str("APP_ENV", default="development")
+
         # Webhook settings (for webhook_bot.py)
-        self.WEBHOOK_URL = self.env.str("WEBHOOK_URL", default="")  # e.g., https://yourdomain.com
+        self.WEBHOOK_URL = self.env.str("WEBHOOK_URL", default="")
         self.WEBHOOK_PATH = self.env.str("WEBHOOK_PATH", default="/webhook")
-        self.WEBHOOK_SECRET = self.env.str("WEBHOOK_SECRET", default="")  # Secret token for verification
+        self.WEBHOOK_SECRET = self.env.str("WEBHOOK_SECRET", default="")
+
+    def validate_production_security(self) -> None:
+        """Raise RuntimeError if any critical secret is using an insecure default in production."""
+        if self.APP_ENV != "production":
+            return
+        errors: list[str] = []
+        if self.JWT_SECRET_KEY in _INSECURE_JWT_KEYS:
+            errors.append("JWT_SECRET_KEY is using an insecure default — set a strong random value")
+        if self.WEBAPP_SECRET_KEY in _INSECURE_WEBAPP_KEYS:
+            errors.append("WEBAPP_SECRET_KEY is using an insecure default (64 zeros) — generate a real key")
+        if self.DEFAULT_ADMIN_PASSWORD in _INSECURE_ADMIN_PASSWORDS:
+            errors.append(f"DEFAULT_ADMIN_PASSWORD is '{self.DEFAULT_ADMIN_PASSWORD}' — change it before deploying")
+        if not self.INTERNAL_API_KEY:
+            errors.append("INTERNAL_API_KEY is not set — bot token-mint endpoints are unprotected")
+        if self.CORS_ORIGINS == ["*"] and self.CORS_ALLOW_CREDENTIALS:
+            errors.append("CORS_ORIGINS='*' with CORS_ALLOW_CREDENTIALS=True is rejected by browsers and insecure")
+        if errors:
+            raise RuntimeError(
+                "Production security checks failed — fix the following before starting:\n"
+                + "\n".join(f"  • {e}" for e in errors)
+            )
+        if self.CORS_ORIGINS == ["*"]:
+            _log.warning("CORS_ORIGINS is '*' — restrict to specific origins in production")
 
 
 def find_project_root() -> Path:

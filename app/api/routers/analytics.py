@@ -12,7 +12,7 @@ from app.api.schemas import (
     CustomQueryRequest,
 )
 from app.infra.database.models.employee.employee import Employee
-from app.internal.usecases.analytics_service import AnalyticsService
+from app.internal.services.analytics_service import AnalyticsService
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 

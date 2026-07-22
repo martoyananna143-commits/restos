@@ -11,8 +11,8 @@ from fastapi import Depends, HTTPException, Header, status
 from app.api.deps import get_employee_service, get_user_service
 from app.infra.database.models.employee.employee import Employee
 from app.infra.database.models.user.user import User
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.user_service import UserService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.user_service import UserService
 
 
 async def get_current_user(

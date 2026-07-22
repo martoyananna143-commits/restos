@@ -5,8 +5,8 @@ from dependency_injector.wiring import Provide, inject
 from aiogram_dialog import DialogManager
 
 from app.internal import Container
-from app.internal.usecases.criterion_service import CriterionService
-from app.internal.usecases.criterion_set_service import CriterionSetService
+from app.internal.services.criterion_service import CriterionService
+from app.internal.services.criterion_set_service import CriterionSetService
 from app.tgbot.dialogs.common.utils import get_form_value
 
 

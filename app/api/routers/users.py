@@ -8,7 +8,7 @@ from app.api.schemas import (
     UserResponse,
 )
 from app.infra.database.repository.user.dto import TelegramUserDTO
-from app.internal.usecases.user_service import UserService
+from app.internal.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
 

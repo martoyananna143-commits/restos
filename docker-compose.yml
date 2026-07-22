@@ -7,13 +7,13 @@ services:
     restart: unless-stopped
     image: postgres:18.1
     environment:
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_USER=postgres
-      - POSTGRES_DB=restos
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-restos}
     volumes:
       - restos_postgres_data:/var/lib/postgresql
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -d restos -U postgres" ]
+      test: [ "CMD-SHELL", "pg_isready -d ${POSTGRES_DB:-restos} -U ${POSTGRES_USER:-postgres}" ]
       interval: 5s
       timeout: 10s
       retries: 5
@@ -37,6 +37,65 @@ services:
     networks:
       - restos_internal
 
+  api:
+    container_name: restos_api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stop_signal: SIGTERM
+    build:
+      context: .
+      dockerfile: ./docker/api/api.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Database
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-restos}
+      - DATABASE_POOL_SIZE=${DATABASE_POOL_SIZE:-10}
+      - DATABASE_MAX_OVERFLOW=${DATABASE_MAX_OVERFLOW:-20}
+      - DATABASE_POOL_RECYCLE=${DATABASE_POOL_RECYCLE:-3600}
+      # Redis (used by AI service / sessions)
+      - REDIS_DSN=redis://redis:6379/0
+      # JWT auth
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_EXPIRE_DAYS=${JWT_EXPIRE_DAYS:-30}
+      # Webapp ChaCha20 token
+      - WEBAPP_SECRET_KEY=${WEBAPP_SECRET_KEY}
+      - WEBAPP_TOKEN_EXPIRY=${WEBAPP_TOKEN_EXPIRY:-3600}
+      - WEBAPP_BASE_URL=${WEBAPP_BASE_URL:-http://localhost:8080}
+      - WEBAPP_API_URL=${WEBAPP_API_URL:-}
+      # Internal key protecting /webapp/token and /webapp/page-token
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-}
+      # CORS — set to your frontend origin in production
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - CORS_ALLOW_CREDENTIALS=${CORS_ALLOW_CREDENTIALS:-true}
+      # Default admin (created on first startup)
+      - DEFAULT_ADMIN_LOGIN=${DEFAULT_ADMIN_LOGIN:-admin}
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-admin123}
+      - DEFAULT_ADMIN_NAME=${DEFAULT_ADMIN_NAME:-Главный администратор}
+      - DEFAULT_ORG_NAME=${DEFAULT_ORG_NAME:-Моя организация}
+      - DEFAULT_ORG_CODE=${DEFAULT_ORG_CODE:-main}
+      # Bot token required by settings loader even in API-only mode
+      - TGBOT_TOKEN=${TGBOT_TOKEN:-dummy}
+      - TGBOT_ADMIN_IDS=${TGBOT_ADMIN_IDS:-0}
+      # Google Sheets / Drive
+      - GOOGLE_SERVICE_ACCOUNT_JSON=${GOOGLE_SERVICE_ACCOUNT_JSON:-}
+      - GOOGLE_SERVICE_ACCOUNT_JSON_DATA=${GOOGLE_SERVICE_ACCOUNT_JSON_DATA:-}
+      - GOOGLE_SHEETS_FETCH_TIMEOUT=${GOOGLE_SHEETS_FETCH_TIMEOUT:-15}
+      - GOOGLE_SHEETS_MAX_ROWS=${GOOGLE_SHEETS_MAX_ROWS:-500}
+      # Environment
+      - APP_ENV=${APP_ENV:-production}
+    networks:
+      - restos_internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+
   bot:
     container_name: restos_bot
     depends_on:
@@ -48,22 +107,38 @@ services:
     build:
       context: .
       dockerfile: ./docker/bot/bot.Dockerfile
-    command: [ "poetry", "run", "python", "local_bot.py"]
-    restart: always
-    # Only expose port 8000 for webhook/API (change to internal only in production)
-    ports:
-      - "8000:8000"
+    command: [ "poetry", "run", "python", "local_bot.py" ]
+    restart: unless-stopped
     environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-restos}
+      - DATABASE_POOL_SIZE=${DATABASE_POOL_SIZE:-10}
+      - DATABASE_MAX_OVERFLOW=${DATABASE_MAX_OVERFLOW:-20}
+      - DATABASE_POOL_RECYCLE=${DATABASE_POOL_RECYCLE:-3600}
+      - REDIS_DSN=redis://redis:6379/0
       - TGBOT_TOKEN=${TGBOT_TOKEN}
       - TGBOT_ADMIN_IDS=${TGBOT_ADMIN_IDS}
       - TGBOT_USE_REDIS=true
       - TGBOT_TRIGGER_MESSAGE_BUSINESS_CHAT=${TGBOT_TRIGGER_MESSAGE_BUSINESS_CHAT:-start}
       - TGBOT_TRIGGER_AUTO_MESSAGE_BUSINESS_CHAT=${TGBOT_TRIGGER_AUTO_MESSAGE_BUSINESS_CHAT:-help}
-      - REDIS_DSN=redis://redis:6379/0
-      - DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/restos
-      - DATABASE_POOL_SIZE=${DATABASE_POOL_SIZE:-10}
-      - DATABASE_MAX_OVERFLOW=${DATABASE_MAX_OVERFLOW:-20}
-      - DATABASE_POOL_RECYCLE=${DATABASE_POOL_RECYCLE:-3600}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_EXPIRE_DAYS=${JWT_EXPIRE_DAYS:-30}
+      - WEBAPP_SECRET_KEY=${WEBAPP_SECRET_KEY}
+      - WEBAPP_TOKEN_EXPIRY=${WEBAPP_TOKEN_EXPIRY:-3600}
+      - WEBAPP_BASE_URL=${WEBAPP_BASE_URL:-http://localhost:8080}
+      - WEBAPP_API_URL=${WEBAPP_API_URL:-}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - CORS_ALLOW_CREDENTIALS=${CORS_ALLOW_CREDENTIALS:-true}
+      - DEFAULT_ADMIN_LOGIN=${DEFAULT_ADMIN_LOGIN:-admin}
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-admin123}
+      - DEFAULT_ADMIN_NAME=${DEFAULT_ADMIN_NAME:-Главный администратор}
+      - DEFAULT_ORG_NAME=${DEFAULT_ORG_NAME:-Моя организация}
+      - DEFAULT_ORG_CODE=${DEFAULT_ORG_CODE:-main}
+      - GOOGLE_SERVICE_ACCOUNT_JSON=${GOOGLE_SERVICE_ACCOUNT_JSON:-}
+      - GOOGLE_SERVICE_ACCOUNT_JSON_DATA=${GOOGLE_SERVICE_ACCOUNT_JSON_DATA:-}
+      - GOOGLE_SHEETS_FETCH_TIMEOUT=${GOOGLE_SHEETS_FETCH_TIMEOUT:-15}
+      - GOOGLE_SHEETS_MAX_ROWS=${GOOGLE_SHEETS_MAX_ROWS:-500}
+      - APP_ENV=${APP_ENV:-production}
     networks:
       - restos_internal
     logging:
@@ -80,7 +155,7 @@ services:
     restart: unless-stopped
     # Only expose internally or through reverse proxy
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       - RUST_LOG=info
     networks:

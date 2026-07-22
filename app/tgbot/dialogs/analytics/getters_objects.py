@@ -9,11 +9,11 @@ from aiogram_dialog import DialogManager
 from dependency_injector.wiring import Provide, inject
 
 from app.internal import Container
-from app.internal.usecases.analytics_service import AnalyticsService
-from app.internal.usecases.criterion_service import CriterionService
-from app.internal.usecases.criterion_set_service import CriterionSetService
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.analytics_service import AnalyticsService
+from app.internal.services.criterion_service import CriterionService
+from app.internal.services.criterion_set_service import CriterionSetService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.organization_service import OrganizationService
 
 logger = logging.getLogger(__name__)
 

@@ -9,10 +9,10 @@ from aiogram_dialog import DialogManager
 from dependency_injector.wiring import Provide, inject
 
 from app.internal import Container
-from app.internal.usecases.analytics_service import AnalyticsService
-from app.internal.usecases.criterion_service import CriterionService
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.analytics_service import AnalyticsService
+from app.internal.services.criterion_service import CriterionService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.organization_service import OrganizationService
 from app.tgbot.dialogs.common.organization import (
     get_organizations_list_data as common_get_organizations_list_data,
 )
@@ -1143,7 +1143,7 @@ async def get_ai_assistant_data(
         if user_id and chat_id:
             storage = dialog_manager.middleware_data.get("storage")
             if storage:
-                from app.internal.usecases.ai_assistant_service import (
+                from app.internal.services.ai_assistant_service import (
                     AIAssistantService,
                 )
 

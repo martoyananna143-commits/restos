@@ -8,7 +8,7 @@ from aiogram_dialog.widgets.kbd import Button
 from dependency_injector.wiring import Provide, inject
 
 from app.internal import Container
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.organization_service import OrganizationService
 from app.tgbot.dialogs.help.states import HelpDialog
 from app.tgbot.dialogs.organization.states import OrganizationDialog
 

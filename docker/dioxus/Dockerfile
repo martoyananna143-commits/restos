@@ -9,15 +9,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install wasm target and dioxus-cli
 RUN rustup target add wasm32-unknown-unknown \
-    && cargo install dioxus-cli --locked
+    && cargo install dioxus-cli --version 0.7.3 --locked
 
 WORKDIR /app
 
 # Copy project files
 COPY resty_form_alpha/ .
 
-# Build dependencies in release mode (for faster startup)
-RUN dx build --release || true
+# Compile the production bundle during image build so deployment fails early on frontend errors.
+RUN dx build --release
 
 EXPOSE 8080
 

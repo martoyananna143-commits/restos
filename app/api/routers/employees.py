@@ -1,5 +1,6 @@
 """Employees API router."""
 
+import json
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,10 +18,54 @@ from app.infra.database.repository.employee.dto import (
     CreateEmployeeDTO,
     UpdateEmployeeDTO,
 )
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.organization_service import OrganizationService
 
 router = APIRouter(prefix="/employees", tags=["employees"])
+
+
+def _normalize_meta(raw_meta) -> dict:
+    """Normalize JSONB meta that may come as dict/string/None."""
+    if raw_meta is None:
+        return {}
+    if isinstance(raw_meta, dict):
+        return raw_meta
+    if isinstance(raw_meta, str):
+        if not raw_meta.strip():
+            return {}
+        try:
+            parsed = json.loads(raw_meta)
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
+async def _is_org_creator(
+    org_service: OrganizationService,
+    employee_service: EmployeeService,
+    admin_employee: Employee,
+) -> bool:
+    """Check org creator based on organization meta or legacy fallback."""
+    org = await org_service.get_by_id(admin_employee.organization_id)
+    if not org:
+        return False
+
+    org_meta = _normalize_meta(getattr(org, "meta", {}))
+    creator_id = org_meta.get("created_by_employee_id")
+    if creator_id is not None:
+        return int(creator_id) == int(admin_employee.id)
+
+    employee_types = await employee_service.get_employee_types()
+    admin_type_ids = {
+        int(t["id"]) for t in employee_types if bool(t.get("is_administrator", False))
+    }
+    org_employees = await employee_service.get_by_organization_id(admin_employee.organization_id)
+    admins = [e for e in org_employees if int(e.employee_type_id) in admin_type_ids]
+    if not admins:
+        return False
+    first_admin = min(admins, key=lambda e: e.created_at)
+    return int(first_admin.id) == int(admin_employee.id)
 
 
 @router.get("", response_model=List[EmployeeResponse])
@@ -206,6 +251,7 @@ async def delete_employee(
     employee_id: int,
     admin_employee: Employee = Depends(require_admin),
     service: EmployeeService = Depends(get_employee_service),
+    organization_service: OrganizationService = Depends(get_organization_service),
 ):
     """Delete employee (soft delete).
     
@@ -235,6 +281,12 @@ async def delete_employee(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have access to this employee",
+        )
+
+    if not await _is_org_creator(organization_service, service, admin_employee):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only organization creator can delete employees",
         )
     
     # Prevent self-deletion

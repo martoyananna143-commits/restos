@@ -1,5 +1,6 @@
 """CriterionSet repository implementation using asyncpg and buildpg."""
 
+import json
 from typing import Any, Awaitable, Optional, Union
 
 from buildpg.asyncpg import BuildPgPool
@@ -17,6 +18,12 @@ from app.infra.database.repository.criterion_set.dto import (
 
 class CriterionSetRepositoryAsyncpg:
     """Repository for CriterionSet model using asyncpg and buildpg."""
+
+    _SELECT_COLS = """
+        id, organization_id, name, description, is_default, is_active,
+        source_type, source_url, source_meta,
+        created_at, updated_at, deleted_at
+    """
 
     def __init__(self, pool: Union[BuildPgPool, Awaitable[BuildPgPool], Any]):
         """Initialize repository with database pool.
@@ -50,6 +57,55 @@ class CriterionSetRepositoryAsyncpg:
                 raise TypeError(f"Cannot resolve pool: {type(self._pool)}")
         return self._resolved_pool
 
+    @staticmethod
+    def _normalize_source_meta(meta_raw: Any) -> dict:
+        """Normalize source_meta from database to dict.
+
+        Args:
+            meta_raw: Raw value from PostgreSQL JSONB (dict, str, bytes, or None).
+
+        Returns:
+            Normalized dict (empty dict if None, empty, or unsupported type).
+        """
+        if meta_raw is None:
+            return {}
+        if isinstance(meta_raw, dict):
+            return meta_raw
+        if isinstance(meta_raw, str):
+            return json.loads(meta_raw) if meta_raw else {}
+        if isinstance(meta_raw, (bytes, bytearray)):
+            return json.loads(meta_raw) if meta_raw else {}
+        return {}
+
+    async def _criterion_ids_for_set(self, conn, criterion_set_id: int) -> list[int]:
+        criterion_rows = await conn.fetch_b(
+            """
+            SELECT criterion_id
+            FROM criterion_set_criterion
+            WHERE criterion_set_id = :criterion_set_id
+            """,
+            criterion_set_id=criterion_set_id,
+        )
+        return [r["criterion_id"] for r in criterion_rows] if criterion_rows else []
+
+    def _dto_from_row(self, row, criterion_ids: list[int]) -> CriterionSetDTO:
+        meta = self._normalize_source_meta(row.get("source_meta"))
+        return CriterionSetDTO(
+            id=row["id"],
+            organization_id=row["organization_id"],
+            name=row["name"],
+            description=row["description"],
+            is_default=row["is_default"],
+            is_active=row["is_active"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            deleted_at=row["deleted_at"],
+            criterion_ids=criterion_ids,
+            source_type=row.get("source_type") or "internal",
+            source_url=row.get("source_url"),
+            source_meta=meta,
+        )
+
     async def get_by_id(self, criterion_set_id: int) -> Optional[CriterionSetDTO]:
         """Get criterion set by ID.
 
@@ -62,10 +118,8 @@ class CriterionSetRepositoryAsyncpg:
         pool = await self._get_pool()
         async with get_connection(pool) as conn:
             row = await conn.fetchrow_b(
-                """
-                SELECT
-                    id, organization_id, name, description, is_default, is_active,
-                    created_at, updated_at, deleted_at
+                f"""
+                SELECT {self._SELECT_COLS}
                 FROM criterion_sets
                 WHERE id = :criterion_set_id AND deleted_at IS NULL
                 """,
@@ -75,29 +129,8 @@ class CriterionSetRepositoryAsyncpg:
             if not row:
                 return None
 
-            # Получаем IDs критериев в наборе
-            criterion_rows = await conn.fetch_b(
-                """
-                SELECT criterion_id
-                FROM criterion_set_criterion
-                WHERE criterion_set_id = :criterion_set_id
-                """,
-                criterion_set_id=criterion_set_id,
-            )
-            criterion_ids = [r["criterion_id"] for r in criterion_rows] if criterion_rows else []
-
-            return CriterionSetDTO(
-                id=row["id"],
-                organization_id=row["organization_id"],
-                name=row["name"],
-                description=row["description"],
-                is_default=row["is_default"],
-                is_active=row["is_active"],
-                created_at=row["created_at"],
-                updated_at=row["updated_at"],
-                deleted_at=row["deleted_at"],
-                criterion_ids=criterion_ids,
-            )
+            criterion_ids = await self._criterion_ids_for_set(conn, criterion_set_id)
+            return self._dto_from_row(row, criterion_ids)
 
     async def get_by_organization_id(
         self, organization_id: int, include_inactive: bool = False
@@ -113,10 +146,8 @@ class CriterionSetRepositoryAsyncpg:
         """
         pool = await self._get_pool()
         async with get_connection(pool) as conn:
-            query = """
-                SELECT
-                    id, organization_id, name, description, is_default, is_active,
-                    created_at, updated_at, deleted_at
+            query = f"""
+                SELECT {self._SELECT_COLS}
                 FROM criterion_sets
                 WHERE organization_id = :organization_id
                     AND deleted_at IS NULL
@@ -129,31 +160,8 @@ class CriterionSetRepositoryAsyncpg:
 
             result = []
             for row in rows:
-                # Получаем IDs критериев в наборе
-                criterion_rows = await conn.fetch_b(
-                    """
-                    SELECT criterion_id
-                    FROM criterion_set_criterion
-                    WHERE criterion_set_id = :criterion_set_id
-                    """,
-                    criterion_set_id=row["id"],
-                )
-                criterion_ids = [r["criterion_id"] for r in criterion_rows] if criterion_rows else []
-
-                result.append(
-                    CriterionSetDTO(
-                        id=row["id"],
-                        organization_id=row["organization_id"],
-                        name=row["name"],
-                        description=row["description"],
-                        is_default=row["is_default"],
-                        is_active=row["is_active"],
-                        created_at=row["created_at"],
-                        updated_at=row["updated_at"],
-                        deleted_at=row["deleted_at"],
-                        criterion_ids=criterion_ids,
-                    )
-                )
+                criterion_ids = await self._criterion_ids_for_set(conn, row["id"])
+                result.append(self._dto_from_row(row, criterion_ids))
 
             return result
 
@@ -171,10 +179,8 @@ class CriterionSetRepositoryAsyncpg:
         pool = await self._get_pool()
         async with get_connection(pool) as conn:
             row = await conn.fetchrow_b(
-                """
-                SELECT
-                    id, organization_id, name, description, is_default, is_active,
-                    created_at, updated_at, deleted_at
+                f"""
+                SELECT {self._SELECT_COLS}
                 FROM criterion_sets
                 WHERE organization_id = :organization_id
                     AND is_default = true
@@ -188,29 +194,8 @@ class CriterionSetRepositoryAsyncpg:
             if not row:
                 return None
 
-            # Получаем IDs критериев в наборе
-            criterion_rows = await conn.fetch_b(
-                """
-                SELECT criterion_id
-                FROM criterion_set_criterion
-                WHERE criterion_set_id = :criterion_set_id
-                """,
-                criterion_set_id=row["id"],
-            )
-            criterion_ids = [r["criterion_id"] for r in criterion_rows] if criterion_rows else []
-
-            return CriterionSetDTO(
-                id=row["id"],
-                organization_id=row["organization_id"],
-                name=row["name"],
-                description=row["description"],
-                is_default=row["is_default"],
-                is_active=row["is_active"],
-                created_at=row["created_at"],
-                updated_at=row["updated_at"],
-                deleted_at=row["deleted_at"],
-                criterion_ids=criterion_ids,
-            )
+            criterion_ids = await self._criterion_ids_for_set(conn, row["id"])
+            return self._dto_from_row(row, criterion_ids)
 
     async def create(self, dto: CreateCriterionSetDTO) -> CriterionSetDTO:
         """Create a new criterion set.
@@ -241,13 +226,16 @@ class CriterionSetRepositoryAsyncpg:
                 row = await conn.fetchrow_b(
                     """
                     INSERT INTO criterion_sets (
-                        organization_id, name, description, is_default, is_active
+                        organization_id, name, description, is_default, is_active,
+                        source_type, source_url, source_meta
                     )
                     VALUES (
-                        :organization_id, :name, :description, :is_default, :is_active
+                        :organization_id, :name, :description, :is_default, :is_active,
+                        :source_type, :source_url, CAST(:source_meta AS jsonb)
                     )
                     RETURNING
                         id, organization_id, name, description, is_default, is_active,
+                        source_type, source_url, source_meta,
                         created_at, updated_at, deleted_at
                     """,
                     organization_id=dto.organization_id,
@@ -255,6 +243,9 @@ class CriterionSetRepositoryAsyncpg:
                     description=dto.description,
                     is_default=dto.is_default,
                     is_active=dto.is_active,
+                    source_type=dto.source_type or "internal",
+                    source_url=dto.source_url,
+                    source_meta=json.dumps(dto.source_meta or {}),
                 )
 
                 criterion_set_id = row["id"]
@@ -272,17 +263,30 @@ class CriterionSetRepositoryAsyncpg:
                             criterion_id=criterion_id,
                         )
 
-                return CriterionSetDTO(
-                    id=row["id"],
-                    organization_id=row["organization_id"],
-                    name=row["name"],
-                    description=row["description"],
-                    is_default=row["is_default"],
-                    is_active=row["is_active"],
-                    created_at=row["created_at"],
-                    updated_at=row["updated_at"],
-                    deleted_at=row["deleted_at"],
-                    criterion_ids=dto.criterion_ids or [],
+                return self._dto_from_row(row, dto.criterion_ids or [])
+
+    async def append_criterion_links(
+        self, criterion_set_id: int, criterion_ids: list[int]
+    ) -> None:
+        """Attach criteria to a set; existing links are kept (idempotent).
+
+        Args:
+            criterion_set_id: Target criterion set ID.
+            criterion_ids: Criterion IDs to link (duplicates skipped by PK + ON CONFLICT).
+        """
+        if not criterion_ids:
+            return
+        pool = await self._get_pool()
+        async with get_connection(pool) as conn:
+            for criterion_id in criterion_ids:
+                await conn.execute_b(
+                    """
+                    INSERT INTO criterion_set_criterion (criterion_set_id, criterion_id)
+                    VALUES (:criterion_set_id, :criterion_id)
+                    ON CONFLICT DO NOTHING
+                    """,
+                    criterion_set_id=criterion_set_id,
+                    criterion_id=criterion_id,
                 )
 
     async def update(
@@ -344,6 +348,15 @@ class CriterionSetRepositoryAsyncpg:
                 if dto.is_active is not None:
                     updates.append("is_active = :is_active")
                     params["is_active"] = dto.is_active
+                if dto.source_type is not None:
+                    updates.append("source_type = :source_type")
+                    params["source_type"] = dto.source_type
+                if dto.source_url is not None:
+                    updates.append("source_url = :source_url")
+                    params["source_url"] = dto.source_url
+                if dto.source_meta is not None:
+                    updates.append("source_meta = CAST(:source_meta AS jsonb)")
+                    params["source_meta"] = json.dumps(dto.source_meta)
 
                 if updates:
                     updates.append("updated_at = NOW()")
@@ -353,16 +366,15 @@ class CriterionSetRepositoryAsyncpg:
                         WHERE id = :criterion_set_id
                         RETURNING
                             id, organization_id, name, description, is_default, is_active,
+                            source_type, source_url, source_meta,
                             created_at, updated_at, deleted_at
                     """
                     row = await conn.fetchrow_b(query, **params)
                 else:
                     # Если нет обновлений полей, просто получаем текущие данные
                     row = await conn.fetchrow_b(
-                        """
-                        SELECT
-                            id, organization_id, name, description, is_default, is_active,
-                            created_at, updated_at, deleted_at
+                        f"""
+                        SELECT {self._SELECT_COLS}
                         FROM criterion_sets
                         WHERE id = :criterion_set_id
                         """,
@@ -391,29 +403,8 @@ class CriterionSetRepositoryAsyncpg:
                             criterion_id=criterion_id,
                         )
 
-                # Получаем актуальные IDs критериев
-                criterion_rows = await conn.fetch_b(
-                    """
-                    SELECT criterion_id
-                    FROM criterion_set_criterion
-                    WHERE criterion_set_id = :criterion_set_id
-                    """,
-                    criterion_set_id=criterion_set_id,
-                )
-                criterion_ids = [r["criterion_id"] for r in criterion_rows] if criterion_rows else []
-
-                return CriterionSetDTO(
-                    id=row["id"],
-                    organization_id=row["organization_id"],
-                    name=row["name"],
-                    description=row["description"],
-                    is_default=row["is_default"],
-                    is_active=row["is_active"],
-                    created_at=row["created_at"],
-                    updated_at=row["updated_at"],
-                    deleted_at=row["deleted_at"],
-                    criterion_ids=criterion_ids,
-                )
+                criterion_ids = await self._criterion_ids_for_set(conn, criterion_set_id)
+                return self._dto_from_row(row, criterion_ids)
 
     async def delete(self, criterion_set_id: int) -> bool:
         """Soft delete criterion set.

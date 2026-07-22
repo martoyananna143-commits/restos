@@ -11,8 +11,8 @@ from app.infra.database.repository.employee.dto import (
     UpdateEmployeeDTO,
 )
 from app.internal import Container
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.organization_service import OrganizationService
 from app.tgbot.dialogs.employee.states import EmployeeDialog
 from app.tgbot.dialogs.greeting.states import GreetingDialog
 from app.tgbot.dialogs.organization.states import OrganizationDialog

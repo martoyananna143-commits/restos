@@ -9,11 +9,11 @@ from dependency_injector.wiring import Provide, inject
 from app.infra.database.repository.employee.dto import CreateEmployeeDTO
 from app.infra.database.repository.user.dto import TelegramUserDTO
 from app.internal import Container
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.evaluation_service import EvaluationService
-from app.internal.usecases.invitation_service import InvitationService
-from app.internal.usecases.organization_service import OrganizationService
-from app.internal.usecases.user_service import UserService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.evaluation_service import EvaluationService
+from app.internal.services.invitation_service import InvitationService
+from app.internal.services.organization_service import OrganizationService
+from app.internal.services.user_service import UserService
 from app.settings import config
 from app.tgbot.dialogs.greeting.states import GreetingDialog
 

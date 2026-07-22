@@ -16,10 +16,14 @@ import bcrypt
 
 from app.infra.database.repository.employee.dto import CreateEmployeeDTO
 from app.infra.database.repository.employee.employee_asyncpg import EmployeeRepositoryAsyncpg
+from app.infra.database.repository.evaluation_type.dto import CreateEvaluationTypeDTO
+from app.infra.database.repository.evaluation_type.evaluation_type_asyncpg import EvaluationTypeRepositoryAsyncpg
 from app.infra.database.repository.organization.dto import CreateOrganizationDTO
+from app.infra.database.repository.organization.dto import UpdateOrganizationDTO
 from app.infra.database.repository.organization.organization_asyncpg import OrganizationRepositoryAsyncpg
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.evaluation_type_service import EvaluationTypeService
+from app.internal.services.organization_service import OrganizationService
 from app.internal import Container
 
 logger = logging.getLogger(__name__)
@@ -50,8 +54,9 @@ async def ensure_default_admin(container: Container) -> None:
     # the initialized BuildPgPool (initializes on first call, cached after).
     pool = await container.postgresql_resource()
 
-    employee_service  = EmployeeService(repository=EmployeeRepositoryAsyncpg(pool=pool))
-    org_service       = OrganizationService(repository=OrganizationRepositoryAsyncpg(pool=pool))
+    employee_service     = EmployeeService(repository=EmployeeRepositoryAsyncpg(pool=pool))
+    org_service          = OrganizationService(repository=OrganizationRepositoryAsyncpg(pool=pool))
+    eval_type_service    = EvaluationTypeService(repository=EvaluationTypeRepositoryAsyncpg(pool=pool))
 
     # ── 1. Skip if admin already exists ─────────────────────────────────────
     existing = await employee_service.get_by_web_login(login)
@@ -100,6 +105,12 @@ async def ensure_default_admin(container: Container) -> None:
         )
     )
 
+    org_meta = dict(getattr(org, "meta", {}) or {})
+    if not org_meta.get("created_by_employee_id"):
+        org_meta["created_by_employee_id"] = admin.id
+        org_meta["created_by_telegram_id"] = admin.telegram_id
+        await org_service.update(org.id, UpdateOrganizationDTO(meta=org_meta))
+
     logger.info(
         "✓ Default admin created: login='%s' | org='%s' (id=%s) | employee_id=%s",
         login, org.name, org.id, admin.id,
@@ -108,3 +119,14 @@ async def ensure_default_admin(container: Container) -> None:
         "⚠  Change DEFAULT_ADMIN_PASSWORD='%s' in .env before production!",
         password,
     )
+
+    # ── 5. Create default evaluation type if none exist ──────────────────────
+    existing_types = await eval_type_service.get_all(organization_id=org.id)
+    if not existing_types:
+        await eval_type_service.create(CreateEvaluationTypeDTO(
+            organization_id=org.id,
+            name="Стандартная оценка",
+            code="standard",
+            description="Стандартный тип оценки сотрудников",
+        ))
+        logger.info("Created default evaluation type 'Стандартная оценка' for org %s", org.id)

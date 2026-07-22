@@ -16,9 +16,9 @@ from app.infra.database.repository.criterion.dto import (
     CreateCriterionDTO,
     UpdateCriterionDTO,
 )
-from app.internal.usecases.criterion_service import CriterionService
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.criterion_service import CriterionService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.organization_service import OrganizationService
 
 router = APIRouter(prefix="/criteria", tags=["criteria"])
 

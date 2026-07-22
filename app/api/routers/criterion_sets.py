@@ -22,10 +22,10 @@ from app.infra.database.repository.criterion_set.dto import (
     CreateCriterionSetDTO,
     UpdateCriterionSetDTO,
 )
-from app.internal.usecases.criterion_service import CriterionService
-from app.internal.usecases.criterion_set_service import CriterionSetService
-from app.internal.usecases.evaluation_type_service import EvaluationTypeService
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.criterion_service import CriterionService
+from app.internal.services.criterion_set_service import CriterionSetService
+from app.internal.services.evaluation_type_service import EvaluationTypeService
+from app.internal.services.organization_service import OrganizationService
 
 router = APIRouter(prefix="/criterion-sets", tags=["criterion-sets"])
 
@@ -133,7 +133,6 @@ async def create_criterion_set(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have access to this organization",
         )
-    """
     # Verify organization exists
     organization = await organization_service.get_by_id(data.organization_id)
     if not organization:

@@ -9,7 +9,7 @@ from aiogram_dialog.widgets.text import Const, Format
 from dependency_injector.wiring import Provide, inject
 
 from app.internal import Container
-from app.internal.usecases.criterion_set_service import CriterionSetService
+from app.internal.services.criterion_set_service import CriterionSetService
 
 
 @inject

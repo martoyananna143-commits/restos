@@ -18,13 +18,13 @@ from app.infra.database.repository.evaluation.dto import (
     UpdateEvaluationDTO,
 )
 from app.internal import Container
-from app.internal.usecases.criterion_service import CriterionService
-from app.internal.usecases.criterion_set_service import CriterionSetService
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.evaluation_service import EvaluationService
-from app.internal.usecases.organization_service import OrganizationService
-from app.internal.usecases.excel_report_service import ExcelReportService
-from app.internal.usecases.pdf_report_service import PDFReportService
+from app.internal.services.criterion_service import CriterionService
+from app.internal.services.criterion_set_service import CriterionSetService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.evaluation_service import EvaluationService
+from app.internal.services.organization_service import OrganizationService
+from app.internal.services.excel_report_service import ExcelReportService
+from app.internal.services.pdf_report_service import PDFReportService
 from app.tgbot.dialogs.common.evaluation_type import (
     confirm_evaluation_type,
     process_evaluation_type_code_input as common_process_code,

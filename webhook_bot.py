@@ -150,7 +150,7 @@ def setup_bot_and_dispatcher():
             "app.tgbot.dialogs.common.organization",
             "app.tgbot.dialogs.common.evaluation_type",
             "app.tgbot.dialogs.common.criterion_set",
-            "app.internal.usecases.pdf_report_service",
+            "app.internal.services.pdf_report_service",
             "app.tgbot.dialogs.greeting.handlers",
             "app.tgbot.dialogs.greeting.getters",
             "app.tgbot.dialogs.greeting.windows",
@@ -246,7 +246,7 @@ def create_app() -> FastAPI:
     from app.settings import config as app_config
     
     app = FastAPI(
-        title="Yarbot API + Webhook",
+        title="Restos API + Webhook",
         description="API for Employee Evaluation System with Telegram Webhook (Web Forms Only)",
         version="1.0.0",
         lifespan=lifespan,
@@ -297,7 +297,7 @@ def create_app() -> FastAPI:
     async def root():
         """Root endpoint."""
         return {
-            "message": "Yarbot API + Webhook (Web Forms Only)",
+            "message": "Restos API + Webhook",
             "version": "1.0.0",
             "docs": "/docs",
             "redoc": "/redoc",

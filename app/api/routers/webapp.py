@@ -4,10 +4,10 @@ import base64
 import logging
 import os
 import time
-from typing import Optional
+from typing import Annotated, Optional
 
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel
 
 from app.api.deps import (
@@ -23,17 +23,32 @@ from app.infra.database.repository.criterion_value.criterion_value_asyncpg impor
 from app.infra.database.repository.criterion_value.dto import CreateCriterionValueDTO
 from app.infra.database.repository.employee.dto import UpdateEmployeeDTO
 from app.infra.database.repository.evaluation.dto import CreateEvaluationDTO, UpdateEvaluationDTO
-from app.internal.usecases.criterion_service import CriterionService
-from app.internal.usecases.criterion_set_service import CriterionSetService
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.evaluation_service import EvaluationService
-from app.internal.usecases.evaluation_type_service import EvaluationTypeService
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.criterion_service import CriterionService
+from app.internal.services.criterion_set_service import CriterionSetService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.evaluation_service import EvaluationService
+from app.internal.services.evaluation_type_service import EvaluationTypeService
+from app.internal.services.organization_service import OrganizationService
 from app.settings import config
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webapp", tags=["webapp"])
+
+
+# ==================== Internal key guard ====================
+
+async def _require_internal_key(
+    x_internal_key: Annotated[Optional[str], Header()] = None,
+) -> None:
+    """Dependency: reject requests that don't carry the correct internal API key.
+
+    When INTERNAL_API_KEY is empty (local dev) all requests are allowed so
+    existing integrations continue to work without configuration.
+    """
+    key = config.INTERNAL_API_KEY
+    if key and x_internal_key != key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
 
 # ==================== Schemas ====================
@@ -300,14 +315,19 @@ async def get_form_data(
             detail="Организация не найдена"
         )
     
-    # Get criterion set
+    # Get criterion set and verify it belongs to the organisation in the token.
     criterion_set = await criterion_set_service.get_by_id(payload.set_id)
     if not criterion_set:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Набор критериев не найден"
         )
-    
+    if criterion_set.organization_id != payload.org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Недействительный токен"
+        )
+
     # Get criteria
     criterion_ids = criterion_set.criterion_ids or []
     criteria = await criterion_service.get_by_ids(criterion_ids)
@@ -342,16 +362,14 @@ async def submit_form(
     token: str,
     request: SubmitRequest,
     evaluation_service: EvaluationService = Depends(get_evaluation_service),
-    criterion_value_repo = Depends(get_criterion_value_repository),
+    criterion_value_repo=Depends(get_criterion_value_repository),
     employee_service: EmployeeService = Depends(get_employee_service),
+    criterion_set_service: CriterionSetService = Depends(get_criterion_set_service),
 ):
     """Submit form answers.
-    
-    PUBLIC ENDPOINT - Uses ChaCha20Poly1305 token authentication.
-    Token is validated and marked as used after successful submission.
-    
-    This endpoint is intentionally public to allow web form submissions.
-    Authorization is handled via encrypted token validation + replay protection.
+
+    PUBLIC ENDPOINT — access controlled via encrypted ChaCha20Poly1305 token.
+    Includes replay-attack protection (token is burned after first use).
     """
     # Decrypt and validate token
     payload = decrypt_token(token)
@@ -360,14 +378,28 @@ async def submit_form(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Форма не найдена или срок действия истек"
         )
-    
-    # Check if already used (prevent replay)
+
+    # Prevent replay attacks
     if is_token_used(token):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Эта форма уже была отправлена"
         )
-    
+
+    # Verify the criterion set belongs to the organisation from the token
+    # and that submitted answers only reference criteria from that set.
+    criterion_set = await criterion_set_service.get_by_id(payload.set_id)
+    if not criterion_set or criterion_set.organization_id != payload.org_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недействительный токен")
+
+    allowed_criterion_ids = set(criterion_set.criterion_ids or [])
+    for answer in request.answers:
+        if answer.criterion_id not in allowed_criterion_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Criterion {answer.criterion_id} is not part of this form",
+            )
+
     # Create evaluation
     create_dto = CreateEvaluationDTO(
         evaluation_type_id=payload.type_id,
@@ -435,14 +467,11 @@ async def submit_form(
     )
 
 
-@router.post("/token", response_model=CreateTokenResponse)
+@router.post("/token", response_model=CreateTokenResponse, dependencies=[Depends(_require_internal_key)])
 async def create_token(request: CreateTokenRequest):
     """Create encrypted form token (called by bot internally).
-    
-    NOTE: This endpoint should only be called by the bot internally.
-    In production, consider adding IP whitelist or internal service auth.
-    
-    Returns URL-safe token containing all authorization data.
+
+    Protected by X-Internal-Key header. Set INTERNAL_API_KEY in env.
     """
     token = create_encrypted_token(
         organization_id=request.organization_id,
@@ -529,9 +558,9 @@ def _validate_page_token(token: str, expected_page: str) -> PageTokenPayload:
     return payload
 
 
-@router.post("/page-token")
+@router.post("/page-token", dependencies=[Depends(_require_internal_key)])
 async def create_page_token_endpoint(request: CreatePageTokenRequest):
-    """Create encrypted page token (called by bot)."""
+    """Create encrypted page token (called by bot). Protected by X-Internal-Key header."""
     token = create_page_token(
         page=request.page,
         org_id=request.organization_id,
@@ -618,12 +647,20 @@ async def update_employee_role_endpoint(
     employee_service: EmployeeService = Depends(get_employee_service),
 ):
     """Update employee role via the webapp."""
-    _validate_page_token(token, "employees")
+    payload = _validate_page_token(token, "employees")
 
     employee_id = request.get("employee_id")
     employee_type_id = request.get("employee_type_id")
     if not employee_id or not employee_type_id:
         raise HTTPException(status_code=400, detail="employee_id and employee_type_id required")
+
+    # Verify the target employee belongs to the organisation encoded in the token.
+    target = await employee_service.get_by_id(int(employee_id))
+    if not target:
+        raise HTTPException(status_code=404, detail="Сотрудник не найден")
+    is_superuser = _is_superuser_token(payload)
+    if not is_superuser and target.organization_id != payload.org_id:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
 
     update_dto = UpdateEmployeeDTO(employee_type_id=int(employee_type_id))
     updated = await employee_service.update(int(employee_id), update_dto)
@@ -912,8 +949,18 @@ async def submit_criteria_select(
     if not set_id:
         raise HTTPException(status_code=400, detail="criterion_set_id missing from token")
 
+    # Verify the criterion set belongs to the organisation from the token.
+    crit_set = await criterion_set_service.get_by_id(int(set_id))
+    if not crit_set:
+        raise HTTPException(status_code=404, detail="Набор критериев не найден")
+    if crit_set.organization_id != payload.org_id:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
+
     criterion_ids = request.get("criterion_ids", [])
-    update_dto = UpdateCriterionSetDTO(criterion_ids=criterion_ids)
+    if not isinstance(criterion_ids, list):
+        raise HTTPException(status_code=400, detail="criterion_ids must be a list")
+
+    update_dto = UpdateCriterionSetDTO(criterion_ids=[int(cid) for cid in criterion_ids])
     await criterion_set_service.update(int(set_id), update_dto)
 
     return {"ok": True}

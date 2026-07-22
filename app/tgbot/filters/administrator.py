@@ -7,7 +7,7 @@ from aiogram.types import CallbackQuery, Message
 from dependency_injector.wiring import Provide, inject
 
 from app.internal import Container
-from app.internal.usecases.employee_service import EmployeeService
+from app.internal.services.employee_service import EmployeeService
 
 
 class IsAdministratorFilter(BaseFilter):

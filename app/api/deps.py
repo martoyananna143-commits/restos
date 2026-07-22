@@ -6,17 +6,21 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import Depends
 
 from app.internal import Container
-from app.internal.usecases.analytics_service import AnalyticsService
-from app.internal.usecases.criterion_service import CriterionService
-from app.internal.usecases.criterion_set_service import CriterionSetService
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.evaluation_service import EvaluationService
-from app.internal.usecases.evaluation_type_service import EvaluationTypeService
-from app.internal.usecases.invitation_service import InvitationService
-from app.internal.usecases.organization_service import OrganizationService
-from app.internal.usecases.user_service import UserService
-from app.internal.usecases.excel_report_service import ExcelReportService
-from app.internal.usecases.pdf_report_service import PDFReportService
+from app.internal.services.ai_assistant_service import AIAssistantService
+from app.internal.services.analytics_service import AnalyticsService
+from app.internal.services.criterion_service import CriterionService
+from app.internal.services.criterion_set_service import CriterionSetService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.evaluation_service import EvaluationService
+from app.internal.services.evaluation_type_service import EvaluationTypeService
+from app.internal.services.invitation_service import InvitationService
+from app.internal.services.organization_service import OrganizationService
+from app.internal.services.user_service import UserService
+from app.internal.services.excel_report_service import ExcelReportService
+from app.internal.services.google_criterion_sync_service import GoogleCriterionSyncService
+from app.internal.services.google_drive_service import GoogleDriveService
+from app.internal.services.google_sheet_service import GoogleSheetService
+from app.internal.services.pdf_report_service import PDFReportService
 from app.infra.database.repository.criterion_value.criterion_value_asyncpg import (
     CriterionValueRepositoryAsyncpg,
 )
@@ -200,3 +204,39 @@ async def get_criterion_value_repository(
         CriterionValueRepositoryAsyncpg instance.
     """
     return repo
+
+
+@inject
+async def get_ai_assistant_service(
+    service: AIAssistantService = Depends(Provide[Container.ai_assistant_service]),
+) -> AIAssistantService:
+    """Get AI assistant service dependency.
+
+    Args:
+        service: Injected AI assistant service.
+
+    Returns:
+        AIAssistantService instance.
+    """
+    return service
+
+
+@inject
+async def get_google_sheet_service(
+    service: GoogleSheetService = Depends(Provide[Container.google_sheet_service]),
+) -> GoogleSheetService:
+    return service
+
+
+@inject
+async def get_google_drive_service(
+    service: GoogleDriveService = Depends(Provide[Container.google_drive_service]),
+) -> GoogleDriveService:
+    return service
+
+
+@inject
+async def get_google_criterion_sync_service(
+    service: GoogleCriterionSyncService = Depends(Provide[Container.google_criterion_sync_service]),
+) -> GoogleCriterionSyncService:
+    return service

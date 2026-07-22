@@ -72,6 +72,17 @@ class CriterionSetService:
         """
         return await self.repository.create(dto)
 
+    async def append_criteria_to_set(
+        self, criterion_set_id: int, criterion_ids: list[int]
+    ) -> None:
+        """Add criteria to an existing set without removing current links.
+
+        Args:
+            criterion_set_id: Criterion set ID.
+            criterion_ids: IDs to attach (skipped if already linked).
+        """
+        await self.repository.append_criterion_links(criterion_set_id, criterion_ids)
+
     async def update(
         self, criterion_set_id: int, dto: UpdateCriterionSetDTO
     ) -> Optional[CriterionSetDTO]:

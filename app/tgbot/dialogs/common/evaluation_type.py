@@ -19,8 +19,8 @@ from aiogram_dialog.widgets.text import Const, Format
 from dependency_injector.wiring import Provide, inject
 
 from app.internal import Container
-from app.internal.usecases.evaluation_type_service import EvaluationTypeService
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.evaluation_type_service import EvaluationTypeService
+from app.internal.services.organization_service import OrganizationService
 
 
 @inject

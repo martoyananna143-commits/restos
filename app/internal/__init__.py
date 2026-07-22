@@ -26,19 +26,22 @@ from app.infra.database.repository.organization.organization_asyncpg import (
     OrganizationRepositoryAsyncpg,
 )
 from app.infra.database.repository.user.user_asyncpg import UserRepositoryAsyncpg
-from app.internal.usecases.ai_assistant_service import AIAssistantService
-from app.internal.usecases.analytics_service import AnalyticsService
-from app.internal.usecases.criterion_service import CriterionService
-from app.internal.usecases.criterion_set_service import CriterionSetService
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.evaluation_service import EvaluationService
-from app.internal.usecases.evaluation_type_service import EvaluationTypeService
-from app.internal.usecases.excel_report_service import ExcelReportService
-from app.internal.usecases.export_data_service import ExportDataService
-from app.internal.usecases.invitation_service import InvitationService
-from app.internal.usecases.organization_service import OrganizationService
-from app.internal.usecases.pdf_report_service import PDFReportService
-from app.internal.usecases.user_service import UserService
+from app.internal.services.ai_assistant_service import AIAssistantService
+from app.internal.services.analytics_service import AnalyticsService
+from app.internal.services.criterion_service import CriterionService
+from app.internal.services.criterion_set_service import CriterionSetService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.evaluation_service import EvaluationService
+from app.internal.services.evaluation_type_service import EvaluationTypeService
+from app.internal.services.excel_report_service import ExcelReportService
+from app.internal.services.export_data_service import ExportDataService
+from app.internal.services.google_criterion_sync_service import GoogleCriterionSyncService
+from app.internal.services.google_drive_service import GoogleDriveService
+from app.internal.services.google_sheet_service import GoogleSheetService
+from app.internal.services.invitation_service import InvitationService
+from app.internal.services.organization_service import OrganizationService
+from app.internal.services.pdf_report_service import PDFReportService
+from app.internal.services.user_service import UserService
 from app.settings import config
 
 
@@ -187,6 +190,15 @@ class Container(containers.DeclarativeContainer):
     invitation_service = providers.Factory(
         InvitationService,
         storage=storage,
+    )
+
+    google_sheet_service = providers.Factory(GoogleSheetService)
+    google_drive_service = providers.Factory(GoogleDriveService)
+    google_criterion_sync_service = providers.Factory(
+        GoogleCriterionSyncService,
+        sheet_service=google_sheet_service,
+        criterion_set_service=criterion_set_service,
+        criterion_service=criterion_service,
     )
 
     # Service providers

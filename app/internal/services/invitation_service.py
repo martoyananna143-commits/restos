@@ -3,6 +3,7 @@
 import json
 import logging
 import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -41,10 +42,15 @@ class InvitationService:
 
     async def create_invitation(
         self,
-        inviter_telegram_id: int,
+        inviter_telegram_id: Optional[int],
         organization_id: Optional[int] = None,
         invitation_type: str = "employee",
         employee_type_id: Optional[int] = None,
+        position: Optional[str] = None,
+        contact_email: Optional[str] = None,
+        contact_telegram: Optional[str] = None,
+        full_name: Optional[str] = None,
+        created_by_employee_id: Optional[int] = None,
         ttl: int = 86400 * 7,
     ) -> str:
         """Create a new invitation code.
@@ -67,6 +73,14 @@ class InvitationService:
             "organization_id": organization_id,
             "invitation_type": invitation_type,
             "employee_type_id": employee_type_id,
+            "position": position,
+            "contact_email": contact_email,
+            "contact_telegram": contact_telegram,
+            "full_name": full_name,
+            "created_by_employee_id": created_by_employee_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(seconds=max(1, ttl))).isoformat(),
+            "ttl": ttl,
             "used": False,
         }
 
@@ -219,6 +233,68 @@ class InvitationService:
         except Exception as e:
             logger.error(f"Error deleting invitation code: {e}", exc_info=True)
             return False
+
+    async def list_invitations_for_organization(
+        self,
+        organization_id: int,
+        include_used: bool = True,
+    ) -> list[dict]:
+        """List invitation objects for one organization from Redis.
+
+        Returns newest first. Expired keys are naturally absent in Redis.
+        """
+        pattern = "invitation:*"
+        rows: list[dict] = []
+
+        try:
+            redis_client = None
+            if hasattr(self.storage, "_redis") and self.storage._redis:
+                redis_client = self.storage._redis
+            elif hasattr(self.storage, "redis"):
+                redis_client = self.storage.redis
+
+            if redis_client is None:
+                # In-memory fallback storage
+                data_store = getattr(self.storage, "data", {})
+                for key, payload in data_store.items():
+                    if not str(key).startswith("invitation:"):
+                        continue
+                    data = payload if isinstance(payload, dict) else {}
+                    if data.get("organization_id") != organization_id:
+                        continue
+                    if not include_used and data.get("used", False):
+                        continue
+                    rows.append({"code": str(key).split("invitation:", 1)[-1], **data})
+                return sorted(rows, key=lambda x: x.get("created_at", ""), reverse=True)
+
+            try:
+                keys = await redis_client.keys(pattern)
+            except Exception:
+                keys = []
+                if hasattr(redis_client, "scan_iter"):
+                    async for key in redis_client.scan_iter(match=pattern):
+                        keys.append(key)
+
+            for raw_key in keys:
+                key = raw_key.decode("utf-8") if isinstance(raw_key, bytes) else str(raw_key)
+                raw = await redis_client.get(raw_key)
+                if not raw:
+                    continue
+                raw_text = raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
+                try:
+                    data = json.loads(raw_text)
+                except Exception:
+                    continue
+                if data.get("organization_id") != organization_id:
+                    continue
+                if not include_used and data.get("used", False):
+                    continue
+                rows.append({"code": key.split("invitation:", 1)[-1], **data})
+
+            return sorted(rows, key=lambda x: x.get("created_at", ""), reverse=True)
+        except Exception as e:
+            logger.error("Error listing invitations: %s", e, exc_info=True)
+            return []
 
 
 

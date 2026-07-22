@@ -10,8 +10,8 @@ from app.api.schemas import (
     MessageResponse,
 )
 from app.infra.database.models.employee.employee import Employee
-from app.internal.usecases.invitation_service import InvitationService
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.invitation_service import InvitationService
+from app.internal.services.organization_service import OrganizationService
 
 router = APIRouter(prefix="/invitations", tags=["invitations"])
 

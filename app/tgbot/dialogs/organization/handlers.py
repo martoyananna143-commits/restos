@@ -14,9 +14,9 @@ from app.infra.database.repository.organization.dto import (
     UpdateOrganizationDTO,
 )
 from app.internal import Container
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.invitation_service import InvitationService
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.invitation_service import InvitationService
+from app.internal.services.organization_service import OrganizationService
 from app.settings import config
 from app.tgbot.dialogs.organization.states import OrganizationDialog
 

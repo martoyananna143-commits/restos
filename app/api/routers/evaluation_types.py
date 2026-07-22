@@ -13,7 +13,7 @@ from app.api.schemas import (
 from app.infra.database.models.employee.employee import Employee
 from app.infra.database.models.user.user import User
 from app.infra.database.repository.evaluation_type.dto import CreateEvaluationTypeDTO
-from app.internal.usecases.evaluation_type_service import EvaluationTypeService
+from app.internal.services.evaluation_type_service import EvaluationTypeService
 
 router = APIRouter(prefix="/evaluation-types", tags=["evaluation-types"])
 

@@ -15,17 +15,17 @@ from aiogram_dialog.widgets.kbd import Button
 from dependency_injector.wiring import Provide, inject
 
 from app.internal import Container
-from app.internal.usecases.ai_assistant_service import AIAssistantService
-from app.internal.usecases.analytics_service import AnalyticsService
-from app.internal.usecases.criterion_service import CriterionService
-from app.internal.usecases.criterion_set_service import CriterionSetService
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.evaluation_service import EvaluationService
-from app.internal.usecases.evaluation_type_service import EvaluationTypeService
-from app.internal.usecases.excel_report_service import ExcelReportService
-from app.internal.usecases.export_data_service import ExportDataService
-from app.internal.usecases.organization_service import OrganizationService
-from app.internal.usecases.pdf_report_service import PDFReportService
+from app.internal.services.ai_assistant_service import AIAssistantService
+from app.internal.services.analytics_service import AnalyticsService
+from app.internal.services.criterion_service import CriterionService
+from app.internal.services.criterion_set_service import CriterionSetService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.evaluation_service import EvaluationService
+from app.internal.services.evaluation_type_service import EvaluationTypeService
+from app.internal.services.excel_report_service import ExcelReportService
+from app.internal.services.export_data_service import ExportDataService
+from app.internal.services.organization_service import OrganizationService
+from app.internal.services.pdf_report_service import PDFReportService
 from app.tgbot.dialogs.analytics.states import AnalyticsDialog
 from app.tgbot.dialogs.greeting.states import GreetingDialog
 from app.tgbot.services import broadcaster

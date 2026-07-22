@@ -8,7 +8,7 @@ package-dir = { "" = "src" }
 [tool.poetry]
 name = "restos"
 version = "0.0.1"
-description = "Simple Telegram bot for group monitoring"
+description = "Restos — система оценки сотрудников"
 authors = []
 
 [tool.poetry.dependencies]
@@ -38,5 +38,9 @@ python-multipart = "^0.0.20"
 cryptography = "^46.0.3"
 bcrypt = ">=4.0.0,<5"
 python-jose = {extras = ["cryptography"], version = "^3.5.0"}
+httpx = "^0.28.0"
+google-api-python-client = "^2.160.0"
+google-auth = "^2.38.0"
 
-[tool.poetry.dev-dependencies]
+[tool.pytest.ini_options]
+pythonpath = ["."]

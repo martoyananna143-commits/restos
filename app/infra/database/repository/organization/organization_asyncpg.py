@@ -1,5 +1,7 @@
 """Organization repository implementation using asyncpg and buildpg."""
 
+import json
+
 from typing import Any, Awaitable, Optional, Union
 
 from buildpg.asyncpg import BuildPgPool
@@ -216,7 +218,7 @@ class OrganizationRepositoryAsyncpg:
                 address=dto.address,
                 phone=dto.phone,
                 is_active=dto.is_active,
-                meta=str(dto.meta or {}),
+                meta=json.dumps(dto.meta or {}, ensure_ascii=False),
             )
 
             return OrganizationDTO(
@@ -292,7 +294,7 @@ class OrganizationRepositoryAsyncpg:
             if dto.is_active is not None:
                 update_params["is_active"] = dto.is_active
             if dto.meta is not None:
-                update_params["meta"] = dto.meta
+                update_params["meta"] = json.dumps(dto.meta, ensure_ascii=False)
             update_params["organization_id"] = organization_id
 
             # Use fetchrow_b with named parameters directly

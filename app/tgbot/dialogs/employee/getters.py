@@ -4,8 +4,8 @@ from aiogram_dialog import DialogManager
 from dependency_injector.wiring import Provide, inject
 
 from app.internal import Container
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.organization_service import OrganizationService
 from app.tgbot.dialogs.common.utils import get_form_value
 
 

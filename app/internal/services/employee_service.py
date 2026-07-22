@@ -140,6 +140,10 @@ class EmployeeService:
         """Get employee by web_login stored in meta JSONB."""
         return await self.repository.get_by_web_login(login)
 
+    async def get_all_by_web_login(self, login: str) -> list[EmployeeDTO]:
+        """Get all employee records across all orgs sharing the same web_login."""
+        return await self.repository.get_all_by_web_login(login)
+
     async def update_meta(self, employee_id: int, meta: dict) -> bool:
         """Update employee meta JSONB field."""
         return await self.repository.update_meta(employee_id, meta)

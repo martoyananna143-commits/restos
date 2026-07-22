@@ -11,8 +11,8 @@ from aiogram_dialog.widgets.text import Const, Format
 from dependency_injector.wiring import Provide, inject
 
 from app.internal import Container
-from app.internal.usecases.organization_service import OrganizationService
-from app.internal.usecases.user_service import UserService
+from app.internal.services.organization_service import OrganizationService
+from app.internal.services.user_service import UserService
 from app.settings import config
 
 logger = logging.getLogger(__name__)

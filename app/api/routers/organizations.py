@@ -18,8 +18,8 @@ from app.infra.database.repository.organization.dto import (
     CreateOrganizationDTO,
     UpdateOrganizationDTO,
 )
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.organization_service import OrganizationService
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 

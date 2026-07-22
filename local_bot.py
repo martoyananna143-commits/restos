@@ -234,7 +234,7 @@ async def main():
             "app.tgbot.dialogs.common.organization",
             "app.tgbot.dialogs.common.evaluation_type",
             "app.tgbot.dialogs.common.criterion_set",
-            "app.internal.usecases.pdf_report_service",
+            "app.internal.services.pdf_report_service",
             "app.tgbot.dialogs.greeting.handlers",
             "app.tgbot.dialogs.greeting.getters",
             "app.tgbot.dialogs.greeting.windows",

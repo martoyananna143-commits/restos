@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, List
 
 import sqlalchemy as sa
 from sqlalchemy import Boolean, ForeignKey, Integer, String, Table, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infra.database.models.base import Base, SoftDeleteMixin, TimestampMixin
@@ -35,6 +36,11 @@ class CriterionSet(Base, TimestampMixin, SoftDeleteMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    source_type: Mapped[str] = mapped_column(
+        String(32), default="internal", nullable=False
+    )  # internal | google_sheet | google_drive_folder
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_meta: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
 
     criteria: Mapped[List["Criterion"]] = relationship(
         "Criterion",

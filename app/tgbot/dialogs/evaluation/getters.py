@@ -4,11 +4,11 @@ from aiogram_dialog import DialogManager
 from dependency_injector.wiring import Provide, inject
 
 from app.internal import Container
-from app.internal.usecases.criterion_set_service import CriterionSetService
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.evaluation_service import EvaluationService
-from app.internal.usecases.evaluation_type_service import EvaluationTypeService
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.criterion_set_service import CriterionSetService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.evaluation_service import EvaluationService
+from app.internal.services.evaluation_type_service import EvaluationTypeService
+from app.internal.services.organization_service import OrganizationService
 
 
 @inject

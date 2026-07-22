@@ -58,6 +58,7 @@ async def lifespan(app: FastAPI):
             "app.api.routers.webapp",
             "app.api.routers.web_auth",
             "app.api.routers.web_data",
+            "app.api.routers.web",
         ])
         owns_container = True
     
@@ -80,23 +81,33 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    """Create and configure FastAPI application.
-    
-    Returns:
-        Configured FastAPI application instance.
-    """
+    """Create and configure FastAPI application."""
+    import logging as _logging
     from app.settings import config
-    
+
+    # Fail fast in production if critical secrets are misconfigured.
+    config.validate_production_security()
+
+    is_production = config.APP_ENV == "production"
+    _log = _logging.getLogger(__name__)
+
+    if is_production and config.CORS_ORIGINS == ["*"]:
+        _log.warning(
+            "SECURITY: CORS_ORIGINS is set to '*' in production — "
+            "restrict to specific origins via the CORS_ORIGINS env variable"
+        )
+
     app = FastAPI(
-        title="Yarbot API",
-        description="API for Employee Evaluation System (Web Forms Only)",
+        title="Restos API",
+        description="API системы оценки сотрудников Restos",
         version="1.0.0",
         lifespan=lifespan,
+        # Disable interactive docs in production to avoid exposing the API schema.
+        docs_url=None if is_production else "/docs",
+        redoc_url=None if is_production else "/redoc",
+        openapi_url=None if is_production else "/openapi.json",
     )
-    
-    # Configure CORS
-    # In production, set CORS_ORIGINS environment variable to specific domains
-    # Example: CORS_ORIGINS="https://yourdomain.com,https://webapp.yourdomain.com"
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=config.CORS_ORIGINS,
@@ -104,34 +115,23 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Telegram-Id", "X-Telegram-Chat-Id", "X-Organization-Id"],
     )
-    
-    app.include_router(webapp.router, prefix="/api")      # /api/webapp/...
-    app.include_router(web_auth.router, prefix="/api")    # /api/web/auth/...
-    app.include_router(web_data.router, prefix="/api")    # /api/web/...
-    
+
+    app.include_router(webapp.router, prefix="/api")
+    app.include_router(web_auth.router, prefix="/api")
+    app.include_router(web_data.router, prefix="/api")
+
     @app.get("/health")
     async def health_check():
-        """Health check endpoint.
-        
-        Returns:
-            Health status.
-        """
         return {"status": "healthy"}
-    
+
     @app.get("/")
     async def root():
-        """Root endpoint.
-        
-        Returns:
-            Welcome message.
-        """
-        return {
-            "message": "Yarbot API - Web Forms",
-            "version": "1.0.0",
-            "docs": "/docs",
-            "redoc": "/redoc",
-        }
-    
+        info: dict = {"message": "Restos API", "version": "1.0.0"}
+        if not is_production:
+            info["docs"] = "/docs"
+            info["redoc"] = "/redoc"
+        return info
+
     return app
 
 

@@ -11,8 +11,9 @@ import asyncio
 import json
 import logging
 import threading
+import importlib
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 import g4f  # type: ignore
 import g4f.debug  # type: ignore
@@ -29,12 +30,112 @@ _REQUEST_TIMEOUT = 20.0  # per-request hard timeout (seconds)
 _STREAM_SELECT_TIMEOUT = 20.0  # time to find a valid stream (seconds)
 _STREAM_READ_TIMEOUT = 120.0  # total allowed time for the winning stream
 _QUEUE_GET_TIMEOUT = 2.0  # how long to block on the queue before re-checking
+_REQUEST_TIMEOUT_PER_PROVIDER = 12.0  # timeout per provider/model route
+
+
+# ---------------------------------------------------------------------------
+# Provider/model routing (free, mostly no-auth routes)
+# ---------------------------------------------------------------------------
+_ACTIVE_PROVIDER_NAMES = [
+    # gpt-3.5-ish / free routes
+    "Yqcloud",
+    "AItianhu",
+    "AItianhuSpace",
+    "AiAsk",
+    "Aichat",
+    "ChatBase",
+    "ChatgptAi",
+    "ChatgptFree",
+    "ChatgptX",
+    "FreeGpt",
+    "GPTalk",
+    "GptForLove",
+    "GptGo",
+    "Llama2",
+    "NoowAi",
+    "You",
+    # gpt-4-ish routes that can work without explicit api key in some setups
+    "Bing",
+    "GeekGpt",
+    "Liaobots",
+    "Phind",
+]
+
+_PRIMARY_MODELS = [
+    "gpt-3.5-turbo",
+    "gpt-4",
+]
+
+_provider_cache: dict[str, Any] = {}
+
+
+def _resolve_provider(name: str):
+    """Resolve g4f provider class by name, or None if unavailable."""
+    if name in _provider_cache:
+        return _provider_cache[name]
+    try:
+        provider_module = importlib.import_module("g4f.Provider")
+        provider_obj = getattr(provider_module, name, None)
+        _provider_cache[name] = provider_obj
+        return provider_obj
+    except Exception:
+        _provider_cache[name] = None
+        return None
+
+
+def _build_routes() -> list[dict]:
+    """Build provider/model routes plus automatic selection fallback."""
+    routes: list[dict] = []
+
+    for provider_name in _ACTIVE_PROVIDER_NAMES:
+        provider_obj = _resolve_provider(provider_name)
+        if not provider_obj:
+            continue
+        for model_name in _PRIMARY_MODELS:
+            routes.append(
+                {
+                    "provider_name": provider_name,
+                    "provider": provider_obj,
+                    "model": model_name,
+                }
+            )
+
+    # Automatic selection route as the last fallback
+    routes.append(
+        {
+            "provider_name": "auto",
+            "provider": None,
+            "model": g4f.models.default,
+        }
+    )
+    return routes
+
+
+def _routes_for_worker(all_routes: list[dict], worker_id: int, workers_count: int) -> list[dict]:
+    """Distribute routes among workers in a round-robin way."""
+    if not all_routes:
+        return []
+    chunk = all_routes[(worker_id - 1) :: workers_count]
+    # Keep auto route at end for every worker as a guaranteed fallback
+    auto_route = next((r for r in all_routes if r.get("provider_name") == "auto"), None)
+    if auto_route and auto_route not in chunk:
+        chunk.append(auto_route)
+    return chunk
 
 
 def _has_cyrillic(text: str, min_chars: int = 5) -> bool:
-    """Return True if the first *min_chars* of *text* contain Cyrillic."""
-    sample = text[:max(min_chars, 10)]
-    return any("\u0400" <= ch <= "\u04FF" for ch in sample)
+    """Return True if *text* contains at least *min_chars* Cyrillic characters.
+
+    Scans the whole text so JSON-wrapped responses (e.g. {"key": "Значение…"})
+    are not falsely rejected because the JSON framing at the start has no Cyrillic.
+    """
+    count = 0
+    for ch in text:
+        if "\u0400" <= ch <= "\u04FF":
+            count += 1
+            if count >= min_chars:
+                return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +300,16 @@ class AIAssistantService:
                     "<b>для жирного текста</b>, <i>для курсива</i>, <code>для кода</code>. "
                     "Для списков используй обычный текст с номерами или маркерами. "
                     "Не используй markdown таблицы, заголовки или другие элементы разметки.\n\n"
+                    "8. ИНТЕГРАЦИЯ С ДАННЫМИ СИСТЕМЫ: если пользователю нужен анализ данных Restos "
+                    "(сотрудники, замеры, критерии, наборы критериев, типы оценок, организация, сводная аналитика), "
+                    "ты можешь сначала запросить подгрузку данных через служебные команды.\n"
+                    "Формат команды (строго): [[SYS_FETCH {\"entity\":\"employees\",\"limit\":50}]]\n"
+                    "Где entity только из: employees, evaluations, criteria, criterion_sets, evaluation_types, "
+                    "organization, analytics_summary.\n"
+                    "limit — целое число. Если не уверен, используй 30-50.\n"
+                    "Можно отправить несколько команд, каждая на новой строке.\n"
+                    "После получения загруженных данных дай пользователю финальный полезный ответ.\n"
+                    "Никогда не показывай пользователю внутренние команды и их формат.\n\n"
                     f"Контекст данных:\n{data_context}\n\n"
                     "Используй эти данные для ответов на вопросы пользователя. "
                     "Если данных недостаточно, честно скажи об этом."
@@ -299,55 +410,79 @@ class AIAssistantService:
                 _PARALLEL_REQUESTS,
                 _REQUEST_TIMEOUT,
             )
+            all_routes = _build_routes()
+            logger.info("[ai] Routes prepared: %d", len(all_routes))
 
             # --- single worker -------------------------------------------
             async def _worker(wid: int) -> Optional[str]:
                 """One AI call.  Returns validated text or None."""
+                worker_routes = _routes_for_worker(all_routes, wid, _PARALLEL_REQUESTS)
+                if not worker_routes:
+                    logger.warning("[ai-w%d] no routes available", wid)
+                    return None
+
                 try:
-                    response = await asyncio.wait_for(
-                        asyncio.to_thread(
-                            lambda: Client().chat.completions.create(
-                                model=g4f.models.default,
-                                messages=messages,
-                                web_search=False,
+                    for route in worker_routes:
+                        provider_name = route["provider_name"]
+                        provider_obj = route["provider"]
+                        model_name = route["model"]
+                        try:
+                            def _call():
+                                kwargs = {
+                                    "model": model_name,
+                                    "messages": messages,
+                                    "web_search": False,
+                                }
+                                if provider_obj is not None:
+                                    kwargs["provider"] = provider_obj
+                                return Client().chat.completions.create(**kwargs)
+
+                            response = await asyncio.wait_for(
+                                asyncio.to_thread(_call),
+                                timeout=_REQUEST_TIMEOUT_PER_PROVIDER,
                             )
-                        ),
-                        timeout=_REQUEST_TIMEOUT,
-                    )
 
-                    if not response or not response.choices:
-                        logger.warning("[ai-w%d] empty response", wid)
-                        return None
+                            if not response or not response.choices:
+                                logger.warning("[ai-w%d][%s] empty response", wid, provider_name)
+                                continue
 
-                    content = response.choices[0].message.content
-                    if not content:
-                        logger.warning("[ai-w%d] empty content", wid)
-                        return None
+                            content = response.choices[0].message.content
+                            if not content:
+                                logger.warning("[ai-w%d][%s] empty content", wid, provider_name)
+                                continue
 
-                    if self._is_html_response(content):
-                        logger.warning("[ai-w%d] HTML/captcha", wid)
-                        return None
+                            if self._is_html_response(content):
+                                logger.warning("[ai-w%d][%s] HTML/captcha", wid, provider_name)
+                                continue
 
-                    if not _has_cyrillic(content):
-                        logger.warning("[ai-w%d] not Russian: %.40s…", wid, content)
-                        return None
+                            if not _has_cyrillic(content):
+                                logger.warning("[ai-w%d][%s] not Russian: %.40s…", wid, provider_name, content)
+                                continue
 
-                    if _contains_identity_leak(content):
-                        logger.warning("[ai-w%d] identity leak detected", wid)
-                        return None
+                            if _contains_identity_leak(content):
+                                logger.warning("[ai-w%d][%s] identity leak detected", wid, provider_name)
+                                continue
 
-                    logger.info("[ai-w%d] valid response, len=%d", wid, len(content))
-                    return content
+                            logger.info(
+                                "[ai-w%d][%s] valid response, len=%d",
+                                wid,
+                                provider_name,
+                                len(content),
+                            )
+                            return content
 
+                        except asyncio.TimeoutError:
+                            logger.warning("[ai-w%d][%s] timeout", wid, provider_name)
+                            continue
+                        except Exception as exc:
+                            logger.warning("[ai-w%d][%s] error: %s", wid, provider_name, exc)
+                            continue
                 except asyncio.CancelledError:
                     logger.debug("[ai-w%d] cancelled", wid)
                     return None
-                except asyncio.TimeoutError:
-                    logger.warning("[ai-w%d] timeout", wid)
-                    return None
-                except Exception as exc:
-                    logger.warning("[ai-w%d] error: %s", wid, exc)
-                    return None
+
+                logger.warning("[ai-w%d] all routes failed", wid)
+                return None
 
             # --- launch & select -----------------------------------------
             tasks = [
@@ -363,11 +498,8 @@ class AIAssistantService:
                     done, pending = await asyncio.wait(
                         pending,
                         return_when=asyncio.FIRST_COMPLETED,
-                        timeout=_REQUEST_TIMEOUT,
+                        timeout=None,
                     )
-                    if not done:
-                        # global timeout — nothing completed in time
-                        break
 
                     for task in done:
                         result = task.result()
@@ -450,6 +582,8 @@ class AIAssistantService:
                 _PARALLEL_REQUESTS,
                 _STREAM_SELECT_TIMEOUT,
             )
+            all_routes = _build_routes()
+            logger.info("[stream] Routes prepared: %d", len(all_routes))
 
             # --- shared state (thread-safe) ------------------------------
             channel: asyncio.Queue = asyncio.Queue()
@@ -469,39 +603,64 @@ class AIAssistantService:
             # --- stream worker (runs in a thread) -----------------------
             def _stream_worker(wid: int):
                 my_cancel = cancel_flags[wid]
-                try:
-                    client = Client()
-                    stream = client.chat.completions.create(
-                        model=g4f.models.default,
-                        messages=messages,
-                        web_search=False,
-                        stream=True,
-                    )
+                worker_routes = _routes_for_worker(all_routes, wid, _PARALLEL_REQUESTS)
+                if not worker_routes:
+                    _put((wid, "error", "no routes available", ""))
+                    return
 
-                    full_text = ""
-                    for chunk_resp in stream:
+                for route in worker_routes:
+                    if my_cancel.is_set() or shutdown.is_set():
+                        logger.debug("[stream-w%d] cancelled before route start", wid)
+                        return
+
+                    provider_name = route["provider_name"]
+                    provider_obj = route["provider"]
+                    model_name = route["model"]
+
+                    try:
+                        client = Client()
+                        kwargs = {
+                            "model": model_name,
+                            "messages": messages,
+                            "web_search": False,
+                            "stream": True,
+                        }
+                        if provider_obj is not None:
+                            kwargs["provider"] = provider_obj
+                        stream = client.chat.completions.create(**kwargs)
+
+                        full_text = ""
+                        for chunk_resp in stream:
+                            if my_cancel.is_set() or shutdown.is_set():
+                                logger.debug("[stream-w%d] cancelled", wid)
+                                return
+
+                            if (
+                                chunk_resp.choices
+                                and chunk_resp.choices[0].delta.content
+                            ):
+                                chunk = chunk_resp.choices[0].delta.content
+                                full_text += chunk
+                                _put((wid, "chunk", chunk, full_text))
+
+                        _put((wid, "done", None, full_text))
+                        logger.info(
+                            "[stream-w%d][%s] completed, len=%d",
+                            wid,
+                            provider_name,
+                            len(full_text),
+                        )
+                        return
+
+                    except Exception as exc:
                         if my_cancel.is_set() or shutdown.is_set():
-                            logger.debug("[stream-w%d] cancelled", wid)
                             return
-
-                        if (
-                            chunk_resp.choices
-                            and chunk_resp.choices[0].delta.content
-                        ):
-                            chunk = chunk_resp.choices[0].delta.content
-                            full_text += chunk
-                            _put((wid, "chunk", chunk, full_text))
-
-                    _put((wid, "done", None, full_text))
-                    logger.info(
-                        "[stream-w%d] completed, len=%d", wid, len(full_text)
-                    )
-
-                except Exception as exc:
-                    if not my_cancel.is_set() and not shutdown.is_set():
                         err = str(exc)
-                        logger.warning("[stream-w%d] error: %s", wid, err)
-                        _put((wid, "error", err, ""))
+                        logger.warning("[stream-w%d][%s] error: %s", wid, provider_name, err)
+                        continue
+
+                if not my_cancel.is_set() and not shutdown.is_set():
+                    _put((wid, "error", "all provider routes failed", ""))
 
             # --- start workers -------------------------------------------
             executor = ThreadPoolExecutor(
@@ -572,8 +731,11 @@ class AIAssistantService:
                     # --- chunk ---
                     if msg_type == "chunk":
                         if selected is None:
-                            # Validate once we have enough text
-                            if len(full_text) >= 5:
+                            # Validate once we have enough text.
+                            # Use a larger threshold so JSON-wrapped responses
+                            # ("{ \"key\": \"Значение..." ) aren't rejected before
+                            # the Cyrillic content arrives.
+                            if len(full_text) >= 30:
                                 if not _has_cyrillic(full_text):
                                     failed.add(wid)
                                     cancel_flags[wid].set()

@@ -3,7 +3,7 @@
 from dependency_injector.wiring import Provide, inject
 
 from app.internal import Container
-from app.internal.usecases.organization_service import OrganizationService
+from app.internal.services.organization_service import OrganizationService
 
 # Base navigation data for all steps
 BASE_NAVIGATION = {

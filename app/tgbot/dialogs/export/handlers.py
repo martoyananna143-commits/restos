@@ -10,10 +10,10 @@ from app.infra.database.repository.criterion_value.criterion_value_asyncpg impor
     CriterionValueRepositoryAsyncpg,
 )
 from app.internal import Container
-from app.internal.usecases.criterion_service import CriterionService
-from app.internal.usecases.employee_service import EmployeeService
-from app.internal.usecases.excel_report_service import ExcelReportService
-from app.internal.usecases.pdf_report_service import PDFReportService
+from app.internal.services.criterion_service import CriterionService
+from app.internal.services.employee_service import EmployeeService
+from app.internal.services.excel_report_service import ExcelReportService
+from app.internal.services.pdf_report_service import PDFReportService
 from app.tgbot.dialogs.greeting.states import GreetingDialog
 from app.tgbot.services import broadcaster
 

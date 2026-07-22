@@ -163,7 +163,7 @@ class EmployeeRepositoryAsyncpg:
                 position=row["position"],
                 hire_date=row["hire_date"],
                 is_active=row["is_active"],
-                meta=row["meta"] or {},
+                meta=self._normalize_meta(row["meta"]),
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
                 deleted_at=row["deleted_at"],
@@ -327,7 +327,7 @@ class EmployeeRepositoryAsyncpg:
                 position=row["position"],
                 hire_date=row["hire_date"],
                 is_active=row["is_active"],
-                meta=row["meta"] or {},
+                meta=self._normalize_meta(row["meta"]),
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
                 deleted_at=row["deleted_at"],
@@ -443,7 +443,7 @@ class EmployeeRepositoryAsyncpg:
                 position=row["position"],
                 hire_date=row["hire_date"],
                 is_active=row["is_active"],
-                meta=row["meta"] or {},
+                meta=self._normalize_meta(row["meta"]),
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
                 deleted_at=row["deleted_at"],
@@ -563,6 +563,41 @@ class EmployeeRepositoryAsyncpg:
                 updated_at=row["updated_at"],
                 deleted_at=row["deleted_at"],
             )
+
+    async def get_all_by_web_login(self, login: str) -> list[EmployeeDTO]:
+        """Get all employees (across all orgs) that share the same web_login."""
+        async with get_connection(self._pool) as conn:
+            rows = await conn.fetch_b(
+                """
+                SELECT
+                    id, telegram_id, employee_type_id, organization_id,
+                    full_name, username, phone, position, hire_date,
+                    is_active, meta, created_at, updated_at, deleted_at
+                FROM employees
+                WHERE meta->>'web_login' = :login AND deleted_at IS NULL
+                ORDER BY organization_id
+                """,
+                login=login,
+            )
+            return [
+                EmployeeDTO(
+                    id=row["id"],
+                    telegram_id=row["telegram_id"],
+                    employee_type_id=row["employee_type_id"],
+                    organization_id=row["organization_id"],
+                    full_name=row["full_name"],
+                    username=row["username"],
+                    phone=row["phone"],
+                    position=row["position"],
+                    hire_date=row["hire_date"],
+                    is_active=row["is_active"],
+                    meta=self._normalize_meta(row["meta"]),
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                    deleted_at=row["deleted_at"],
+                )
+                for row in rows
+            ]
 
     async def update_meta(self, employee_id: int, meta: dict) -> bool:
         """Update employee meta JSONB field."""
