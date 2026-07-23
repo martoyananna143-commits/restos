@@ -18,6 +18,11 @@ from app.infra.database.models.employee_assignment import (
     EmployeeAssignment,
 )
 from app.infra.database.models.employee_profile import EmployeeProfile
+from app.infra.database.models.invitation_v1 import (
+    Invitation,
+    InvitationScopeVenue,
+    InvitationVenue,
+)
 from app.infra.database.models.company import Company
 from app.infra.database.models.evaluation import (
     Category,
@@ -48,6 +53,9 @@ __all__ = [
     "EmployeeAssignment",
     "AssignmentVenue",
     "AssignmentScopeVenue",
+    "Invitation",
+    "InvitationVenue",
+    "InvitationScopeVenue",
     "Organization",
     "EmployeeType",
     "Employee",
