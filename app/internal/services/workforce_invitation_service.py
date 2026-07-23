@@ -16,7 +16,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infra.database.models.access_profile import AccessProfile
+from app.infra.database.models.account import Account
 from app.infra.database.models.company import Company
+from app.infra.database.models.employee_assignment import (
+    AssignmentScopeVenue,
+    AssignmentVenue,
+    EmployeeAssignment,
+)
 from app.infra.database.models.employee_profile import EmployeeProfile
 from app.infra.database.models.invitation_v1 import (
     Invitation,
@@ -60,6 +66,22 @@ class InvitationCodeCollisionExhausted(WorkforceInvitationError):
     """No unique six-digit code was found within the attempt limit."""
 
 
+class InvalidOrUnavailableInvitation(WorkforceInvitationError):
+    """Invitation code is invalid, unknown, expired, or no longer pending."""
+
+
+class AccountUnavailableForInvitation(WorkforceInvitationError):
+    """The accepting account is not active and available."""
+
+
+class AccountAlreadyMemberOfCompany(WorkforceInvitationError):
+    """The accepting account already has a profile in the company."""
+
+
+class InvitationNoLongerApplicable(WorkforceInvitationError):
+    """The invitation's referenced workforce data is no longer applicable."""
+
+
 @dataclass(frozen=True)
 class CreateWorkforceInvitation:
     actor_account_id: UUID
@@ -80,6 +102,26 @@ class CreatedWorkforceInvitation:
     invitation_id: UUID
     code: str
     expires_at: datetime
+
+
+@dataclass(frozen=True)
+class AcceptWorkforceInvitation:
+    account_id: UUID
+    code: str
+    now: datetime
+
+
+@dataclass(frozen=True)
+class AcceptedWorkforceInvitation:
+    invitation_id: UUID
+    company_id: UUID
+    employee_profile_id: UUID
+    employee_assignment_id: UUID
+    position_id: UUID
+    access_profile_id: UUID
+    scope_type: str
+    working_venue_ids: set[UUID]
+    scope_venue_ids: set[UUID]
 
 
 class WorkforceInvitationService:
@@ -178,6 +220,273 @@ class WorkforceInvitationService:
         raise InvitationCodeCollisionExhausted(
             "six-digit invitation code attempts exhausted"
         )
+
+    async def accept(
+        self, request: AcceptWorkforceInvitation
+    ) -> AcceptedWorkforceInvitation:
+        """Atomically accept one pending invitation inside a savepoint."""
+        self._validate_accept_input(request)
+        digest = hmac.new(
+            self._pepper, request.code.encode("ascii"), hashlib.sha256
+        ).digest()
+        try:
+            async with self._session.begin_nested():
+                result = await self._accept_locked(request, digest)
+                await self._session.flush()
+                return result
+        except IntegrityError as error:
+            constraint = _postgres_constraint_name(error)
+            if constraint == "uq_employee_profiles_active_company_account":
+                raise AccountAlreadyMemberOfCompany(
+                    "account already belongs to this company"
+                ) from error
+            raise
+
+    def _validate_accept_input(self, request: AcceptWorkforceInvitation) -> None:
+        if not isinstance(request.account_id, UUID):
+            raise AccountUnavailableForInvitation("account_id must be a UUID")
+        if not isinstance(request.code, str) or not _SIX_ASCII_DIGITS.fullmatch(
+            request.code
+        ):
+            raise InvalidOrUnavailableInvitation("invitation is unavailable")
+        try:
+            self._require_aware("now", request.now)
+        except InvalidWorkforceInvitation as error:
+            raise InvalidOrUnavailableInvitation("invitation is unavailable") from error
+
+    async def _accept_locked(
+        self, request: AcceptWorkforceInvitation, digest: bytes
+    ) -> AcceptedWorkforceInvitation:
+        invitation = (
+            await self._session.execute(
+                select(Invitation)
+                .where(
+                    Invitation.code_digest == digest,
+                    Invitation.status == "pending",
+                    Invitation.deleted_at.is_(None),
+                )
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        if invitation is None or not hmac.compare_digest(
+            invitation.code_digest, digest
+        ):
+            raise InvalidOrUnavailableInvitation("invitation is unavailable")
+        if (
+            invitation.status != "pending"
+            or invitation.deleted_at is not None
+            or invitation.expires_at <= request.now
+        ):
+            raise InvalidOrUnavailableInvitation("invitation is unavailable")
+
+        account = (
+            await self._session.execute(
+                select(Account)
+                .where(
+                    Account.id == request.account_id,
+                    Account.status == "active",
+                    Account.deleted_at.is_(None),
+                )
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        if account is None:
+            raise AccountUnavailableForInvitation("account is unavailable")
+
+        existing_profile = (
+            await self._session.execute(
+                select(EmployeeProfile.id).where(
+                    EmployeeProfile.company_id == invitation.company_id,
+                    EmployeeProfile.account_id == request.account_id,
+                    EmployeeProfile.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        if existing_profile is not None:
+            raise AccountAlreadyMemberOfCompany(
+                "account already belongs to this company"
+            )
+
+        profile = (
+            await self._session.execute(
+                select(EmployeeProfile)
+                .where(EmployeeProfile.id == invitation.employee_profile_id)
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        if (
+            profile is None
+            or profile.company_id != invitation.company_id
+            or profile.deleted_at is not None
+            or profile.employment_status != "invited"
+            or profile.account_id is not None
+        ):
+            raise InvitationNoLongerApplicable(
+                "employee profile is no longer invitible"
+            )
+
+        maximum_scope = await self._validate_acceptance_objects(invitation)
+        if _SCOPE_RANK[invitation.scope_type] > _SCOPE_RANK[maximum_scope]:
+            raise InvitationNoLongerApplicable(
+                "invitation scope exceeds access profile maximum_scope"
+            )
+        working_ids, scope_ids = await self._locked_invitation_venues(invitation)
+        try:
+            self._validate_scope_lists(invitation.scope_type, working_ids, scope_ids)
+        except InvalidWorkforceInvitation as error:
+            raise InvitationNoLongerApplicable(str(error)) from error
+
+        profile.account_id = request.account_id
+        profile.employment_status = "active"
+        if profile.hired_at is None:
+            profile.hired_at = request.now
+        profile.terminated_at = None
+        profile.updated_at = request.now
+
+        assignment_id = uuid4()
+        assignment = EmployeeAssignment(
+            id=assignment_id,
+            company_id=invitation.company_id,
+            employee_profile_id=invitation.employee_profile_id,
+            position_id=invitation.position_id,
+            access_profile_id=invitation.access_profile_id,
+            scope_type=invitation.scope_type,
+            is_primary=True,
+            status="active",
+            starts_at=request.now,
+            ends_at=None,
+            revoked_at=None,
+            revoked_by_account_id=None,
+            revoke_reason=None,
+            legacy_employee_id=None,
+            created_at=request.now,
+            updated_at=request.now,
+        )
+        self._session.add(assignment)
+        await self._session.flush()
+        self._session.add_all(
+            [
+                AssignmentVenue(
+                    assignment_id=assignment_id,
+                    venue_id=venue_id,
+                    company_id=invitation.company_id,
+                    created_at=request.now,
+                )
+                for venue_id in working_ids
+            ]
+            + [
+                AssignmentScopeVenue(
+                    assignment_id=assignment_id,
+                    venue_id=venue_id,
+                    company_id=invitation.company_id,
+                    created_at=request.now,
+                )
+                for venue_id in scope_ids
+            ]
+        )
+
+        invitation.status = "accepted"
+        invitation.accepted_by_account_id = request.account_id
+        invitation.accepted_assignment_id = assignment_id
+        invitation.accepted_at = request.now
+        invitation.updated_at = request.now
+
+        return AcceptedWorkforceInvitation(
+            invitation_id=invitation.id,
+            company_id=invitation.company_id,
+            employee_profile_id=invitation.employee_profile_id,
+            employee_assignment_id=assignment_id,
+            position_id=invitation.position_id,
+            access_profile_id=invitation.access_profile_id,
+            scope_type=invitation.scope_type,
+            working_venue_ids=working_ids,
+            scope_venue_ids=scope_ids,
+        )
+
+    async def _validate_acceptance_objects(self, invitation: Invitation) -> str:
+        company = (
+            await self._session.execute(
+                select(Company.id)
+                .where(
+                    Company.id == invitation.company_id,
+                    Company.status == "active",
+                    Company.deleted_at.is_(None),
+                )
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        position = (
+            await self._session.execute(
+                select(Position.id)
+                .where(
+                    Position.id == invitation.position_id,
+                    Position.company_id == invitation.company_id,
+                    Position.is_active.is_(True),
+                    Position.deleted_at.is_(None),
+                )
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        maximum_scope = (
+            await self._session.execute(
+                select(AccessProfile.maximum_scope)
+                .where(
+                    AccessProfile.id == invitation.access_profile_id,
+                    AccessProfile.company_id == invitation.company_id,
+                    AccessProfile.is_active.is_(True),
+                    AccessProfile.deleted_at.is_(None),
+                )
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        if company is None or position is None or maximum_scope is None:
+            raise InvitationNoLongerApplicable(
+                "invitation references unavailable business objects"
+            )
+        return maximum_scope
+
+    async def _locked_invitation_venues(
+        self, invitation: Invitation
+    ) -> tuple[set[UUID], set[UUID]]:
+        working_ids = set(
+            (
+                await self._session.execute(
+                    select(InvitationVenue.venue_id)
+                    .where(InvitationVenue.invitation_id == invitation.id)
+                    .with_for_update()
+                )
+            ).scalars()
+        )
+        scope_ids = set(
+            (
+                await self._session.execute(
+                    select(InvitationScopeVenue.venue_id)
+                    .where(InvitationScopeVenue.invitation_id == invitation.id)
+                    .with_for_update()
+                )
+            ).scalars()
+        )
+        venue_ids = working_ids | scope_ids
+        if venue_ids:
+            valid_ids = set(
+                (
+                    await self._session.execute(
+                        select(Venue.id)
+                        .where(
+                            Venue.id.in_(venue_ids),
+                            Venue.company_id == invitation.company_id,
+                            Venue.deleted_at.is_(None),
+                            Venue.status != "closed",
+                        )
+                        .with_for_update()
+                    )
+                ).scalars()
+            )
+            if valid_ids != venue_ids:
+                raise InvitationNoLongerApplicable(
+                    "invitation references unavailable venues"
+                )
+        return working_ids, scope_ids
 
     @staticmethod
     def _generate_code() -> str:
