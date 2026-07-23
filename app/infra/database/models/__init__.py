@@ -33,6 +33,9 @@ from app.infra.database.models.evaluation import (
 )
 from app.infra.database.models.organization import Organization
 from app.infra.database.models.position import Position
+from app.infra.database.models.phone_verification_challenge import (
+    PhoneVerificationChallenge,
+)
 from app.infra.database.models.user import User
 from app.infra.database.models.venue import Venue
 
@@ -56,6 +59,7 @@ __all__ = [
     "Invitation",
     "InvitationVenue",
     "InvitationScopeVenue",
+    "PhoneVerificationChallenge",
     "Organization",
     "EmployeeType",
     "Employee",
