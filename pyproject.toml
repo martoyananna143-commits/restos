@@ -42,5 +42,12 @@ httpx = "^0.28.0"
 google-api-python-client = "^2.160.0"
 google-auth = "^2.38.0"
 
+[tool.poetry.group.test]
+optional = true
+
+[tool.poetry.group.test.dependencies]
+pytest = "9.1.1"
+pytest-asyncio = "1.4.0"
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
