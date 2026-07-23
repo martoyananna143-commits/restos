@@ -12,6 +12,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
@@ -25,6 +26,7 @@ class Position(Base, TimestampMixin, SoftDeleteMixin):
 
     __tablename__ = "positions"
     __table_args__ = (
+        UniqueConstraint("id", "company_id", name="uq_positions_id_company"),
         ForeignKeyConstraint(
             ["default_access_profile_id", "company_id"],
             ["access_profiles.id", "access_profiles.company_id"],

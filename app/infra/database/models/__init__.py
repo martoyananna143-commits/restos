@@ -12,6 +12,12 @@ from app.infra.database.models.access_profile import (
     AccessProfilePermission,
 )
 from app.infra.database.models.employee import Employee, EmployeeType
+from app.infra.database.models.employee_assignment import (
+    AssignmentScopeVenue,
+    AssignmentVenue,
+    EmployeeAssignment,
+)
+from app.infra.database.models.employee_profile import EmployeeProfile
 from app.infra.database.models.company import Company
 from app.infra.database.models.evaluation import (
     Category,
@@ -38,6 +44,10 @@ __all__ = [
     "Company",
     "Venue",
     "Position",
+    "EmployeeProfile",
+    "EmployeeAssignment",
+    "AssignmentVenue",
+    "AssignmentScopeVenue",
     "Organization",
     "EmployeeType",
     "Employee",

@@ -17,6 +17,7 @@ class Venue(Base, TimestampMixin, SoftDeleteMixin):
 
     __tablename__ = "venues"
     __table_args__ = (
+        UniqueConstraint("id", "company_id", name="uq_venues_id_company"),
         CheckConstraint(
             "status IN ('active', 'temporarily_closed', 'closed')",
             name="ck_venues_status",
