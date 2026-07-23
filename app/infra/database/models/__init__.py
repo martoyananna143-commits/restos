@@ -1,6 +1,12 @@
 """Database models package."""
 
 from app.infra.database.models.base import Base, SoftDeleteMixin, TimestampMixin
+from app.infra.database.models.account import (
+    Account,
+    AccountDevice,
+    AccountIdentity,
+    AccountSession,
+)
 from app.infra.database.models.employee import Employee, EmployeeType
 from app.infra.database.models.evaluation import (
     Category,
@@ -16,6 +22,10 @@ __all__ = [
     "Base",
     "TimestampMixin",
     "SoftDeleteMixin",
+    "Account",
+    "AccountIdentity",
+    "AccountDevice",
+    "AccountSession",
     "Organization",
     "EmployeeType",
     "Employee",
