@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers import webapp
 from app.api.routers import web_auth, web_data
+from app.api.routers import account_invitation_auth
 from app.api.setup import ensure_default_admin
 from app.internal import Container
 
@@ -115,10 +116,12 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Telegram-Id", "X-Telegram-Chat-Id", "X-Organization-Id"],
     )
+    account_invitation_auth.configure_account_auth_http_security(app)
 
     app.include_router(webapp.router, prefix="/api")
     app.include_router(web_auth.router, prefix="/api")
     app.include_router(web_data.router, prefix="/api")
+    app.include_router(account_invitation_auth.router)
 
     @app.get("/health")
     async def health_check():

@@ -35,6 +35,24 @@ class Config:
         self.DATABASE_MAX_OVERFLOW = self.env.int("DATABASE_MAX_OVERFLOW", default=20)
         self.DATABASE_POOL_RECYCLE = self.env.int("DATABASE_POOL_RECYCLE", default=3600)
 
+        # Additive Account-auth settings. Secret values have no production
+        # fallback and are only consumed by the new invitation auth router.
+        self.ACCOUNT_AUTH_INVITATION_PEPPER = self.env.str(
+            "ACCOUNT_AUTH_INVITATION_PEPPER", default=""
+        )
+        self.ACCOUNT_AUTH_PHONE_PEPPER = self.env.str(
+            "ACCOUNT_AUTH_PHONE_PEPPER", default=""
+        )
+        self.ACCOUNT_AUTH_CODE_PEPPER = self.env.str(
+            "ACCOUNT_AUTH_CODE_PEPPER", default=""
+        )
+        self.ACCOUNT_AUTH_SESSION_PEPPER = self.env.str(
+            "ACCOUNT_AUTH_SESSION_PEPPER", default=""
+        )
+        self.ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN = self.env.str(
+            "ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN", default=""
+        )
+
         # Web App settings
         self.WEBAPP_BASE_URL = self.env.str("WEBAPP_BASE_URL", default="http://localhost:8080")
         self.WEBAPP_API_URL = self.env.str("WEBAPP_API_URL", default="")
