@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.infra.database.models.invitation_v1 import Invitation
+from app.infra.sms import SmsAeroSender
 from app.internal.services.access_decision_service import AccessDecisionService
 from app.internal.services.account_session_service import AccountSessionService
 from app.internal.services.invited_employee_registration_service import (
@@ -129,8 +130,34 @@ async def get_account_auth_session():
         yield session
 
 
-def get_sms_sender() -> SmsSender:
-    return UnconfiguredSmsSender()
+def get_sms_sender(request: Request) -> SmsSender:
+    provider = config.SMS_PROVIDER.strip().lower()
+    if provider in {"", "disabled"}:
+        return UnconfiguredSmsSender()
+    if provider != "smsaero":
+        raise _error(503, "sms_temporarily_unavailable")
+    values = (
+        config.SMS_AERO_EMAIL,
+        config.SMS_AERO_API_KEY,
+        config.SMS_AERO_SIGN,
+        config.SMS_AERO_BASE_URL,
+    )
+    if not all(isinstance(value, str) and value.strip() for value in values):
+        raise _error(503, "sms_temporarily_unavailable")
+    client = getattr(request.app.state, "sms_http_client", None)
+    if client is None:
+        raise _error(503, "sms_temporarily_unavailable")
+    try:
+        return SmsAeroSender(
+            client,
+            email=config.SMS_AERO_EMAIL,
+            api_key=config.SMS_AERO_API_KEY,
+            sign=config.SMS_AERO_SIGN,
+            base_url=config.SMS_AERO_BASE_URL,
+            timeout_seconds=config.SMS_HTTP_TIMEOUT_SECONDS,
+        )
+    except ValueError as error:
+        raise _error(503, "sms_temporarily_unavailable") from error
 
 
 def _secret(value: str, name: str) -> bytes:

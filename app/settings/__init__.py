@@ -52,6 +52,14 @@ class Config:
         self.ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN = self.env.str(
             "ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN", default=""
         )
+        self.SMS_PROVIDER = self.env.str("SMS_PROVIDER", default="disabled")
+        self.SMS_AERO_EMAIL = self.env.str("SMS_AERO_EMAIL", default="")
+        self.SMS_AERO_API_KEY = self.env.str("SMS_AERO_API_KEY", default="")
+        self.SMS_AERO_SIGN = self.env.str("SMS_AERO_SIGN", default="")
+        self.SMS_AERO_BASE_URL = self.env.str("SMS_AERO_BASE_URL", default="")
+        self.SMS_HTTP_TIMEOUT_SECONDS = self.env.float(
+            "SMS_HTTP_TIMEOUT_SECONDS", default=10.0
+        )
 
         # Web App settings
         self.WEBAPP_BASE_URL = self.env.str("WEBAPP_BASE_URL", default="http://localhost:8080")

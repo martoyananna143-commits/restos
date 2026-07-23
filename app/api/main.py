@@ -5,6 +5,7 @@ from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import httpx
 
 from app.api.routers import webapp
 from app.api.routers import web_auth, web_data
@@ -64,6 +65,7 @@ async def lifespan(app: FastAPI):
         owns_container = True
     
     app.state.container = container
+    app.state.sms_http_client = httpx.AsyncClient()
 
     # Create default admin on first startup (idempotent)
     try:
@@ -75,6 +77,8 @@ async def lifespan(app: FastAPI):
         )
 
     yield
+
+    await app.state.sms_http_client.aclose()
 
     # Only shutdown if we own the container
     if owns_container:
