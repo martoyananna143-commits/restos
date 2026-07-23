@@ -7,6 +7,10 @@ from app.infra.database.models.account import (
     AccountIdentity,
     AccountSession,
 )
+from app.infra.database.models.access_profile import (
+    AccessProfile,
+    AccessProfilePermission,
+)
 from app.infra.database.models.employee import Employee, EmployeeType
 from app.infra.database.models.company import Company
 from app.infra.database.models.evaluation import (
@@ -17,6 +21,7 @@ from app.infra.database.models.evaluation import (
     EvaluationType,
 )
 from app.infra.database.models.organization import Organization
+from app.infra.database.models.position import Position
 from app.infra.database.models.user import User
 from app.infra.database.models.venue import Venue
 
@@ -28,8 +33,11 @@ __all__ = [
     "AccountIdentity",
     "AccountDevice",
     "AccountSession",
+    "AccessProfile",
+    "AccessProfilePermission",
     "Company",
     "Venue",
+    "Position",
     "Organization",
     "EmployeeType",
     "Employee",
