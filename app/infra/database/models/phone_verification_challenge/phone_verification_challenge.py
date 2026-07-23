@@ -61,10 +61,28 @@ class PhoneVerificationChallenge(Base, TimestampMixin):
             "(status = 'cancelled' AND verified_at IS NULL AND locked_at IS NULL AND cancelled_at IS NOT NULL))",
             name="ck_phone_verification_challenges_state",
         ),
+        CheckConstraint(
+            "((consumed_at IS NULL AND consumed_by_account_id IS NULL) OR "
+            "(consumed_at IS NOT NULL AND consumed_by_account_id IS NOT NULL))",
+            name="ck_phone_verification_challenges_consumption_pair",
+        ),
+        CheckConstraint(
+            "consumed_at IS NULL OR status = 'verified'",
+            name="ck_phone_verification_challenges_consumed_verified",
+        ),
+        CheckConstraint(
+            "consumed_at IS NULL OR consumed_at >= verified_at",
+            name="ck_phone_verification_challenges_consumed_after_verified",
+        ),
+        CheckConstraint(
+            "consumed_at IS NULL OR consumed_at <= updated_at",
+            name="ck_phone_verification_challenges_consumed_before_updated",
+        ),
         Index("ix_phone_verification_challenges_phone_digest", "phone_digest"),
         Index("ix_phone_verification_challenges_account_id", "account_id"),
         Index("ix_phone_verification_challenges_invitation_id", "invitation_id"),
         Index("ix_phone_verification_challenges_employee_profile_id", "employee_profile_id"),
+        Index("ix_phone_verification_challenges_consumed_by_account_id", "consumed_by_account_id"),
         Index(
             "uq_phone_verification_challenges_active_pending",
             "purpose",
@@ -95,3 +113,7 @@ class PhoneVerificationChallenge(Base, TimestampMixin):
     verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     locked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    consumed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    consumed_by_account_id: Mapped[Optional[UUID]] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=True
+    )
