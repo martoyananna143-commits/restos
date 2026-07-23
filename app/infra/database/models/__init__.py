@@ -8,6 +8,7 @@ from app.infra.database.models.account import (
     AccountSession,
 )
 from app.infra.database.models.employee import Employee, EmployeeType
+from app.infra.database.models.company import Company
 from app.infra.database.models.evaluation import (
     Category,
     Criterion,
@@ -17,6 +18,7 @@ from app.infra.database.models.evaluation import (
 )
 from app.infra.database.models.organization import Organization
 from app.infra.database.models.user import User
+from app.infra.database.models.venue import Venue
 
 __all__ = [
     "Base",
@@ -26,6 +28,8 @@ __all__ = [
     "AccountIdentity",
     "AccountDevice",
     "AccountSession",
+    "Company",
+    "Venue",
     "Organization",
     "EmployeeType",
     "Employee",
