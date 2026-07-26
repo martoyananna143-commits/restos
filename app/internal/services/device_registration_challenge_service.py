@@ -64,6 +64,7 @@ class IssueDeviceRegistrationChallenge:
 @dataclass(frozen=True)
 class IssuedDeviceRegistrationChallenge:
     device_challenge_id: UUID
+    invitation_id: UUID
     nonce: str
     algorithm: str
     expires_at: datetime
@@ -240,6 +241,7 @@ class DeviceRegistrationChallengeService:
             await self._session.flush()
             return IssuedDeviceRegistrationChallenge(
                 device_challenge_id=challenge_id,
+                invitation_id=invitation.id,
                 nonce=base64.urlsafe_b64encode(nonce).rstrip(b"=").decode("ascii"),
                 algorithm="ES256",
                 expires_at=expires_at,

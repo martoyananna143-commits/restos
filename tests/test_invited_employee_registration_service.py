@@ -1,17 +1,20 @@
 """PostgreSQL integration tests for atomic invited-employee registration."""
 
 import asyncio
+import base64
 from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import os
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
+import httpx
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
+from fastapi import FastAPI
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -26,6 +29,7 @@ from app.infra.database.models.invitation_v1 import Invitation, InvitationScopeV
 from app.infra.database.models.phone_verification_challenge import PhoneVerificationChallenge
 from app.infra.database.models.position import Position
 from app.infra.database.models.venue import Venue
+from app.api.routers import account_invitation_auth as auth
 from app.internal.services.access_decision_service import AccessDecisionService
 from app.internal.services.account_session_service import AccountSessionService
 from app.internal.services.invited_employee_registration_service import (
@@ -175,6 +179,122 @@ def request(ctx, **changes):
     )
     values.update(changes)
     return RegisterInvitedEmployee(**values)
+
+
+async def issue_device_challenge_over_http(context, monkeypatch):
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return NOW if tz is not None else NOW.replace(tzinfo=None)
+
+    monkeypatch.setattr(auth, "datetime", FixedDatetime)
+    monkeypatch.setattr(
+        auth.config, "ACCOUNT_AUTH_INVITATION_PEPPER", INVITATION_PEPPER.decode()
+    )
+    monkeypatch.setattr(auth.config, "ACCOUNT_AUTH_PHONE_PEPPER", PHONE_PEPPER.decode())
+
+    async def session_override():
+        yield context.session
+
+    app = FastAPI()
+    auth.configure_account_auth_http_security(app)
+    app.include_router(auth.router)
+    app.dependency_overrides[auth.get_account_auth_session] = session_override
+
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    public_key = private_key.public_key().public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    app_instance_id = uuid4()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://testserver"
+    ) as http:
+        response = await http.post(
+            "/api/v1/auth/invitations/device/challenge",
+            json={
+                "invitation_code": CODE,
+                "phone_verification_challenge_id": str(context.challenge.id),
+                "phone": PHONE,
+                "app_instance_id": str(app_instance_id),
+                "platform": "ios",
+                "public_key": base64.b64encode(public_key).decode("ascii"),
+            },
+        )
+    assert response.status_code == 200
+    payload = response.json()
+    nonce = base64.urlsafe_b64decode(payload["nonce"] + "==")
+    return payload, private_key, app_instance_id, nonce
+
+
+@pytest.mark.asyncio
+async def test_http_device_challenge_invitation_id_is_registration_compatible(
+    context, monkeypatch
+):
+    payload, private_key, app_instance_id, nonce = await issue_device_challenge_over_http(
+        context, monkeypatch
+    )
+    invitation_id = UUID(payload["invitation_id"])
+    device_challenge_id = UUID(payload["device_challenge_id"])
+    signature = private_key.sign(
+        canonical_signed_message(
+            device_challenge_id=device_challenge_id,
+            invitation_id=invitation_id,
+            phone_challenge_id=context.challenge.id,
+            app_instance_id=app_instance_id,
+            platform="ios",
+            nonce=nonce,
+        ),
+        ec.ECDSA(hashes.SHA256()),
+    )
+
+    result = await make_service(context.session).register(
+        request(
+            context,
+            app_instance_id=app_instance_id,
+            device_challenge_id=device_challenge_id,
+            device_challenge_nonce=nonce,
+            device_challenge_signature=signature,
+        )
+    )
+
+    assert invitation_id == context.invitation.id
+    assert result.employee_profile_id == context.profile.id
+
+
+@pytest.mark.asyncio
+async def test_http_device_challenge_rejects_signature_with_wrong_invitation_id(
+    context, monkeypatch
+):
+    payload, private_key, app_instance_id, nonce = await issue_device_challenge_over_http(
+        context, monkeypatch
+    )
+    device_challenge_id = UUID(payload["device_challenge_id"])
+    signature = private_key.sign(
+        canonical_signed_message(
+            device_challenge_id=device_challenge_id,
+            invitation_id=uuid4(),
+            phone_challenge_id=context.challenge.id,
+            app_instance_id=app_instance_id,
+            platform="ios",
+            nonce=nonce,
+        ),
+        ec.ECDSA(hashes.SHA256()),
+    )
+
+    with pytest.raises(InvitedEmployeeRegistrationUnavailable):
+        await make_service(context.session).register(
+            request(
+                context,
+                app_instance_id=app_instance_id,
+                device_challenge_id=device_challenge_id,
+                device_challenge_nonce=nonce,
+                device_challenge_signature=signature,
+            )
+        )
+    stored = await context.session.get(DeviceRegistrationChallenge, device_challenge_id)
+    assert stored.status == "pending"
+    assert stored.consumed_at is None
 
 
 @pytest.mark.asyncio

@@ -149,6 +149,7 @@ class DeviceChallengeRequest(BaseModel):
 
 class DeviceChallengeResponse(BaseModel):
     device_challenge_id: UUID
+    invitation_id: UUID
     nonce: str
     algorithm: str
     expires_at: datetime
@@ -538,7 +539,13 @@ async def issue_device_challenge(
     ) as error:
         await session.rollback()
         raise _error(400, "registration_unavailable") from error
-    return DeviceChallengeResponse(**result.__dict__)
+    return DeviceChallengeResponse(
+        device_challenge_id=result.device_challenge_id,
+        invitation_id=result.invitation_id,
+        nonce=result.nonce,
+        algorithm=result.algorithm,
+        expires_at=result.expires_at,
+    )
 
 
 @router.post(

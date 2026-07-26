@@ -278,6 +278,7 @@ def registration_json():
 def test_device_challenge_success_is_no_store_and_public(monkeypatch):
     expected = IssuedDeviceRegistrationChallenge(
         device_challenge_id=uuid4(),
+        invitation_id=uuid4(),
         nonce="bm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm4",
         algorithm="ES256",
         expires_at=NOW + timedelta(minutes=5),
@@ -306,6 +307,9 @@ def test_device_challenge_success_is_no_store_and_public(monkeypatch):
             },
         )
     assert response.status_code == 200
+    assert response.json()["device_challenge_id"] == str(expected.device_challenge_id)
+    assert response.json()["invitation_id"] == str(expected.invitation_id)
+    assert response.json()["invitation_id"] != response.json()["device_challenge_id"]
     assert response.json()["algorithm"] == "ES256"
     assert response.json()["nonce"] == expected.nonce
     assert response.headers["cache-control"] == "no-store"
