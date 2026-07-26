@@ -12,6 +12,9 @@ from app.api.routers import account_invitation_auth as auth
 from app.internal.services.invited_employee_registration_service import (
     InvitedEmployeeRegistrationUnavailable,
 )
+from app.internal.services.device_registration_challenge_service import (
+    IssuedDeviceRegistrationChallenge,
+)
 from app.internal.services.phone_verification_service import (
     InvalidOrUnavailablePhoneChallenge,
     PhoneVerificationCodeRequested,
@@ -262,8 +265,47 @@ def registration_json():
         "app_instance_id": str(uuid4()),
         "platform": "ios",
         "device_display_name": "iPhone",
-        "device_public_key": "cHVibGljLWtleQ==",
+        "device_challenge_id": str(uuid4()),
+        "device_challenge_nonce": "bm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm4",
+        "device_challenge_signature": "c2lnbmF0dXJl",
     }
+
+
+def test_device_challenge_success_is_no_store_and_public(monkeypatch):
+    expected = IssuedDeviceRegistrationChallenge(
+        device_challenge_id=uuid4(),
+        nonce="bm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm4",
+        algorithm="ES256",
+        expires_at=NOW + timedelta(minutes=5),
+    )
+
+    class Service:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        async def issue_challenge(self, request):
+            assert request.public_key == b"public-key"
+            return expected
+
+    monkeypatch.setattr(auth, "DeviceRegistrationChallengeService", Service)
+    http, session, _ = client(monkeypatch)
+    with http:
+        response = http.post(
+            "/api/v1/auth/invitations/device/challenge",
+            json={
+                "invitation_code": "123456",
+                "phone_verification_challenge_id": str(uuid4()),
+                "phone": "+79990001122",
+                "app_instance_id": str(uuid4()),
+                "platform": "ios",
+                "public_key": "cHVibGljLWtleQ==",
+            },
+        )
+    assert response.status_code == 200
+    assert response.json()["algorithm"] == "ES256"
+    assert response.json()["nonce"] == expected.nonce
+    assert response.headers["cache-control"] == "no-store"
+    assert session.commits == 1
 
 
 def test_register_success_returns_only_public_result(monkeypatch):
@@ -340,7 +382,7 @@ def test_validation_response_never_reflects_auth_secrets(monkeypatch):
             "invitation_code": "secret-invitation",
             "phone": "+79998887766",
             "password": "secret-password-value",
-            "device_public_key": "secret-public-key",
+            "device_challenge_signature": "secret-device-signature",
         }
     )
     http, _, _ = client(monkeypatch)
@@ -389,7 +431,7 @@ def test_openapi_response_schemas_do_not_expose_digest_or_password(monkeypatch):
     http, _, _ = client(monkeypatch)
     schema = http.app.openapi()
     response_schema_names = {
-        "SmsRequested", "RegistrationResponse", "PublicError"
+        "SmsRequested", "DeviceChallengeResponse", "RegistrationResponse", "PublicError"
     }
     text = " ".join(
         str(schema["components"]["schemas"][name]) for name in response_schema_names
@@ -397,3 +439,4 @@ def test_openapi_response_schemas_do_not_expose_digest_or_password(monkeypatch):
     assert "password" not in text
     assert "digest" not in text
     assert "constraint" not in text
+    assert "private_key" not in str(schema).lower()

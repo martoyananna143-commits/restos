@@ -18,6 +18,9 @@ from app.infra.database.models.employee_assignment import (
     EmployeeAssignment,
 )
 from app.infra.database.models.employee_profile import EmployeeProfile
+from app.infra.database.models.device_registration_challenge import (
+    DeviceRegistrationChallenge,
+)
 from app.infra.database.models.invitation_v1 import (
     Invitation,
     InvitationScopeVenue,
@@ -53,6 +56,7 @@ __all__ = [
     "Venue",
     "Position",
     "EmployeeProfile",
+    "DeviceRegistrationChallenge",
     "EmployeeAssignment",
     "AssignmentVenue",
     "AssignmentScopeVenue",

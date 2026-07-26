@@ -10,6 +10,8 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -19,6 +21,7 @@ from app.infra.database.models.account import Account, AccountDevice, AccountIde
 from app.infra.database.models.company import Company
 from app.infra.database.models.employee_assignment import AssignmentScopeVenue, AssignmentVenue, EmployeeAssignment
 from app.infra.database.models.employee_profile import EmployeeProfile
+from app.infra.database.models.device_registration_challenge import DeviceRegistrationChallenge
 from app.infra.database.models.invitation_v1 import Invitation, InvitationScopeVenue, InvitationVenue
 from app.infra.database.models.phone_verification_challenge import PhoneVerificationChallenge
 from app.infra.database.models.position import Position
@@ -31,6 +34,12 @@ from app.internal.services.invited_employee_registration_service import (
     InvitedEmployeeRegistrationService,
     InvitedEmployeeRegistrationUnavailable,
     RegisterInvitedEmployee,
+)
+from app.internal.services.device_registration_challenge_service import (
+    InvalidDeviceRegistrationChallengeRequest,
+    IssueDeviceRegistrationChallenge,
+    DeviceRegistrationChallengeService,
+    canonical_signed_message,
 )
 from app.internal.services.workforce_invitation_service import WorkforceInvitationService
 
@@ -83,7 +92,36 @@ async def seed(session):
     )
     session.add(challenge)
     await session.flush()
-    return SimpleNamespace(owner=owner, company=company, access=access, position=position, profile=profile, venue1=venue1, venue2=venue2, invitation=invitation, challenge=challenge)
+    device_private_key = ec.generate_private_key(ec.SECP256R1())
+    device_public_key = device_private_key.public_key().public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    device_nonce = b"n" * 32
+    app_instance_id = uuid4()
+    device_challenge = DeviceRegistrationChallenge(
+        id=uuid4(), invitation_id=invitation.id,
+        phone_verification_challenge_id=challenge.id,
+        employee_profile_id=profile.id, app_instance_id=app_instance_id,
+        platform="ios", public_key=device_public_key,
+        public_key_fingerprint=hashlib.sha256(device_public_key).digest(),
+        nonce_digest=b"x" * 32, status="pending",
+        expires_at=NOW + timedelta(minutes=5), consumed_at=None,
+        created_at=NOW, updated_at=NOW,
+    )
+    device_challenge.nonce_digest = DeviceRegistrationChallengeService._nonce_digest(
+        device_challenge.id, invitation.id, challenge.id, app_instance_id,
+        "ios", device_nonce,
+    )
+    session.add(device_challenge)
+    await session.flush()
+    return SimpleNamespace(
+        owner=owner, company=company, access=access, position=position,
+        profile=profile, venue1=venue1, venue2=venue2, invitation=invitation,
+        challenge=challenge, device_challenge=device_challenge,
+        device_private_key=device_private_key, device_nonce=device_nonce,
+        app_instance_id=app_instance_id, device_public_key=device_public_key,
+    )
 
 
 @pytest_asyncio.fixture
@@ -108,17 +146,32 @@ def make_service(session):
         session,
         WorkforceInvitationService(session, AccessDecisionService(session), INVITATION_PEPPER),
         AccountSessionService(session, SESSION_PEPPER),
+        DeviceRegistrationChallengeService(session, INVITATION_PEPPER, PHONE_PEPPER),
         INVITATION_PEPPER,
         PHONE_PEPPER,
     )
 
 
 def request(ctx, **changes):
+    signature = ctx.device_private_key.sign(
+        canonical_signed_message(
+            device_challenge_id=ctx.device_challenge.id,
+            invitation_id=ctx.invitation.id,
+            phone_challenge_id=ctx.challenge.id,
+            app_instance_id=ctx.app_instance_id,
+            platform="ios",
+            nonce=ctx.device_nonce,
+        ),
+        ec.ECDSA(hashes.SHA256()),
+    )
     values = dict(
         invitation_code=CODE, phone_verification_challenge_id=ctx.challenge.id,
         phone=PHONE, display_name=" Anna Invitee ", password="correct horse battery",
-        app_instance_id=uuid4(), platform="ios", device_display_name="Anna iPhone",
-        device_public_key=b"device-public-key", now=NOW,
+        app_instance_id=ctx.app_instance_id, platform="ios",
+        device_display_name="Anna iPhone",
+        device_challenge_id=ctx.device_challenge.id,
+        device_challenge_nonce=ctx.device_nonce,
+        device_challenge_signature=signature, now=NOW,
     )
     values.update(changes)
     return RegisterInvitedEmployee(**values)
@@ -144,6 +197,9 @@ async def test_success_is_complete_secret_safe_and_challenge_one_time(context):
     assert set((await context.session.execute(select(AssignmentVenue.venue_id).where(AssignmentVenue.assignment_id == assignment.id))).scalars()) == {context.venue1.id}
     assert set((await context.session.execute(select(AssignmentScopeVenue.venue_id).where(AssignmentScopeVenue.assignment_id == assignment.id))).scalars()) == {context.venue2.id}
     assert device.quick_unlock_enabled is False and stored_session.status == "active"
+    assert device.public_key == context.device_public_key
+    assert context.device_challenge.status == "consumed"
+    assert context.device_challenge.consumed_at == NOW
     assert context.challenge.consumed_at == NOW and context.challenge.consumed_by_account_id == result.account_id
     assert not hasattr(result, "password_hash") and not hasattr(result, "phone_digest")
     with pytest.raises(InvitedEmployeeRegistrationUnavailable):
@@ -166,7 +222,7 @@ async def test_only_verified_challenge_is_available(context, status):
 @pytest.mark.parametrize("change", [
     {"phone": "+79990000000"}, {"invitation_code": "١٢٣٤٥٦"},
     {"password": "short"}, {"password": "я" * 40}, {"platform": "watchos"},
-    {"device_public_key": "not-bytes"}, {"now": datetime(2026, 7, 23, 16, 0)},
+    {"device_challenge_signature": "not-bytes"}, {"now": datetime(2026, 7, 23, 16, 0)},
 ])
 async def test_invalid_runtime_or_phone_is_controlled_and_outer_transaction_works(context, change):
     error = InvalidInvitedEmployeeRegistration if change.get("phone") is None else InvitedEmployeeRegistrationUnavailable
@@ -239,6 +295,7 @@ async def test_late_failure_rolls_back_outer_savepoint_and_session_remains_usabl
     invitation_id = context.invitation.id
     employee_profile_id = context.profile.id
     challenge_id = context.challenge.id
+    device_challenge_id = context.device_challenge.id
     service = make_service(context.session)
     original = service._account_sessions.register_device_and_issue_session
     async def fail_late(registration):
@@ -257,7 +314,91 @@ async def test_late_failure_rolls_back_outer_savepoint_and_session_remains_usabl
     assert profile.account_id is None and profile.employment_status == "invited"
     challenge = await context.session.get(PhoneVerificationChallenge, challenge_id)
     assert challenge.consumed_at is None and challenge.consumed_by_account_id is None
+    device_challenge = await context.session.get(
+        DeviceRegistrationChallenge, device_challenge_id
+    )
+    assert device_challenge.status == "pending"
+    assert device_challenge.consumed_at is None
     assert (await context.session.execute(select(1))).scalar_one() == 1
+
+
+@pytest.mark.asyncio
+async def test_issue_device_challenge_stores_only_bound_nonce_digest(context):
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    public_key = private_key.public_key().public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    app_instance_id = uuid4()
+    result = await DeviceRegistrationChallengeService(
+        context.session, INVITATION_PEPPER, PHONE_PEPPER
+    ).issue_challenge(
+        IssueDeviceRegistrationChallenge(
+            invitation_code=CODE,
+            phone_verification_challenge_id=context.challenge.id,
+            phone=PHONE,
+            app_instance_id=app_instance_id,
+            platform="ios",
+            public_key=public_key,
+            now=NOW,
+        )
+    )
+    stored = await context.session.get(
+        DeviceRegistrationChallenge, result.device_challenge_id
+    )
+    raw_nonce = __import__("base64").urlsafe_b64decode(result.nonce + "=")
+    assert result.algorithm == "ES256"
+    assert len(raw_nonce) == 32
+    assert stored.public_key == public_key
+    assert stored.public_key_fingerprint == hashlib.sha256(public_key).digest()
+    assert stored.nonce_digest != raw_nonce
+    assert raw_nonce not in stored.__dict__.values()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "public_key",
+    [
+        b"not-a-key",
+        ec.generate_private_key(ec.SECP384R1()).public_key().public_bytes(
+            serialization.Encoding.DER,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        ),
+    ],
+)
+async def test_issue_device_challenge_rejects_malformed_or_wrong_curve(
+    context, public_key
+):
+    with pytest.raises(InvalidDeviceRegistrationChallengeRequest):
+        await DeviceRegistrationChallengeService(
+            context.session, INVITATION_PEPPER, PHONE_PEPPER
+        ).issue_challenge(
+            IssueDeviceRegistrationChallenge(
+                invitation_code=CODE,
+                phone_verification_challenge_id=context.challenge.id,
+                phone=PHONE,
+                app_instance_id=uuid4(),
+                platform="ios",
+                public_key=public_key,
+                now=NOW,
+            )
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"device_challenge_signature": b"invalid-signature"},
+        {"device_challenge_nonce": b"z" * 32},
+        {"app_instance_id": uuid4()},
+        {"platform": "web"},
+    ],
+)
+async def test_device_proof_context_and_signature_are_bound(context, change):
+    with pytest.raises(InvitedEmployeeRegistrationUnavailable):
+        await make_service(context.session).register(request(context, **change))
+    assert context.device_challenge.status == "pending"
 
 
 @pytest.mark.asyncio
@@ -277,10 +418,22 @@ async def test_concurrent_registration_succeeds_once():
     async with AsyncSession(engine, expire_on_commit=False) as setup:
         ctx = await seed(setup)
         challenge_id = ctx.challenge.id
+        invitation_id = ctx.invitation.id
+        device_challenge_id = ctx.device_challenge.id
+        device_private_key = ctx.device_private_key
+        app_instance_id = ctx.app_instance_id
+        device_nonce = ctx.device_nonce
         await setup.commit()
     async def attempt():
         async with AsyncSession(engine, expire_on_commit=False) as session:
-            local = SimpleNamespace(challenge=SimpleNamespace(id=challenge_id))
+            local = SimpleNamespace(
+                challenge=SimpleNamespace(id=challenge_id),
+                invitation=SimpleNamespace(id=invitation_id),
+                device_challenge=SimpleNamespace(id=device_challenge_id),
+                device_private_key=device_private_key,
+                app_instance_id=app_instance_id,
+                device_nonce=device_nonce,
+            )
             try:
                 result = await make_service(session).register(request(local))
                 await session.commit()

@@ -24,6 +24,10 @@ from app.internal.services.account_session_service import (
     AccountSessionService,
     RegisterDeviceAndIssueSession,
 )
+from app.internal.services.device_registration_challenge_service import (
+    DeviceRegistrationChallengeService,
+    DeviceRegistrationChallengeUnavailable,
+)
 from app.internal.services.phone_verification_service import PhoneVerificationService
 from app.internal.services.workforce_invitation_service import (
     AcceptWorkforceInvitation,
@@ -83,7 +87,9 @@ class RegisterInvitedEmployee:
     app_instance_id: UUID
     platform: str
     device_display_name: str | None
-    device_public_key: bytes
+    device_challenge_id: UUID
+    device_challenge_nonce: bytes
+    device_challenge_signature: bytes
     now: datetime
 
 
@@ -107,6 +113,7 @@ class InvitedEmployeeRegistrationService:
         session: AsyncSession,
         workforce_invitations: WorkforceInvitationService,
         account_sessions: AccountSessionService,
+        device_challenges: DeviceRegistrationChallengeService,
         invitation_pepper: bytes,
         phone_pepper: bytes,
         password_hasher: PasswordHasher | None = None,
@@ -118,6 +125,7 @@ class InvitedEmployeeRegistrationService:
         self._session = session
         self._workforce = workforce_invitations
         self._account_sessions = account_sessions
+        self._device_challenges = device_challenges
         self._invitation_pepper = invitation_pepper
         self._phone_pepper = phone_pepper
         self._password_hasher = password_hasher or BcryptPasswordHasher()
@@ -156,7 +164,7 @@ class InvitedEmployeeRegistrationService:
                     "registration is unavailable"
                 )
 
-            challenge = (
+            phone_challenge = (
                 await self._session.execute(
                     select(PhoneVerificationChallenge)
                     .where(
@@ -167,14 +175,14 @@ class InvitedEmployeeRegistrationService:
                 )
             ).scalar_one_or_none()
             if (
-                challenge is None
-                or challenge.purpose != "invitation_registration"
-                or challenge.status != "verified"
-                or challenge.consumed_at is not None
-                or challenge.expires_at <= request.now
-                or challenge.invitation_id != invitation.id
-                or challenge.employee_profile_id != invitation.employee_profile_id
-                or not hmac.compare_digest(challenge.phone_digest, phone_digest)
+                phone_challenge is None
+                or phone_challenge.purpose != "invitation_registration"
+                or phone_challenge.status != "verified"
+                or phone_challenge.consumed_at is not None
+                or phone_challenge.expires_at <= request.now
+                or phone_challenge.invitation_id != invitation.id
+                or phone_challenge.employee_profile_id != invitation.employee_profile_id
+                or not hmac.compare_digest(phone_challenge.phone_digest, phone_digest)
             ):
                 raise InvitedEmployeeRegistrationUnavailable(
                     "registration is unavailable"
@@ -210,6 +218,23 @@ class InvitedEmployeeRegistrationService:
                 raise InvitedEmployeeRegistrationUnavailable(
                     "registration is unavailable"
                 )
+
+            try:
+                device_challenge = await self._device_challenges.verify_locked(
+                    device_challenge_id=request.device_challenge_id,
+                    nonce=request.device_challenge_nonce,
+                    signature=request.device_challenge_signature,
+                    invitation_id=invitation.id,
+                    phone_challenge_id=phone_challenge.id,
+                    employee_profile_id=profile.id,
+                    app_instance_id=request.app_instance_id,
+                    platform=request.platform,
+                    now=request.now,
+                )
+            except DeviceRegistrationChallengeUnavailable as error:
+                raise InvitedEmployeeRegistrationUnavailable(
+                    "registration is unavailable"
+                ) from error
 
             account_id = uuid4()
             password_hash = self._password_hasher.hash(request.password)
@@ -261,13 +286,16 @@ class InvitedEmployeeRegistrationService:
                     app_instance_id=request.app_instance_id,
                     platform=request.platform,
                     display_name=request.device_display_name,
-                    public_key=request.device_public_key,
+                    public_key=device_challenge.public_key,
                     now=request.now,
                 )
             )
-            challenge.consumed_at = request.now
-            challenge.consumed_by_account_id = account_id
-            challenge.updated_at = request.now
+            phone_challenge.consumed_at = request.now
+            phone_challenge.consumed_by_account_id = account_id
+            phone_challenge.updated_at = request.now
+            device_challenge.status = "consumed"
+            device_challenge.consumed_at = request.now
+            device_challenge.updated_at = request.now
             await self._session.flush()
             return RegisteredInvitedEmployee(
                 account_id=account_id,
@@ -287,7 +315,11 @@ class InvitedEmployeeRegistrationService:
             raise InvalidInvitedEmployeeRegistration(
                 "invitation code must be six ASCII digits"
             )
-        for name in ("phone_verification_challenge_id", "app_instance_id"):
+        for name in (
+            "phone_verification_challenge_id",
+            "app_instance_id",
+            "device_challenge_id",
+        ):
             if not isinstance(getattr(request, name), UUID):
                 raise InvalidInvitedEmployeeRegistration(f"{name} must be a UUID")
         if not isinstance(request.display_name, str) or not request.display_name.strip():
@@ -312,8 +344,13 @@ class InvitedEmployeeRegistrationService:
             )
         if request.device_display_name is not None and len(request.device_display_name) > 255:
             raise InvalidInvitedEmployeeRegistration("device_display_name is too long")
-        if not isinstance(request.device_public_key, bytes) or not request.device_public_key:
-            raise InvalidInvitedEmployeeRegistration("device_public_key is required")
+        if (
+            not isinstance(request.device_challenge_nonce, bytes)
+            or len(request.device_challenge_nonce) != 32
+            or not isinstance(request.device_challenge_signature, bytes)
+            or not request.device_challenge_signature
+        ):
+            raise InvalidInvitedEmployeeRegistration("device proof is invalid")
         if not isinstance(request.now, datetime) or request.now.tzinfo is None or request.now.utcoffset() is None:
             raise InvalidInvitedEmployeeRegistration("now must be timezone-aware")
         try:

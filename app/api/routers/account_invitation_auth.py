@@ -27,6 +27,12 @@ from app.infra.database.models.invitation_v1 import Invitation
 from app.infra.sms import SmsAeroSender
 from app.internal.services.access_decision_service import AccessDecisionService
 from app.internal.services.account_session_service import AccountSessionService
+from app.internal.services.device_registration_challenge_service import (
+    DeviceRegistrationChallengeError,
+    DeviceRegistrationChallengeService,
+    InvalidDeviceRegistrationChallengeRequest,
+    IssueDeviceRegistrationChallenge,
+)
 from app.internal.services.invited_employee_registration_service import (
     InvalidInvitedEmployeeRegistration,
     InvitedEmployeeRegistrationError,
@@ -111,7 +117,26 @@ class RegistrationRequest(BaseModel):
     app_instance_id: UUID
     platform: str
     device_display_name: str | None = Field(default=None, max_length=255)
-    device_public_key: str = Field(min_length=4, max_length=8192)
+    device_challenge_id: UUID
+    device_challenge_nonce: str = Field(min_length=43, max_length=43)
+    device_challenge_signature: str = Field(min_length=8, max_length=256)
+
+
+class DeviceChallengeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    invitation_code: str = Field(min_length=6, max_length=6, pattern=r"^[0-9]{6}$")
+    phone_verification_challenge_id: UUID
+    phone: str = Field(min_length=8, max_length=32)
+    app_instance_id: UUID
+    platform: str
+    public_key: str = Field(min_length=4, max_length=8192)
+
+
+class DeviceChallengeResponse(BaseModel):
+    device_challenge_id: UUID
+    nonce: str
+    algorithm: str
+    expires_at: datetime
 
 
 class RegistrationResponse(BaseModel):
@@ -322,6 +347,50 @@ async def verify_sms(
 
 
 @router.post(
+    "/device/challenge",
+    response_model=DeviceChallengeResponse,
+    responses={400: {"model": PublicError}},
+)
+async def issue_device_challenge(
+    body: DeviceChallengeRequest,
+    response: Response,
+    session: Annotated[AsyncSession, Depends(get_account_auth_session)],
+) -> DeviceChallengeResponse:
+    _no_store(response)
+    if body.platform not in _PLATFORMS:
+        raise _error(400, "invalid_request")
+    try:
+        public_key = base64.b64decode(body.public_key, validate=True)
+    except (ValueError, binascii.Error) as error:
+        raise _error(400, "registration_unavailable") from error
+    service = DeviceRegistrationChallengeService(
+        session,
+        _secret(config.ACCOUNT_AUTH_INVITATION_PEPPER, "INVITATION_PEPPER"),
+        _secret(config.ACCOUNT_AUTH_PHONE_PEPPER, "PHONE_PEPPER"),
+    )
+    try:
+        result = await service.issue_challenge(
+            IssueDeviceRegistrationChallenge(
+                invitation_code=body.invitation_code,
+                phone_verification_challenge_id=body.phone_verification_challenge_id,
+                phone=body.phone,
+                app_instance_id=body.app_instance_id,
+                platform=body.platform,
+                public_key=public_key,
+                now=datetime.now(timezone.utc),
+            )
+        )
+        await session.commit()
+    except (
+        InvalidDeviceRegistrationChallengeRequest,
+        DeviceRegistrationChallengeError,
+    ) as error:
+        await session.rollback()
+        raise _error(400, "registration_unavailable") from error
+    return DeviceChallengeResponse(**result.__dict__)
+
+
+@router.post(
     "/register",
     response_model=RegistrationResponse,
     responses={400: {"model": PublicError}},
@@ -335,7 +404,17 @@ async def register(
     if body.platform not in _PLATFORMS:
         raise _error(400, "invalid_request")
     try:
-        public_key = base64.b64decode(body.device_public_key, validate=True)
+        nonce = base64.b64decode(
+            body.device_challenge_nonce + "=",
+            altchars=b"-_",
+            validate=True,
+        )
+        signature = base64.b64decode(
+            body.device_challenge_signature
+            + "=" * (-len(body.device_challenge_signature) % 4),
+            altchars=b"-_",
+            validate=True,
+        )
     except (ValueError, binascii.Error) as error:
         raise _error(400, "invalid_request") from error
     invitation_pepper = _secret(
@@ -351,10 +430,14 @@ async def register(
         session,
         _secret(config.ACCOUNT_AUTH_SESSION_PEPPER, "SESSION_PEPPER"),
     )
+    device_challenges = DeviceRegistrationChallengeService(
+        session, invitation_pepper, phone_pepper
+    )
     service = InvitedEmployeeRegistrationService(
         session,
         workforce,
         account_sessions,
+        device_challenges,
         invitation_pepper,
         phone_pepper,
     )
@@ -369,7 +452,9 @@ async def register(
                 app_instance_id=body.app_instance_id,
                 platform=body.platform,
                 device_display_name=body.device_display_name,
-                device_public_key=public_key,
+                device_challenge_id=body.device_challenge_id,
+                device_challenge_nonce=nonce,
+                device_challenge_signature=signature,
                 now=datetime.now(timezone.utc),
             )
         )
