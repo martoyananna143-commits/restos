@@ -63,6 +63,8 @@ from app.settings import config
 
 AUTH_PREFIX = "/api/v1/auth/invitations"
 AUTH_PREFIXES = (AUTH_PREFIX, "/api/v1/auth/sessions")
+ASSESSMENT_LIBRARY_PREFIX = "/api/v1/assessment-library"
+ASSESSMENT_COMPANY_MARKER = "/assessment-templates"
 router = APIRouter(prefix=AUTH_PREFIX, tags=["account-auth"])
 _SIX_ASCII_DIGITS = re.compile(r"^[0-9]{6}$")
 _PLATFORMS = {"ios", "android", "web", "desktop", "unknown"}
@@ -219,9 +221,16 @@ def _error(http_status: int, code: str) -> HTTPException:
 def configure_account_auth_http_security(app: FastAPI) -> None:
     """Install path-scoped cache and validation protection on the existing app."""
 
+    def is_assessment_path(path: str) -> bool:
+        return path.startswith(ASSESSMENT_LIBRARY_PREFIX) or (
+            path.startswith("/api/v1/companies/")
+            and ASSESSMENT_COMPANY_MARKER in path
+        )
+
     @app.middleware("http")
     async def account_auth_no_store(request: Request, call_next):
-        if not request.url.path.startswith(AUTH_PREFIXES):
+        assessment_path = is_assessment_path(request.url.path)
+        if not request.url.path.startswith(AUTH_PREFIXES) and not assessment_path:
             return await call_next(request)
         try:
             response = await call_next(request)
@@ -230,19 +239,34 @@ def configure_account_auth_http_security(app: FastAPI) -> None:
                 status_code=500,
                 content={"detail": {"code": "internal_error"}},
             )
-        response.headers["Cache-Control"] = "no-store"
+        response.headers["Cache-Control"] = (
+            "private, no-store" if assessment_path else "no-store"
+        )
         return response
 
     @app.exception_handler(RequestValidationError)
     async def account_auth_validation_error(
         request: Request, exc: RequestValidationError
     ):
-        if not request.url.path.startswith(AUTH_PREFIXES):
+        assessment_path = is_assessment_path(request.url.path)
+        if not request.url.path.startswith(AUTH_PREFIXES) and not assessment_path:
             return await request_validation_exception_handler(request, exc)
         return JSONResponse(
             status_code=422,
-            content={"detail": {"code": "invalid_request"}},
-            headers={"Cache-Control": "no-store"},
+            content={
+                "detail": {
+                    "code": (
+                        "invalid_assessment_request"
+                        if assessment_path
+                        else "invalid_request"
+                    )
+                }
+            },
+            headers={
+                "Cache-Control": (
+                    "private, no-store" if assessment_path else "no-store"
+                )
+            },
         )
 
 
