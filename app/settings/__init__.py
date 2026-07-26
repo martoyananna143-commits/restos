@@ -49,6 +49,12 @@ class Config:
         self.ACCOUNT_AUTH_SESSION_PEPPER = self.env.str(
             "ACCOUNT_AUTH_SESSION_PEPPER", default=""
         )
+        self.ACCOUNT_AUTH_ACCESS_TOKEN_KEY = self.env.str(
+            "ACCOUNT_AUTH_ACCESS_TOKEN_KEY", default=""
+        )
+        self.ACCOUNT_AUTH_ACCESS_TOKEN_TTL_SECONDS = self.env.int(
+            "ACCOUNT_AUTH_ACCESS_TOKEN_TTL_SECONDS", default=600
+        )
         self.ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN = self.env.str(
             "ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN", default=""
         )

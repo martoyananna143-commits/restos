@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 import binascii
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import re
@@ -26,6 +26,11 @@ from sqlalchemy.ext.asyncio import (
 from app.infra.database.models.invitation_v1 import Invitation
 from app.infra.sms import SmsAeroSender
 from app.internal.services.access_decision_service import AccessDecisionService
+from app.internal.services.account_access_token_service import (
+    AccountAccessTokenConfigurationError,
+    AccountAccessTokenService,
+    IssueAccountAccessToken,
+)
 from app.internal.services.account_session_service import AccountSessionService
 from app.internal.services.device_registration_challenge_service import (
     DeviceRegistrationChallengeError,
@@ -57,6 +62,7 @@ from app.settings import config
 
 
 AUTH_PREFIX = "/api/v1/auth/invitations"
+AUTH_PREFIXES = (AUTH_PREFIX, "/api/v1/auth/sessions")
 router = APIRouter(prefix=AUTH_PREFIX, tags=["account-auth"])
 _SIX_ASCII_DIGITS = re.compile(r"^[0-9]{6}$")
 _PLATFORMS = {"ios", "android", "web", "desktop", "unknown"}
@@ -146,6 +152,9 @@ class RegistrationResponse(BaseModel):
     company_id: UUID
     device_id: UUID
     session_id: UUID
+    access_token: str
+    access_token_expires_at: datetime
+    token_type: str = "bearer"
     refresh_token: str
     display_name: str
 
@@ -212,7 +221,7 @@ def configure_account_auth_http_security(app: FastAPI) -> None:
 
     @app.middleware("http")
     async def account_auth_no_store(request: Request, call_next):
-        if not request.url.path.startswith(AUTH_PREFIX):
+        if not request.url.path.startswith(AUTH_PREFIXES):
             return await call_next(request)
         try:
             response = await call_next(request)
@@ -228,7 +237,7 @@ def configure_account_auth_http_security(app: FastAPI) -> None:
     async def account_auth_validation_error(
         request: Request, exc: RequestValidationError
     ):
-        if not request.url.path.startswith(AUTH_PREFIX):
+        if not request.url.path.startswith(AUTH_PREFIXES):
             return await request_validation_exception_handler(request, exc)
         return JSONResponse(
             status_code=422,
@@ -458,8 +467,27 @@ async def register(
                 now=datetime.now(timezone.utc),
             )
         )
+        access = await AccountAccessTokenService(
+            session,
+            config.ACCOUNT_AUTH_ACCESS_TOKEN_KEY.encode("utf-8"),
+            timedelta(seconds=config.ACCOUNT_AUTH_ACCESS_TOKEN_TTL_SECONDS),
+        ).issue(
+            IssueAccountAccessToken(
+                account_id=result.account_id,
+                session_id=result.session_id,
+                device_id=result.device_id,
+                now=datetime.now(timezone.utc),
+            )
+        )
         await session.commit()
+    except AccountAccessTokenConfigurationError as error:
+        await session.rollback()
+        raise _error(503, "configuration_unavailable") from error
     except (InvalidInvitedEmployeeRegistration, InvitedEmployeeRegistrationError) as error:
         await session.rollback()
         raise _error(400, "registration_unavailable") from error
-    return RegistrationResponse(**result.__dict__)
+    return RegistrationResponse(
+        **result.__dict__,
+        access_token=access.access_token,
+        access_token_expires_at=access.expires_at,
+    )

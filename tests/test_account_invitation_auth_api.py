@@ -23,6 +23,9 @@ from app.internal.services.phone_verification_service import (
     PhoneVerificationSucceeded,
     SmsDeliveryFailed,
 )
+from app.internal.services.account_access_token_service import (
+    IssuedAccountAccessToken,
+)
 
 
 NOW = datetime.now(timezone.utc)
@@ -68,6 +71,7 @@ def client(monkeypatch, session=None, sender=None):
     monkeypatch.setattr(auth.config, "ACCOUNT_AUTH_PHONE_PEPPER", "p" * 32)
     monkeypatch.setattr(auth.config, "ACCOUNT_AUTH_CODE_PEPPER", "c" * 32)
     monkeypatch.setattr(auth.config, "ACCOUNT_AUTH_SESSION_PEPPER", "s" * 32)
+    monkeypatch.setattr(auth.config, "ACCOUNT_AUTH_ACCESS_TOKEN_KEY", "a" * 32)
     monkeypatch.setattr(auth.config, "ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN", "example.test")
 
     async def session_override():
@@ -327,15 +331,29 @@ def test_register_success_returns_only_public_result(monkeypatch):
         async def register(self, _request):
             return result
 
+    class Tokens:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        async def issue(self, request):
+            assert request.session_id == result.session_id
+            return IssuedAccountAccessToken(
+                "access.jwt.value", NOW + timedelta(minutes=10)
+            )
+
     monkeypatch.setattr(auth, "InvitedEmployeeRegistrationService", Service)
+    monkeypatch.setattr(auth, "AccountAccessTokenService", Tokens)
     http, session, _ = client(monkeypatch)
     with http:
         response = http.post("/api/v1/auth/invitations/register", json=registration_json())
     assert response.status_code == 200
     assert response.json()["refresh_token"] == "selector.secret"
+    assert response.json()["access_token"] == "access.jwt.value"
+    assert response.json()["token_type"] == "bearer"
     assert set(response.json()) == {
         "account_id", "employee_profile_id", "employee_assignment_id",
-        "company_id", "device_id", "session_id", "refresh_token", "display_name",
+        "company_id", "device_id", "session_id", "access_token",
+        "access_token_expires_at", "token_type", "refresh_token", "display_name",
     }
     assert session.commits == 1
     assert response.headers["cache-control"] == "no-store"

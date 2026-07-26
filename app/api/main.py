@@ -10,6 +10,7 @@ import httpx
 from app.api.routers import webapp
 from app.api.routers import web_auth, web_data
 from app.api.routers import account_invitation_auth
+from app.api.routers import account_sessions
 from app.api.setup import ensure_default_admin
 from app.internal import Container
 
@@ -126,6 +127,7 @@ def create_app() -> FastAPI:
     app.include_router(web_auth.router, prefix="/api")
     app.include_router(web_data.router, prefix="/api")
     app.include_router(account_invitation_auth.router)
+    app.include_router(account_sessions.router)
 
     @app.get("/health")
     async def health_check():
