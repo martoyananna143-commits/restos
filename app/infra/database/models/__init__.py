@@ -11,6 +11,14 @@ from app.infra.database.models.access_profile import (
     AccessProfile,
     AccessProfilePermission,
 )
+from app.infra.database.models.assessment_template import (
+    AssessmentMethodology,
+    AssessmentTemplate,
+    AssessmentTemplateItem,
+    AssessmentTemplateItemOption,
+    AssessmentTemplateSection,
+    AssessmentTemplateVersion,
+)
 from app.infra.database.models.employee import Employee, EmployeeType
 from app.infra.database.models.employee_assignment import (
     AssignmentScopeVenue,
@@ -52,6 +60,12 @@ __all__ = [
     "AccountSession",
     "AccessProfile",
     "AccessProfilePermission",
+    "AssessmentMethodology",
+    "AssessmentTemplate",
+    "AssessmentTemplateVersion",
+    "AssessmentTemplateSection",
+    "AssessmentTemplateItem",
+    "AssessmentTemplateItemOption",
     "Company",
     "Venue",
     "Position",
