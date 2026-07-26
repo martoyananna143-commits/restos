@@ -98,6 +98,17 @@ class RefreshRejected:
 
 
 @dataclass(frozen=True)
+class RevokeCurrentRefreshSession:
+    refresh_token: str
+    now: datetime
+
+
+@dataclass(frozen=True)
+class RevokedCurrentRefreshSession:
+    revoked: bool
+
+
+@dataclass(frozen=True)
 class RevokeDeviceSessions:
     actor_account_id: UUID
     target_account_id: UUID
@@ -366,6 +377,37 @@ class AccountSessionService:
                 session.updated_at = request.now
             await self._session.flush()
             return RevokedDeviceSessions(device.id, len(active_sessions))
+
+    async def revoke_current_refresh_session(
+        self, request: RevokeCurrentRefreshSession
+    ) -> RevokedCurrentRefreshSession:
+        """Revoke only the exact refresh session represented by an opaque token."""
+        self._require_aware("now", request.now)
+        try:
+            selector, secret = self._parse_refresh_token(request.refresh_token)
+        except InvalidRefreshSession:
+            return RevokedCurrentRefreshSession(revoked=False)
+        async with self._session.begin_nested():
+            current = (
+                await self._session.execute(
+                    select(AccountSession)
+                    .where(AccountSession.token_selector == selector)
+                    .with_for_update()
+                )
+            ).scalar_one_or_none()
+            if current is None or not hmac.compare_digest(
+                current.refresh_secret_digest,
+                self._refresh_digest(selector, secret),
+            ):
+                return RevokedCurrentRefreshSession(revoked=False)
+            if current.status == "active":
+                current.status = "revoked"
+                current.revoked_at = request.now
+                current.revoked_reason = "web_logout"
+                current.updated_at = request.now
+                await self._session.flush()
+                return RevokedCurrentRefreshSession(revoked=True)
+            return RevokedCurrentRefreshSession(revoked=False)
 
     async def revoke_all_account_sessions(
         self, request: RevokeAllAccountSessions

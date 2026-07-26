@@ -55,6 +55,19 @@ class Config:
         self.ACCOUNT_AUTH_ACCESS_TOKEN_TTL_SECONDS = self.env.int(
             "ACCOUNT_AUTH_ACCESS_TOKEN_TTL_SECONDS", default=600
         )
+        self.ACCOUNT_WEB_REFRESH_COOKIE_NAME = self.env.str(
+            "ACCOUNT_WEB_REFRESH_COOKIE_NAME", default="restos_refresh"
+        )
+        self.ACCOUNT_WEB_REFRESH_COOKIE_SECURE = self.env.bool(
+            "ACCOUNT_WEB_REFRESH_COOKIE_SECURE",
+            default=self.env.str("APP_ENV", default="development") == "production",
+        )
+        self.ACCOUNT_WEB_REFRESH_COOKIE_SAMESITE = self.env.str(
+            "ACCOUNT_WEB_REFRESH_COOKIE_SAMESITE", default="lax"
+        )
+        self.ACCOUNT_WEB_ALLOWED_ORIGINS = self.env.list(
+            "ACCOUNT_WEB_ALLOWED_ORIGINS", default=[]
+        )
         self.ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN = self.env.str(
             "ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN", default=""
         )

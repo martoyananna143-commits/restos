@@ -9,6 +9,7 @@ import hashlib
 import hmac
 import re
 from typing import Annotated, Protocol
+from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response, status
@@ -24,6 +25,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from app.infra.database.models.invitation_v1 import Invitation
+from app.infra.database.models.account import AccountSession
 from app.infra.sms import SmsAeroSender
 from app.internal.services.access_decision_service import AccessDecisionService
 from app.internal.services.account_access_token_service import (
@@ -62,7 +64,12 @@ from app.settings import config
 
 
 AUTH_PREFIX = "/api/v1/auth/invitations"
-AUTH_PREFIXES = (AUTH_PREFIX, "/api/v1/auth/sessions")
+AUTH_PREFIXES = (
+    AUTH_PREFIX,
+    "/api/v1/auth/sessions",
+    "/api/v1/auth/web",
+    "/api/v1/account/bootstrap",
+)
 ASSESSMENT_LIBRARY_PREFIX = "/api/v1/assessment-library"
 ASSESSMENT_COMPANY_MARKER = "/assessment-templates"
 router = APIRouter(prefix=AUTH_PREFIX, tags=["account-auth"])
@@ -161,6 +168,19 @@ class RegistrationResponse(BaseModel):
     display_name: str
 
 
+class WebRegistrationResponse(BaseModel):
+    account_id: UUID
+    employee_profile_id: UUID
+    employee_assignment_id: UUID
+    company_id: UUID
+    device_id: UUID
+    session_id: UUID
+    access_token: str
+    expires_at: datetime
+    token_type: str = "bearer"
+    display_name: str
+
+
 async def get_account_auth_session():
     async with _session_factory() as session:
         yield session
@@ -218,6 +238,93 @@ def _error(http_status: int, code: str) -> HTTPException:
     )
 
 
+def _web_cookie_config() -> tuple[str, bool, str]:
+    name = config.ACCOUNT_WEB_REFRESH_COOKIE_NAME
+    secure = config.ACCOUNT_WEB_REFRESH_COOKIE_SECURE
+    same_site = config.ACCOUNT_WEB_REFRESH_COOKIE_SAMESITE.strip().lower()
+    if (
+        not isinstance(name, str)
+        or re.fullmatch(r"[A-Za-z0-9!#$%&'*+\-.^_`|~]+", name) is None
+        or same_site not in {"lax", "strict", "none"}
+        or (same_site == "none" and not secure)
+        or (config.APP_ENV == "production" and not secure)
+    ):
+        raise _error(503, "configuration_unavailable")
+    return name, secure, same_site
+
+
+def _normalized_origin(value: str) -> str:
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError("invalid origin")
+    try:
+        port = parsed.port
+    except ValueError as error:
+        raise ValueError("invalid origin") from error
+    effective_port = port or (443 if parsed.scheme == "https" else 80)
+    host = parsed.hostname.lower()
+    return f"{parsed.scheme}://{host}:{effective_port}"
+
+
+def require_web_request(request: Request) -> None:
+    if request.headers.get("X-RestOS-Web-Session") != "1":
+        raise _error(403, "permission_denied")
+    configured = config.ACCOUNT_WEB_ALLOWED_ORIGINS
+    if (
+        not configured
+        or any(origin == "*" for origin in configured)
+    ):
+        raise _error(503, "configuration_unavailable")
+    try:
+        allowed = {_normalized_origin(origin) for origin in configured}
+    except (TypeError, ValueError) as error:
+        raise _error(503, "configuration_unavailable") from error
+    origin = request.headers.get("Origin")
+    try:
+        normalized = _normalized_origin(origin) if origin else None
+    except ValueError as error:
+        raise _error(403, "permission_denied") from error
+    if normalized not in allowed:
+        raise _error(403, "permission_denied")
+
+
+def set_web_refresh_cookie(
+    response: Response, refresh_token: str, absolute_expires_at: datetime
+) -> None:
+    name, secure, same_site = _web_cookie_config()
+    now = datetime.now(timezone.utc)
+    max_age = max(0, int((absolute_expires_at - now).total_seconds()))
+    response.set_cookie(
+        key=name,
+        value=refresh_token,
+        max_age=max_age,
+        expires=absolute_expires_at,
+        path="/api/v1/auth/web",
+        secure=secure,
+        httponly=True,
+        samesite=same_site,
+    )
+
+
+def clear_web_refresh_cookie(response: Response) -> None:
+    name, secure, same_site = _web_cookie_config()
+    response.delete_cookie(
+        key=name,
+        path="/api/v1/auth/web",
+        secure=secure,
+        httponly=True,
+        samesite=same_site,
+    )
+
+
 def configure_account_auth_http_security(app: FastAPI) -> None:
     """Install path-scoped cache and validation protection on the existing app."""
 
@@ -225,6 +332,13 @@ def configure_account_auth_http_security(app: FastAPI) -> None:
         return path.startswith(ASSESSMENT_LIBRARY_PREFIX) or (
             path.startswith("/api/v1/companies/")
             and ASSESSMENT_COMPANY_MARKER in path
+        )
+
+    def is_private_account_path(path: str) -> bool:
+        return (
+            path.startswith("/api/v1/auth/web/")
+            or path == "/api/v1/account/bootstrap"
+            or path == f"{AUTH_PREFIX}/register/web"
         )
 
     @app.middleware("http")
@@ -240,7 +354,9 @@ def configure_account_auth_http_security(app: FastAPI) -> None:
                 content={"detail": {"code": "internal_error"}},
             )
         response.headers["Cache-Control"] = (
-            "private, no-store" if assessment_path else "no-store"
+            "private, no-store"
+            if assessment_path or is_private_account_path(request.url.path)
+            else "no-store"
         )
         return response
 
@@ -264,7 +380,9 @@ def configure_account_auth_http_security(app: FastAPI) -> None:
             },
             headers={
                 "Cache-Control": (
-                    "private, no-store" if assessment_path else "no-store"
+                    "private, no-store"
+                    if assessment_path or is_private_account_path(request.url.path)
+                    else "no-store"
                 )
             },
         )
@@ -514,4 +632,43 @@ async def register(
         **result.__dict__,
         access_token=access.access_token,
         access_token_expires_at=access.expires_at,
+    )
+
+
+@router.post(
+    "/register/web",
+    response_model=WebRegistrationResponse,
+    responses={
+        400: {"model": PublicError},
+        403: {"model": PublicError},
+        503: {"model": PublicError},
+    },
+)
+async def register_web(
+    body: RegistrationRequest,
+    request: Request,
+    response: Response,
+    session: Annotated[AsyncSession, Depends(get_account_auth_session)],
+) -> WebRegistrationResponse:
+    require_web_request(request)
+    _web_cookie_config()
+    native = await register(body, response, session)
+    refresh_session = await session.get(AccountSession, native.session_id)
+    if refresh_session is None:
+        raise _error(500, "internal_error")
+    set_web_refresh_cookie(
+        response,
+        native.refresh_token,
+        refresh_session.absolute_expires_at,
+    )
+    return WebRegistrationResponse(
+        account_id=native.account_id,
+        employee_profile_id=native.employee_profile_id,
+        employee_assignment_id=native.employee_assignment_id,
+        company_id=native.company_id,
+        device_id=native.device_id,
+        session_id=native.session_id,
+        access_token=native.access_token,
+        expires_at=native.access_token_expires_at,
+        display_name=native.display_name,
     )
