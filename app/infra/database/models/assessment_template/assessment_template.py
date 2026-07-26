@@ -199,6 +199,10 @@ class AssessmentTemplateVersion(Base, TimestampMixin):
             name="ck_assessment_template_versions_version",
         ),
         CheckConstraint(
+            "edit_revision >= 1",
+            name="ck_assessment_template_versions_edit_revision",
+        ),
+        CheckConstraint(
             "status IN ('draft', 'published', 'archived')",
             name="ck_assessment_template_versions_status",
         ),
@@ -221,6 +225,9 @@ class AssessmentTemplateVersion(Base, TimestampMixin):
         nullable=False,
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
+    edit_revision: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     methodology_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True),
