@@ -17,6 +17,7 @@ from app.internal.services.phone_verification_service import SmsDeliveryFailed
 from app.internal.services.phone_verification_service import (
     PhoneVerificationCodeRequested,
 )
+from app.settings import config
 
 
 EMAIL = "api@example.test"
@@ -65,6 +66,7 @@ async def test_request_contract_auth_and_success():
     assert "sign=RestOS" in body
     assert "%40restos.app+%23012345" in body
     assert "012345" in body
+    assert API_KEY not in body
 
 
 @pytest.mark.asyncio
@@ -72,6 +74,9 @@ async def test_request_contract_auth_and_success():
     "response",
     [
         httpx.Response(200, json={"success": False, "message": "rejected"}),
+        httpx.Response(
+            200, json={"success": False, "message": "insufficient balance"}
+        ),
         httpx.Response(401, json={"success": False}),
         httpx.Response(403, json={"success": False}),
         httpx.Response(429, json={"success": False}),
@@ -141,6 +146,66 @@ def test_incomplete_adapter_configuration_is_rejected(field):
         SmsAeroSender(httpx.AsyncClient(), timeout_seconds=2.0, **values)
 
 
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "http://gate.smsaero.test",
+        "https://user:secret@gate.smsaero.test",
+        "https://gate.smsaero.test?api_key=secret",
+    ],
+)
+def test_adapter_requires_safe_https_base_url(base_url):
+    with pytest.raises(ValueError, match="safe HTTPS URL"):
+        SmsAeroSender(
+            httpx.AsyncClient(),
+            email=EMAIL,
+            api_key=API_KEY,
+            sign=SIGN,
+            base_url=base_url,
+            timeout_seconds=2.0,
+        )
+
+
+def _safe_production_config(monkeypatch):
+    monkeypatch.setattr(config, "APP_ENV", "production")
+    monkeypatch.setattr(config, "JWT_SECRET_KEY", "j" * 64)
+    monkeypatch.setattr(config, "WEBAPP_SECRET_KEY", "w" * 64)
+    monkeypatch.setattr(config, "DEFAULT_ADMIN_PASSWORD", "Strong-Test-Password-20")
+    monkeypatch.setattr(config, "INTERNAL_API_KEY", "i" * 64)
+    monkeypatch.setattr(config, "CORS_ORIGINS", ["https://restos.test"])
+    monkeypatch.setattr(config, "CORS_ALLOW_CREDENTIALS", True)
+    monkeypatch.setattr(config, "SMS_AERO_EMAIL", EMAIL)
+    monkeypatch.setattr(config, "SMS_AERO_API_KEY", API_KEY)
+    monkeypatch.setattr(config, "SMS_AERO_SIGN", SIGN)
+    monkeypatch.setattr(config, "SMS_AERO_BASE_URL", BASE_URL)
+    monkeypatch.setattr(config, "SMS_HTTP_TIMEOUT_SECONDS", 2.0)
+    monkeypatch.setattr(config, "ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN", "restos.test")
+
+
+def test_production_smsaero_configuration_is_validated_without_secret_values(
+    monkeypatch,
+):
+    _safe_production_config(monkeypatch)
+    monkeypatch.setattr(config, "SMS_PROVIDER", "smsaero")
+    config.validate_production_security()
+
+    monkeypatch.setattr(config, "SMS_AERO_API_KEY", "")
+    with pytest.raises(RuntimeError) as caught:
+        config.validate_production_security()
+    message = str(caught.value)
+    assert "SMS_AERO_API_KEY" in message
+    assert API_KEY not in message
+    assert EMAIL not in message
+
+
+@pytest.mark.parametrize("provider", ["mock", "unknown-provider"])
+def test_production_rejects_non_smsaero_provider(monkeypatch, provider):
+    _safe_production_config(monkeypatch)
+    monkeypatch.setattr(config, "SMS_PROVIDER", provider)
+    with pytest.raises(RuntimeError, match="SMS_PROVIDER"):
+        config.validate_production_security()
+
+
 def factory_client(monkeypatch, provider):
     monkeypatch.setattr(auth.config, "SMS_PROVIDER", provider)
     monkeypatch.setattr(auth.config, "SMS_AERO_EMAIL", EMAIL)
@@ -185,8 +250,21 @@ def test_smsaero_factory_uses_app_lifecycle_client(monkeypatch):
     assert response.json() == {"type": "SmsAeroSender"}
 
 
-def test_failure_does_not_log_phone_code_or_key(caplog):
+@pytest.mark.asyncio
+async def test_failure_does_not_log_phone_code_or_key(caplog):
     caplog.set_level(logging.DEBUG)
+
+    def handler(_request):
+        return httpx.Response(
+            200, json={"success": False, "message": "provider rejected request"}
+        )
+
+    adapter, client = sender(handler)
+    with pytest.raises(SmsDeliveryFailed):
+        await adapter.send_verification_code(
+            "+79990001122", "012345", "invitation_registration", 300, "restos.app"
+        )
+    await client.aclose()
     assert API_KEY not in caplog.text
     assert "+79990001122" not in caplog.text
     assert "012345" not in caplog.text

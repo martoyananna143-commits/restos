@@ -11,6 +11,7 @@ failure may already have delivered the OTP.
 from __future__ import annotations
 
 import re
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -40,6 +41,16 @@ class SmsAeroSender:
             raise ValueError("SMS Aero configuration is incomplete")
         if not isinstance(timeout_seconds, (int, float)) or timeout_seconds <= 0:
             raise ValueError("SMS Aero timeout is invalid")
+        parsed_base_url = urlsplit(base_url.strip())
+        if (
+            parsed_base_url.scheme != "https"
+            or not parsed_base_url.hostname
+            or parsed_base_url.username is not None
+            or parsed_base_url.password is not None
+            or parsed_base_url.query
+            or parsed_base_url.fragment
+        ):
+            raise ValueError("SMS Aero base URL must be a safe HTTPS URL")
         self._client = client
         self._email = email.strip()
         self._api_key = api_key

@@ -3,6 +3,7 @@
 import logging
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 from environs import Env
 
 _log = logging.getLogger(__name__)
@@ -144,6 +145,39 @@ class Config:
             errors.append("INTERNAL_API_KEY is not set — bot token-mint endpoints are unprotected")
         if self.CORS_ORIGINS == ["*"] and self.CORS_ALLOW_CREDENTIALS:
             errors.append("CORS_ORIGINS='*' with CORS_ALLOW_CREDENTIALS=True is rejected by browsers and insecure")
+        sms_provider = self.SMS_PROVIDER.strip().lower()
+        if sms_provider not in {"", "disabled", "smsaero"}:
+            errors.append("SMS_PROVIDER must be 'disabled' or 'smsaero'")
+        elif sms_provider == "smsaero":
+            required_sms_settings = {
+                "SMS_AERO_EMAIL": self.SMS_AERO_EMAIL,
+                "SMS_AERO_API_KEY": self.SMS_AERO_API_KEY,
+                "SMS_AERO_SIGN": self.SMS_AERO_SIGN,
+                "SMS_AERO_BASE_URL": self.SMS_AERO_BASE_URL,
+                "ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN": self.ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN,
+            }
+            missing_sms_settings = [
+                name
+                for name, value in required_sms_settings.items()
+                if not isinstance(value, str) or not value.strip()
+            ]
+            if missing_sms_settings:
+                errors.append(
+                    "SMS_PROVIDER='smsaero' requires: "
+                    + ", ".join(missing_sms_settings)
+                )
+            parsed_sms_url = urlsplit(self.SMS_AERO_BASE_URL.strip())
+            if (
+                parsed_sms_url.scheme != "https"
+                or not parsed_sms_url.hostname
+                or parsed_sms_url.username is not None
+                or parsed_sms_url.password is not None
+                or parsed_sms_url.query
+                or parsed_sms_url.fragment
+            ):
+                errors.append("SMS_AERO_BASE_URL must be a safe HTTPS URL")
+            if self.SMS_HTTP_TIMEOUT_SECONDS <= 0:
+                errors.append("SMS_HTTP_TIMEOUT_SECONDS must be positive")
         if errors:
             raise RuntimeError(
                 "Production security checks failed — fix the following before starting:\n"

@@ -72,6 +72,14 @@ services:
       # CORS — set to your frontend origin in production
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
       - CORS_ALLOW_CREDENTIALS=${CORS_ALLOW_CREDENTIALS:-true}
+      # SMS delivery (credentials stay in the deployment environment)
+      - SMS_PROVIDER=${SMS_PROVIDER:-disabled}
+      - SMS_AERO_EMAIL=${SMS_AERO_EMAIL:-}
+      - SMS_AERO_API_KEY=${SMS_AERO_API_KEY:-}
+      - SMS_AERO_SIGN=${SMS_AERO_SIGN:-}
+      - SMS_AERO_BASE_URL=${SMS_AERO_BASE_URL:-}
+      - SMS_HTTP_TIMEOUT_SECONDS=${SMS_HTTP_TIMEOUT_SECONDS:-10}
+      - ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN=${ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN:-}
       # Default admin (created on first startup)
       - DEFAULT_ADMIN_LOGIN=${DEFAULT_ADMIN_LOGIN:-admin}
       - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-admin123}
@@ -176,5 +184,4 @@ networks:
   restos_internal:
     driver: bridge
     internal: false  # Set to true for completely isolated network (no external access)
-
 
