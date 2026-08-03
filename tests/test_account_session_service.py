@@ -490,6 +490,9 @@ async def test_late_error_rolls_back_savepoint_and_outer_transaction_survives(
     ctx = session_context
     service = make_service(ctx)
     original = service._issue_first_session
+    request = registration(ctx)
+    account_id = request.account_id
+    app_instance_id = request.app_instance_id
 
     async def late_failure(account, device, now):
         await original(account, device, now)
@@ -497,9 +500,22 @@ async def test_late_error_rolls_back_savepoint_and_outer_transaction_survives(
 
     monkeypatch.setattr(service, "_issue_first_session", late_failure)
     with pytest.raises(RuntimeError, match="late session failure"):
-        await service.register_device_and_issue_session(registration(ctx))
-    assert (await ctx.session.execute(select(func.count()).select_from(AccountDevice))).scalar_one() == 0
-    assert (await ctx.session.execute(select(func.count()).select_from(AccountSession))).scalar_one() == 0
+        await service.register_device_and_issue_session(request)
+    assert (
+        await ctx.session.execute(
+            select(func.count()).select_from(AccountDevice).where(
+                AccountDevice.account_id == account_id,
+                AccountDevice.app_instance_id == app_instance_id,
+            )
+        )
+    ).scalar_one() == 0
+    assert (
+        await ctx.session.execute(
+            select(func.count()).select_from(AccountSession).where(
+                AccountSession.account_id == account_id
+            )
+        )
+    ).scalar_one() == 0
     assert (await ctx.session.execute(select(1))).scalar_one() == 1
 
 
@@ -521,6 +537,7 @@ async def test_concurrent_rotation_detects_reuse_and_compromises_family():
     engine = create_async_engine(os.environ["DATABASE_URL"])
     account_id, device_id, session_id = uuid4(), uuid4(), uuid4()
     selector, family = uuid4(), uuid4()
+    public_key = b"concurrent-key-" + account_id.bytes
     token = f"{selector}." + base64.urlsafe_b64encode(SECRET).rstrip(b"=").decode()
     async with AsyncSession(engine) as setup:
         account = Account(
@@ -529,8 +546,8 @@ async def test_concurrent_rotation_detects_reuse_and_compromises_family():
         )
         device = AccountDevice(
             id=device_id, account_id=account_id, app_instance_id=uuid4(),
-            platform="ios", display_name="Device", public_key=b"concurrent-key",
-            public_key_fingerprint=hashlib.sha256(b"concurrent-key").digest(),
+            platform="ios", display_name="Device", public_key=public_key,
+            public_key_fingerprint=hashlib.sha256(public_key).digest(),
             quick_unlock_enabled=False, status="active", last_seen_at=NOW,
         )
         setup.add_all([account, device])

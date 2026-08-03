@@ -174,6 +174,15 @@ def _safe_production_config(monkeypatch):
     monkeypatch.setattr(config, "INTERNAL_API_KEY", "i" * 64)
     monkeypatch.setattr(config, "CORS_ORIGINS", ["https://restos.test"])
     monkeypatch.setattr(config, "CORS_ALLOW_CREDENTIALS", True)
+    monkeypatch.setattr(config, "WEBAUTHN_RP_ID", "passkeys.example.com")
+    monkeypatch.setattr(config, "WEBAUTHN_RP_NAME", "RestOS Test")
+    monkeypatch.setattr(
+        config,
+        "WEBAUTHN_ALLOWED_ORIGINS",
+        ["https://passkeys.example.com"],
+    )
+    monkeypatch.setattr(config, "WEBAUTHN_CHALLENGE_TTL_SECONDS", 300)
+    monkeypatch.setattr(config, "WEBAUTHN_MAX_VERIFY_ATTEMPTS", 3)
     monkeypatch.setattr(config, "SMS_AERO_EMAIL", EMAIL)
     monkeypatch.setattr(config, "SMS_AERO_API_KEY", API_KEY)
     monkeypatch.setattr(config, "SMS_AERO_SIGN", SIGN)

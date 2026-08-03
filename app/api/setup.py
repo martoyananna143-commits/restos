@@ -21,6 +21,7 @@ from app.infra.database.repository.evaluation_type.evaluation_type_asyncpg impor
 from app.infra.database.repository.organization.dto import CreateOrganizationDTO
 from app.infra.database.repository.organization.dto import UpdateOrganizationDTO
 from app.infra.database.repository.organization.organization_asyncpg import OrganizationRepositoryAsyncpg
+from app.infra.database.repository.organization.organization_asyncpg import normalize_organization_meta
 from app.internal.services.employee_service import EmployeeService
 from app.internal.services.evaluation_type_service import EvaluationTypeService
 from app.internal.services.organization_service import OrganizationService
@@ -58,69 +59,45 @@ async def ensure_default_admin(container: Container) -> None:
     org_service          = OrganizationService(repository=OrganizationRepositoryAsyncpg(pool=pool))
     eval_type_service    = EvaluationTypeService(repository=EvaluationTypeRepositoryAsyncpg(pool=pool))
 
-    # ── 1. Skip if admin already exists ─────────────────────────────────────
+    # ── 1. Resolve existing partial bootstrap state ──────────────────────────
     existing = await employee_service.get_by_web_login(login)
-    if existing:
-        logger.info("Default admin '%s' already exists — skipping setup.", login)
-        return
-
-    logger.info("First startup — creating default admin '%s'...", login)
-
-    # ── 2. Get or create default organization ───────────────────────────────
     all_orgs = await org_service.get_all()
     org = next((o for o in all_orgs if o.code == org_code), None)
 
     if not org:
+        if existing:
+            raise RuntimeError("default bootstrap state is invalid")
         org = await org_service.create(CreateOrganizationDTO(name=org_name, code=org_code))
         logger.info("Created organization '%s' (id=%s)", org.name, org.id)
     else:
         logger.info("Using existing organization '%s' (id=%s)", org.name, org.id)
 
-    # ── 3. Find admin employee type ──────────────────────────────────────────
-    emp_types = await employee_service.get_employee_types()
-    if not emp_types:
-        logger.error(
-            "No employee types in DB — run migrations first, then restart."
+    admin = existing
+    if admin is None:
+        emp_types = await employee_service.get_employee_types()
+        if not emp_types:
+            raise RuntimeError("default bootstrap employee type is unavailable")
+        admin_type = next(
+            (t for t in emp_types if t.get("is_administrator") or t.get("code") in ("admin", "administrator")),
+            emp_types[0],
         )
-        return
-
-    admin_type = next(
-        (t for t in emp_types
-         if t.get("is_administrator") or t.get("code") in ("admin", "administrator")),
-        emp_types[0],
-    )
-    logger.info(
-        "Using employee type '%s' (id=%s) for admin.",
-        admin_type.get("name"), admin_type["id"],
-    )
-
-    # ── 4. Create admin employee with hashed password in meta ────────────────
-    hashed = _hash_password(password)
-    admin = await employee_service.create(
-        CreateEmployeeDTO(
-            organization_id=org.id,
-            employee_type_id=admin_type["id"],
-            full_name=admin_name,
-            meta={"web_login": login, "hashed_password": hashed},
+        hashed = _hash_password(password)
+        admin = await employee_service.create(
+            CreateEmployeeDTO(
+                organization_id=org.id,
+                employee_type_id=admin_type["id"],
+                full_name=admin_name,
+                meta={"web_login": login, "hashed_password": hashed},
+            )
         )
-    )
 
-    org_meta = dict(getattr(org, "meta", {}) or {})
+    org_meta = normalize_organization_meta(getattr(org, "meta", None))
     if not org_meta.get("created_by_employee_id"):
         org_meta["created_by_employee_id"] = admin.id
         org_meta["created_by_telegram_id"] = admin.telegram_id
         await org_service.update(org.id, UpdateOrganizationDTO(meta=org_meta))
 
-    logger.info(
-        "✓ Default admin created: login='%s' | org='%s' (id=%s) | employee_id=%s",
-        login, org.name, org.id, admin.id,
-    )
-    logger.warning(
-        "⚠  Change DEFAULT_ADMIN_PASSWORD='%s' in .env before production!",
-        password,
-    )
-
-    # ── 5. Create default evaluation type if none exist ──────────────────────
+    # ── 2. Ensure the default evaluation type exists ─────────────────────────
     existing_types = await eval_type_service.get_all(organization_id=org.id)
     if not existing_types:
         await eval_type_service.create(CreateEvaluationTypeDTO(

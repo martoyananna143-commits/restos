@@ -56,7 +56,15 @@ PHONE_PEPPER = b"registration-phone-pepper-32-byte"
 SESSION_PEPPER = b"registration-session-pepper-32-b"
 
 
-async def seed(session):
+def unique_test_phone() -> str:
+    return f"+7999{uuid4().int % 10_000_000:07d}"
+
+
+def unique_test_code() -> str:
+    return f"{uuid4().int % 1_000_000:06d}"
+
+
+async def seed(session, phone: str = PHONE, code: str = CODE):
     owner = Account(id=uuid4(), display_name="Owner", status="active", security_version=1)
     session.add(owner)
     await session.flush()
@@ -65,7 +73,7 @@ async def seed(session):
     await session.flush()
     access = AccessProfile(id=uuid4(), company_id=company.id, name="Access", code=f"access-{uuid4().hex[:8]}", maximum_scope="explicit_venues", is_system=False, is_active=True, version=1)
     position = Position(id=uuid4(), company_id=company.id, name="Waiter", code=f"waiter-{uuid4().hex[:8]}", is_active=True, sort_order=0)
-    profile = EmployeeProfile(id=uuid4(), company_id=company.id, full_name="Invitee", phone=PHONE, employment_status="invited")
+    profile = EmployeeProfile(id=uuid4(), company_id=company.id, full_name="Invitee", phone=phone, employment_status="invited")
     venue1 = Venue(id=uuid4(), company_id=company.id, name="Work", code=f"work-{uuid4().hex[:8]}", status="active")
     venue2 = Venue(id=uuid4(), company_id=company.id, name="Scope", code=f"scope-{uuid4().hex[:8]}", status="active")
     session.add_all([access, position, profile, venue1, venue2])
@@ -74,7 +82,7 @@ async def seed(session):
         id=uuid4(), company_id=company.id, employee_profile_id=profile.id,
         position_id=position.id, access_profile_id=access.id,
         scope_type="explicit_venues",
-        code_digest=hmac.new(INVITATION_PEPPER, CODE.encode("ascii"), hashlib.sha256).digest(),
+        code_digest=hmac.new(INVITATION_PEPPER, code.encode("ascii"), hashlib.sha256).digest(),
         status="pending", created_by_account_id=owner.id,
         expires_at=NOW + timedelta(hours=1), created_at=NOW - timedelta(minutes=5),
         updated_at=NOW - timedelta(minutes=5),
@@ -85,7 +93,7 @@ async def seed(session):
         InvitationVenue(invitation_id=invitation.id, venue_id=venue1.id, company_id=company.id),
         InvitationScopeVenue(invitation_id=invitation.id, venue_id=venue2.id, company_id=company.id),
     ])
-    phone_digest = hmac.new(PHONE_PEPPER, PHONE.encode("ascii"), hashlib.sha256).digest()
+    phone_digest = hmac.new(PHONE_PEPPER, phone.encode("ascii"), hashlib.sha256).digest()
     challenge = PhoneVerificationChallenge(
         id=uuid4(), invitation_id=invitation.id, employee_profile_id=profile.id,
         purpose="invitation_registration", phone_digest=phone_digest,
@@ -145,6 +153,26 @@ async def context():
         await engine.dispose()
 
 
+@pytest_asyncio.fixture
+async def isolated_context():
+    engine = create_async_engine(os.environ["DATABASE_URL"])
+    connection = await engine.connect()
+    transaction = await connection.begin()
+    session = AsyncSession(bind=connection, expire_on_commit=False)
+    phone = unique_test_phone()
+    code = unique_test_code()
+    ctx = await seed(session, phone=phone, code=code)
+    ctx.engine, ctx.connection, ctx.transaction, ctx.session = engine, connection, transaction, session
+    ctx.phone, ctx.code = phone, code
+    try:
+        yield ctx
+    finally:
+        await session.close()
+        await transaction.rollback()
+        await connection.close()
+        await engine.dispose()
+
+
 def make_service(session):
     return InvitedEmployeeRegistrationService(
         session,
@@ -156,7 +184,7 @@ def make_service(session):
     )
 
 
-def request(ctx, **changes):
+def request(ctx, phone: str = PHONE, code: str = CODE, **changes):
     signature = ctx.device_private_key.sign(
         canonical_signed_message(
             device_challenge_id=ctx.device_challenge.id,
@@ -169,8 +197,8 @@ def request(ctx, **changes):
         ec.ECDSA(hashes.SHA256()),
     )
     values = dict(
-        invitation_code=CODE, phone_verification_challenge_id=ctx.challenge.id,
-        phone=PHONE, display_name=" Anna Invitee ", password="correct horse battery",
+        invitation_code=code, phone_verification_challenge_id=ctx.challenge.id,
+        phone=phone, display_name=" Anna Invitee ", password="correct horse battery",
         app_instance_id=ctx.app_instance_id, platform="ios",
         device_display_name="Anna iPhone",
         device_challenge_id=ctx.device_challenge.id,
@@ -411,24 +439,63 @@ async def test_non_pending_invitation_is_unavailable(context, status):
 
 
 @pytest.mark.asyncio
-async def test_late_failure_rolls_back_outer_savepoint_and_session_remains_usable(context, monkeypatch):
+async def test_late_failure_rolls_back_outer_savepoint_and_session_remains_usable(isolated_context, monkeypatch):
+    context = isolated_context
+    phone = context.phone
+    code = context.code
+    phone_subject_digest = hmac.new(
+        PHONE_PEPPER, phone.encode("ascii"), hashlib.sha256
+    ).digest()
     invitation_id = context.invitation.id
     employee_profile_id = context.profile.id
     challenge_id = context.challenge.id
     device_challenge_id = context.device_challenge.id
+    app_instance_id = context.app_instance_id
     service = make_service(context.session)
     original = service._account_sessions.register_device_and_issue_session
+    attempted_account_id = None
     async def fail_late(registration):
+        nonlocal attempted_account_id
+        attempted_account_id = registration.account_id
         await original(registration)
         raise RuntimeError("late failure")
     monkeypatch.setattr(service._account_sessions, "register_device_and_issue_session", fail_late)
     with pytest.raises(RuntimeError, match="late failure"):
-        await service.register(request(context))
+        await service.register(request(context, phone=phone, code=code))
     context.session.expire_all()
-    assert (await context.session.execute(select(func.count()).select_from(AccountIdentity))).scalar_one() == 0
-    assert (await context.session.execute(select(func.count()).select_from(EmployeeAssignment))).scalar_one() == 0
-    assert (await context.session.execute(select(func.count()).select_from(AccountDevice))).scalar_one() == 0
-    assert (await context.session.execute(select(func.count()).select_from(AccountSession))).scalar_one() == 0
+    assert attempted_account_id is not None
+    assert (
+        await context.session.execute(
+            select(func.count()).select_from(AccountIdentity).where(
+                AccountIdentity.account_id == attempted_account_id,
+                AccountIdentity.identity_type == "phone",
+                AccountIdentity.provider == "e164",
+                AccountIdentity.subject_digest == phone_subject_digest,
+            )
+        )
+    ).scalar_one() == 0
+    assert (
+        await context.session.execute(
+            select(func.count()).select_from(EmployeeAssignment).where(
+                EmployeeAssignment.employee_profile_id == employee_profile_id
+            )
+        )
+    ).scalar_one() == 0
+    assert (
+        await context.session.execute(
+            select(func.count()).select_from(AccountDevice).where(
+                AccountDevice.account_id == attempted_account_id,
+                AccountDevice.app_instance_id == app_instance_id,
+            )
+        )
+    ).scalar_one() == 0
+    assert (
+        await context.session.execute(
+            select(func.count()).select_from(AccountSession).where(
+                AccountSession.account_id == attempted_account_id
+            )
+        )
+    ).scalar_one() == 0
     assert (await context.session.get(Invitation, invitation_id)).status == "pending"
     profile = await context.session.get(EmployeeProfile, employee_profile_id)
     assert profile.account_id is None and profile.employment_status == "invited"
@@ -534,9 +601,14 @@ async def test_unknown_integrity_error_is_not_masked(context, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_concurrent_registration_succeeds_once():
+    phone = unique_test_phone()
+    code = unique_test_code()
+    phone_subject_digest = hmac.new(
+        PHONE_PEPPER, phone.encode("ascii"), hashlib.sha256
+    ).digest()
     engine = create_async_engine(os.environ["DATABASE_URL"])
     async with AsyncSession(engine, expire_on_commit=False) as setup:
-        ctx = await seed(setup)
+        ctx = await seed(setup, phone=phone, code=code)
         challenge_id = ctx.challenge.id
         invitation_id = ctx.invitation.id
         device_challenge_id = ctx.device_challenge.id
@@ -555,7 +627,9 @@ async def test_concurrent_registration_succeeds_once():
                 device_nonce=device_nonce,
             )
             try:
-                result = await make_service(session).register(request(local))
+                result = await make_service(session).register(
+                    request(local, phone=phone, code=code)
+                )
                 await session.commit()
                 return result
             except InvitedEmployeeRegistrationUnavailable as error:
@@ -563,11 +637,46 @@ async def test_concurrent_registration_succeeds_once():
                 return error
     results = await asyncio.gather(attempt(), attempt())
     assert sum(not isinstance(item, Exception) for item in results) == 1
+    winner = next(item for item in results if not isinstance(item, Exception))
+    account_id = winner.account_id
+    assignment_id = winner.employee_assignment_id
+    device_id = winner.device_id
+    session_id = winner.session_id
     async with AsyncSession(engine) as verify:
-        assert (await verify.execute(select(func.count()).select_from(AccountIdentity))).scalar_one() == 1
-        assert (await verify.execute(select(func.count()).select_from(EmployeeAssignment))).scalar_one() == 1
-        assert (await verify.execute(select(func.count()).select_from(AccountDevice))).scalar_one() == 1
-        assert (await verify.execute(select(func.count()).select_from(AccountSession))).scalar_one() == 1
+        assert (
+            await verify.execute(
+                select(func.count()).select_from(AccountIdentity).where(
+                    AccountIdentity.account_id == account_id,
+                    AccountIdentity.identity_type == "phone",
+                    AccountIdentity.provider == "e164",
+                    AccountIdentity.subject_digest == phone_subject_digest,
+                )
+            )
+        ).scalar_one() == 1
+        assert (
+            await verify.execute(
+                select(func.count()).select_from(EmployeeAssignment).where(
+                    EmployeeAssignment.id == assignment_id
+                )
+            )
+        ).scalar_one() == 1
+        assert (
+            await verify.execute(
+                select(func.count()).select_from(AccountDevice).where(
+                    AccountDevice.account_id == account_id,
+                    AccountDevice.app_instance_id == app_instance_id,
+                )
+            )
+        ).scalar_one() == 1
+        assert (
+            await verify.execute(
+                select(func.count()).select_from(AccountSession).where(
+                    AccountSession.id == session_id,
+                    AccountSession.account_id == account_id,
+                    AccountSession.device_id == device_id,
+                )
+            )
+        ).scalar_one() == 1
         challenge = await verify.get(PhoneVerificationChallenge, challenge_id)
         assert challenge.consumed_at == NOW
     await engine.dispose()

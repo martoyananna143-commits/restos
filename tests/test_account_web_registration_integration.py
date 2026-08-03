@@ -48,7 +48,6 @@ from app.internal.services.device_registration_challenge_service import (
 from app.internal.services.invited_employee_registration_service import (
     InvitedEmployeeRegistrationService,
 )
-from tests import test_invited_employee_registration_service as registration_test_data
 from tests.test_invited_employee_registration_service import (
     INVITATION_PEPPER,
     PHONE_PEPPER,
@@ -92,8 +91,7 @@ async def web_registration_context(monkeypatch):
                 break
         else:
             raise RuntimeError("could not allocate a unique test invitation code")
-        monkeypatch.setattr(registration_test_data, "CODE", invitation_code)
-        context = await seed(setup)
+        context = await seed(setup, code=invitation_code)
         context.invitation_code = invitation_code
         now = datetime.now(timezone.utc)
         phone = f"+79{uuid4().int % 10_000_000_000:010d}"

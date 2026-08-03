@@ -7,6 +7,9 @@ from app.infra.database.models.account import (
     AccountIdentity,
     AccountSession,
 )
+from app.infra.database.models.account_webauthn_challenge import (
+    AccountWebAuthnChallenge,
+)
 from app.infra.database.models.access_profile import (
     AccessProfile,
     AccessProfilePermission,
@@ -58,6 +61,7 @@ __all__ = [
     "AccountIdentity",
     "AccountDevice",
     "AccountSession",
+    "AccountWebAuthnChallenge",
     "AccessProfile",
     "AccessProfilePermission",
     "AssessmentMethodology",

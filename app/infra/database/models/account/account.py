@@ -87,14 +87,38 @@ class AccountIdentity(Base, TimestampMixin, SoftDeleteMixin):
             "AND subject_digest IS NOT NULL "
             "AND passkey_credential_id IS NULL "
             "AND passkey_public_key IS NULL "
-            "AND sign_count IS NULL) "
+            "AND sign_count IS NULL "
+            "AND passkey_transports IS NULL "
+            "AND passkey_backup_eligible IS NULL "
+            "AND passkey_backup_state IS NULL "
+            "AND passkey_display_name IS NULL "
+            "AND passkey_last_used_at IS NULL "
+            "AND passkey_revoked_at IS NULL "
+            "AND passkey_revoked_reason IS NULL) "
             "OR (identity_type = 'passkey' "
             "AND subject_digest IS NULL "
             "AND subject_ciphertext IS NULL "
             "AND passkey_credential_id IS NOT NULL "
             "AND passkey_public_key IS NOT NULL "
-            "AND sign_count IS NOT NULL AND sign_count >= 0))",
+            "AND sign_count IS NOT NULL AND sign_count >= 0 "
+            "AND passkey_transports IS NOT NULL "
+            "AND passkey_backup_eligible IS NOT NULL "
+            "AND passkey_backup_state IS NOT NULL))",
             name="ck_account_identities_type_specific_fields",
+        ),
+        CheckConstraint(
+            "(identity_type <> 'passkey') OR "
+            "((status = 'verified' AND passkey_revoked_at IS NULL "
+            "AND passkey_revoked_reason IS NULL) OR "
+            "(status IN ('disabled', 'compromised') "
+            "AND passkey_revoked_at IS NOT NULL "
+            "AND passkey_revoked_reason IS NOT NULL))",
+            name="ck_account_identities_passkey_revocation",
+        ),
+        CheckConstraint(
+            "(identity_type <> 'passkey') OR "
+            "(jsonb_typeof(passkey_transports) = 'array')",
+            name="ck_account_identities_passkey_transports_array",
         ),
         Index(
             "uq_account_identities_active_external",
@@ -138,6 +162,27 @@ class AccountIdentity(Base, TimestampMixin, SoftDeleteMixin):
     passkey_credential_id: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
     passkey_public_key: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
     sign_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    passkey_transports: Mapped[Optional[list[str]]] = mapped_column(
+        JSONB, nullable=True
+    )
+    passkey_backup_eligible: Mapped[Optional[bool]] = mapped_column(
+        Boolean, nullable=True
+    )
+    passkey_backup_state: Mapped[Optional[bool]] = mapped_column(
+        Boolean, nullable=True
+    )
+    passkey_display_name: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True
+    )
+    passkey_last_used_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    passkey_revoked_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    passkey_revoked_reason: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
     verified_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

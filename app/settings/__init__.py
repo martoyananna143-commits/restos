@@ -2,7 +2,9 @@
 
 import logging
 import os
+import ipaddress
 from pathlib import Path
+import re
 from urllib.parse import urlsplit
 from environs import Env
 
@@ -11,6 +13,12 @@ _log = logging.getLogger(__name__)
 _INSECURE_JWT_KEYS = {"change-me-in-production-" + "0" * 32}
 _INSECURE_WEBAPP_KEYS = {"0" * 64}
 _INSECURE_ADMIN_PASSWORDS = {"admin123", "admin", "password", "12345678"}
+_WEBAUTHN_RP_ID = re.compile(
+    r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*"
+    r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
+)
+_WEBAUTHN_MAX_CHALLENGE_TTL_SECONDS = 600
+_WEBAUTHN_MAX_VERIFY_ATTEMPTS = 10
 
 
 class Config:
@@ -71,6 +79,17 @@ class Config:
         )
         self.ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN = self.env.str(
             "ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN", default=""
+        )
+        self.WEBAUTHN_RP_ID = self.env.str("WEBAUTHN_RP_ID", default="")
+        self.WEBAUTHN_RP_NAME = self.env.str("WEBAUTHN_RP_NAME", default="")
+        self.WEBAUTHN_ALLOWED_ORIGINS = self.env.list(
+            "WEBAUTHN_ALLOWED_ORIGINS", default=[]
+        )
+        self.WEBAUTHN_CHALLENGE_TTL_SECONDS = self.env.int(
+            "WEBAUTHN_CHALLENGE_TTL_SECONDS", default=300
+        )
+        self.WEBAUTHN_MAX_VERIFY_ATTEMPTS = self.env.int(
+            "WEBAUTHN_MAX_VERIFY_ATTEMPTS", default=3
         )
         self.SMS_PROVIDER = self.env.str("SMS_PROVIDER", default="disabled")
         self.SMS_AERO_EMAIL = self.env.str("SMS_AERO_EMAIL", default="")
@@ -145,6 +164,79 @@ class Config:
             errors.append("INTERNAL_API_KEY is not set — bot token-mint endpoints are unprotected")
         if self.CORS_ORIGINS == ["*"] and self.CORS_ALLOW_CREDENTIALS:
             errors.append("CORS_ORIGINS='*' with CORS_ALLOW_CREDENTIALS=True is rejected by browsers and insecure")
+        rp_id = self.WEBAUTHN_RP_ID
+        if (
+            not isinstance(rp_id, str)
+            or not rp_id
+            or rp_id != rp_id.strip().lower()
+            or not _WEBAUTHN_RP_ID.fullmatch(rp_id)
+            or rp_id == "localhost"
+        ):
+            errors.append("WEBAUTHN_RP_ID must be a production hostname")
+        else:
+            try:
+                ipaddress.ip_address(rp_id)
+            except ValueError:
+                pass
+            else:
+                errors.append("WEBAUTHN_RP_ID must not be an IP address")
+        if (
+            not isinstance(self.WEBAUTHN_RP_NAME, str)
+            or not self.WEBAUTHN_RP_NAME.strip()
+        ):
+            errors.append("WEBAUTHN_RP_NAME must be non-empty")
+        origins = self.WEBAUTHN_ALLOWED_ORIGINS
+        if not isinstance(origins, list) or not origins:
+            errors.append("WEBAUTHN_ALLOWED_ORIGINS must be non-empty")
+        else:
+            for origin in origins:
+                parsed_origin = urlsplit(origin) if isinstance(origin, str) else None
+                hostname = parsed_origin.hostname if parsed_origin else None
+                try:
+                    invalid_port = parsed_origin.port is not None and not (
+                        1 <= parsed_origin.port <= 65535
+                    )
+                except ValueError:
+                    invalid_port = True
+                if (
+                    not isinstance(origin, str)
+                    or not origin
+                    or origin != origin.strip()
+                    or "*" in origin
+                    or parsed_origin is None
+                    or parsed_origin.scheme != "https"
+                    or not hostname
+                    or parsed_origin.username is not None
+                    or parsed_origin.password is not None
+                    or parsed_origin.path not in {"", "/"}
+                    or parsed_origin.query
+                    or parsed_origin.fragment
+                    or invalid_port
+                    or not rp_id
+                    or not (
+                        hostname == rp_id or hostname.endswith("." + rp_id)
+                    )
+                ):
+                    errors.append(
+                        "WEBAUTHN_ALLOWED_ORIGINS contains an unsafe origin"
+                    )
+                    break
+        if (
+            isinstance(self.WEBAUTHN_CHALLENGE_TTL_SECONDS, bool)
+            or not isinstance(self.WEBAUTHN_CHALLENGE_TTL_SECONDS, int)
+            or not 1
+            <= self.WEBAUTHN_CHALLENGE_TTL_SECONDS
+            <= _WEBAUTHN_MAX_CHALLENGE_TTL_SECONDS
+        ):
+            errors.append("WEBAUTHN_CHALLENGE_TTL_SECONDS is invalid")
+        if (
+            isinstance(self.WEBAUTHN_MAX_VERIFY_ATTEMPTS, bool)
+            or not isinstance(self.WEBAUTHN_MAX_VERIFY_ATTEMPTS, int)
+            or not 1
+            <= self.WEBAUTHN_MAX_VERIFY_ATTEMPTS
+            <= _WEBAUTHN_MAX_VERIFY_ATTEMPTS
+        ):
+            errors.append("WEBAUTHN_MAX_VERIFY_ATTEMPTS is invalid")
         sms_provider = self.SMS_PROVIDER.strip().lower()
         if sms_provider not in {"", "disabled", "smsaero"}:
             errors.append("SMS_PROVIDER must be 'disabled' or 'smsaero'")

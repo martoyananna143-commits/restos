@@ -80,6 +80,12 @@ services:
       - SMS_AERO_BASE_URL=${SMS_AERO_BASE_URL:-}
       - SMS_HTTP_TIMEOUT_SECONDS=${SMS_HTTP_TIMEOUT_SECONDS:-10}
       - ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN=${ACCOUNT_AUTH_SMS_AUTOFILL_DOMAIN:-}
+      # WebAuthn / passkeys (validated at production startup)
+      - WEBAUTHN_RP_ID=${WEBAUTHN_RP_ID}
+      - WEBAUTHN_RP_NAME=${WEBAUTHN_RP_NAME}
+      - WEBAUTHN_ALLOWED_ORIGINS=${WEBAUTHN_ALLOWED_ORIGINS}
+      - WEBAUTHN_CHALLENGE_TTL_SECONDS=${WEBAUTHN_CHALLENGE_TTL_SECONDS}
+      - WEBAUTHN_MAX_VERIFY_ATTEMPTS=${WEBAUTHN_MAX_VERIFY_ATTEMPTS}
       # Default admin (created on first startup)
       - DEFAULT_ADMIN_LOGIN=${DEFAULT_ADMIN_LOGIN:-admin}
       - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-admin123}
@@ -184,4 +190,3 @@ networks:
   restos_internal:
     driver: bridge
     internal: false  # Set to true for completely isolated network (no external access)
-

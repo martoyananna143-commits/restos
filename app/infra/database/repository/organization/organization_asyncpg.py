@@ -1,6 +1,7 @@
 """Organization repository implementation using asyncpg and buildpg."""
 
 import json
+from collections.abc import Mapping
 
 from typing import Any, Awaitable, Optional, Union
 
@@ -15,6 +16,22 @@ from app.infra.database.repository.organization.dto import (
     OrganizationDTO,
     UpdateOrganizationDTO,
 )
+
+
+def normalize_organization_meta(value: object) -> dict[str, object]:
+    """Return organization metadata as a detached JSON object."""
+    if value is None:
+        return {}
+    if isinstance(value, Mapping):
+        return dict(value)
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError as error:
+            raise ValueError("organization metadata is invalid") from error
+        if isinstance(decoded, dict):
+            return decoded
+    raise ValueError("organization metadata is invalid")
 
 
 class OrganizationRepositoryAsyncpg:
@@ -109,7 +126,7 @@ class OrganizationRepositoryAsyncpg:
                     address=row["address"],
                     phone=row["phone"],
                     is_active=row["is_active"],
-                    meta=row["meta"] or {},
+                    meta=normalize_organization_meta(row["meta"]),
                     created_at=row["created_at"],
                     updated_at=row["updated_at"],
                     deleted_at=row["deleted_at"],
@@ -144,7 +161,7 @@ class OrganizationRepositoryAsyncpg:
                     address=row["address"],
                     phone=row["phone"],
                     is_active=row["is_active"],
-                    meta=row["meta"] or {},
+                    meta=normalize_organization_meta(row["meta"]),
                     created_at=row["created_at"],
                     updated_at=row["updated_at"],
                     deleted_at=row["deleted_at"],
@@ -184,7 +201,7 @@ class OrganizationRepositoryAsyncpg:
                 address=row["address"],
                 phone=row["phone"],
                 is_active=row["is_active"],
-                meta=row["meta"] or {},
+                meta=normalize_organization_meta(row["meta"]),
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
                 deleted_at=row["deleted_at"],
@@ -228,7 +245,7 @@ class OrganizationRepositoryAsyncpg:
                 address=row["address"],
                 phone=row["phone"],
                 is_active=row["is_active"],
-                meta=row["meta"] or {},
+                meta=normalize_organization_meta(row["meta"]),
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
                 deleted_at=row["deleted_at"],
@@ -320,7 +337,7 @@ class OrganizationRepositoryAsyncpg:
                 address=row["address"],
                 phone=row["phone"],
                 is_active=row["is_active"],
-                meta=row["meta"] or {},
+                meta=normalize_organization_meta(row["meta"]),
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
                 deleted_at=row["deleted_at"],
