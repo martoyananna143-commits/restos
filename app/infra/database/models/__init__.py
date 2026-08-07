@@ -22,6 +22,11 @@ from app.infra.database.models.assessment_template import (
     AssessmentTemplateSection,
     AssessmentTemplateVersion,
 )
+from app.infra.database.models.assessment_attempt import (
+    AssessmentAssignment,
+    AssessmentAttempt,
+    AssessmentAttemptAnswer,
+)
 from app.infra.database.models.employee import Employee, EmployeeType
 from app.infra.database.models.employee_assignment import (
     AssignmentScopeVenue,
@@ -70,6 +75,9 @@ __all__ = [
     "AssessmentTemplateSection",
     "AssessmentTemplateItem",
     "AssessmentTemplateItemOption",
+    "AssessmentAssignment",
+    "AssessmentAttempt",
+    "AssessmentAttemptAnswer",
     "Company",
     "Venue",
     "Position",
