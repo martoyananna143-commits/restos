@@ -15,6 +15,7 @@ from app.api.routers import account_web_sessions
 from app.api.routers import account_passkeys
 from app.api.routers import assessment_templates
 from app.api.routers import account_assessments
+from app.api.routers import account_assessment_management
 from app.api.setup import ensure_default_admin
 from app.internal import Container
 
@@ -136,6 +137,7 @@ def create_app() -> FastAPI:
     app.include_router(account_passkeys.router)
     app.include_router(assessment_templates.router)
     app.include_router(account_assessments.router)
+    app.include_router(account_assessment_management.router)
 
     @app.get("/health")
     async def health_check():

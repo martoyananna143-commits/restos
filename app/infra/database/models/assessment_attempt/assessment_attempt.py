@@ -25,6 +25,14 @@ class AssessmentAssignment(Base, TimestampMixin):
         Index("ix_assessment_assignments_employee_status", "employee_profile_id", "status"),
         Index("ix_assessment_assignments_company_status", "company_id", "status"),
         Index("ix_assessment_assignments_due_at", "due_at"),
+        Index(
+            "uq_assessment_assignments_active_employee_version",
+            "company_id",
+            "employee_profile_id",
+            "template_version_id",
+            unique=True,
+            postgresql_where=text("status IN ('assigned', 'in_progress')"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -32,6 +40,7 @@ class AssessmentAssignment(Base, TimestampMixin):
     employee_profile_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("employee_profiles.id", ondelete="RESTRICT"), nullable=False)
     template_version_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("assessment_template_versions.id", ondelete="RESTRICT"), nullable=False)
     assigned_by_employee_profile_id: Mapped[Optional[UUID]] = mapped_column(PGUUID(as_uuid=True), ForeignKey("employee_profiles.id", ondelete="SET NULL"), nullable=True)
+    assigned_by_account_id: Mapped[Optional[UUID]] = mapped_column(PGUUID(as_uuid=True), ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="assigned", server_default="assigned")
     assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     due_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
