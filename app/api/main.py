@@ -10,6 +10,7 @@ import httpx
 from app.api.routers import webapp
 from app.api.routers import web_auth, web_data
 from app.api.routers import account_invitation_auth
+from app.api.routers import account_standalone_auth
 from app.api.routers import account_sessions
 from app.api.routers import account_web_sessions
 from app.api.routers import account_passkeys
@@ -73,14 +74,19 @@ async def lifespan(app: FastAPI):
     app.state.container = container
     app.state.sms_http_client = httpx.AsyncClient()
 
-    # Create default admin on first startup (idempotent)
-    try:
-        await ensure_default_admin(container)
-    except Exception as exc:
-        import logging
-        logging.getLogger(__name__).warning(
-            "Could not run default admin setup: %s", exc
-        )
+    # Pilot Account onboarding is explicit. The legacy organization/employee
+    # bootstrap remains opt-in for development and existing installations only.
+    from app.settings import config
+
+    if config.LEGACY_DEFAULT_ADMIN_BOOTSTRAP_ENABLED:
+        try:
+            await ensure_default_admin(container)
+        except Exception as exc:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Could not run default admin setup: %s", exc
+            )
 
     yield
 
@@ -124,7 +130,7 @@ def create_app() -> FastAPI:
         allow_origins=config.CORS_ORIGINS,
         allow_credentials=config.CORS_ALLOW_CREDENTIALS,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "X-Telegram-Id", "X-Telegram-Chat-Id", "X-Organization-Id"],
+        allow_headers=["Content-Type", "Authorization", "X-RestOS-Web-Session", "X-Telegram-Id", "X-Telegram-Chat-Id", "X-Organization-Id"],
     )
     account_invitation_auth.configure_account_auth_http_security(app)
 
@@ -132,6 +138,7 @@ def create_app() -> FastAPI:
     app.include_router(web_auth.router, prefix="/api")
     app.include_router(web_data.router, prefix="/api")
     app.include_router(account_invitation_auth.router)
+    app.include_router(account_standalone_auth.router)
     app.include_router(account_sessions.router)
     app.include_router(account_web_sessions.router)
     app.include_router(account_passkeys.router)

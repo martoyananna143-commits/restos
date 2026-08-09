@@ -132,13 +132,14 @@ async def test_request_normalizes_e164_sends_leading_zero_and_stores_only_hmac(
 @pytest.mark.parametrize("phone,expected", [
     ("+79991234567", "+79991234567"),
     (" +7 (999) 123-45-67 ", "+79991234567"),
+    ("89991234567", "+79991234567"),
     ("+12025550123", "+12025550123"),
 ])
 def test_e164_normalization(phone, expected):
     assert PhoneVerificationService.normalize_e164(phone) == expected
 
 
-@pytest.mark.parametrize("phone", ["89991234567", "+09991234567", "+123", "+1234567890123456", "١٢٣"])
+@pytest.mark.parametrize("phone", ["+09991234567", "+123", "+1234567890123456", "١٢٣"])
 def test_invalid_e164_is_rejected(phone):
     with pytest.raises(InvalidPhoneVerificationRequest):
         PhoneVerificationService.normalize_e164(phone)
@@ -195,13 +196,18 @@ async def test_sms_failure_rolls_back_new_challenge_and_outer_transaction_works(
 ):
     session, account = phone_context
     verification, _ = service(session, sender=FakeSmsSender(fail=True))
+    count_before = (
+        await session.execute(
+            select(func.count()).select_from(PhoneVerificationChallenge)
+        )
+    ).scalar_one()
     with pytest.raises(SmsDeliveryFailed):
         await verification.request_code(request(account))
     assert (
         await session.execute(
             select(func.count()).select_from(PhoneVerificationChallenge)
         )
-    ).scalar_one() == 0
+    ).scalar_one() == count_before
     assert (await session.execute(select(1))).scalar_one() == 1
 
 
@@ -337,6 +343,7 @@ async def test_unknown_integrity_error_is_not_masked(phone_context, monkeypatch)
 async def test_concurrent_requests_leave_one_pending_challenge():
     engine = create_async_engine(os.environ["DATABASE_URL"])
     account_id = uuid4()
+    phone = f"+7999{uuid4().int % 10_000_000:07d}"
     async with AsyncSession(engine) as setup:
         setup.add(Account(
             id=account_id, display_name="Concurrent phone", status="active",
@@ -353,7 +360,7 @@ async def test_concurrent_requests_leave_one_pending_challenge():
             )
             async with session.begin():
                 return await verification.request_code(RequestPhoneVerificationCode(
-                    "login", "+79995555555", NOW, account_id=account_id
+                    "login", phone, NOW, account_id=account_id
                 ))
 
     results = await asyncio.gather(
@@ -366,6 +373,10 @@ async def test_concurrent_requests_leave_one_pending_challenge():
             select(func.count()).select_from(PhoneVerificationChallenge).where(
                 PhoneVerificationChallenge.status == "pending",
                 PhoneVerificationChallenge.purpose == "login",
+                PhoneVerificationChallenge.phone_digest
+                == hmac.new(
+                    PHONE_PEPPER, phone.encode("ascii"), hashlib.sha256
+                ).digest(),
             )
         )).scalar_one()
         assert count == 1

@@ -36,6 +36,7 @@ from app.internal.services.phone_verification_service import PhoneVerificationSe
 _SIX_ASCII_DIGITS = re.compile(r"^[0-9]{6}$")
 _PLATFORMS = {"ios", "android", "web", "desktop", "unknown"}
 _PROTOCOL = b"restos-device-registration-v1"
+_ACCOUNT_PROTOCOL = b"restos-device-registration-v2/account-registration"
 
 
 class DeviceRegistrationChallengeError(Exception):
@@ -70,6 +71,25 @@ class IssuedDeviceRegistrationChallenge:
     expires_at: datetime
 
 
+@dataclass(frozen=True)
+class IssueAccountDeviceRegistrationChallenge:
+    phone_verification_challenge_id: UUID
+    phone: str
+    app_instance_id: UUID
+    platform: str
+    public_key: bytes
+    now: datetime
+
+
+@dataclass(frozen=True)
+class IssuedAccountDeviceRegistrationChallenge:
+    device_challenge_id: UUID
+    nonce: str
+    algorithm: str
+    protocol: str
+    expires_at: datetime
+
+
 def _field(value: bytes) -> bytes:
     return len(value).to_bytes(4, "big") + value
 
@@ -91,6 +111,29 @@ def canonical_signed_message(
             _PROTOCOL,
             device_challenge_id.bytes,
             invitation_id.bytes,
+            phone_challenge_id.bytes,
+            app_instance_id.bytes,
+            platform.encode("ascii"),
+            nonce,
+        )
+    )
+
+
+def canonical_account_registration_message(
+    *,
+    device_challenge_id: UUID,
+    phone_challenge_id: UUID,
+    app_instance_id: UUID,
+    platform: str,
+    nonce: bytes,
+) -> bytes:
+    """Return the isolated v2 Account-registration proof context."""
+
+    return b"".join(
+        _field(value)
+        for value in (
+            _ACCOUNT_PROTOCOL,
+            device_challenge_id.bytes,
             phone_challenge_id.bytes,
             app_instance_id.bytes,
             platform.encode("ascii"),
@@ -219,6 +262,7 @@ class DeviceRegistrationChallengeService:
                 invitation_id=invitation.id,
                 phone_verification_challenge_id=phone_challenge.id,
                 employee_profile_id=invitation.employee_profile_id,
+                registration_context="invitation_registration_v1",
                 app_instance_id=request.app_instance_id,
                 platform=request.platform,
                 public_key=canonical_key,
@@ -247,6 +291,97 @@ class DeviceRegistrationChallengeService:
                 expires_at=expires_at,
             )
 
+    async def issue_account_registration_challenge(
+        self, request: IssueAccountDeviceRegistrationChallenge
+    ) -> IssuedAccountDeviceRegistrationChallenge:
+        normalized_phone, canonical_key = self._validate_account_issue(request)
+        phone_digest = hmac.new(
+            self._phone_pepper,
+            normalized_phone.encode("ascii"),
+            hashlib.sha256,
+        ).digest()
+        async with self._session.begin_nested():
+            phone_challenge = (
+                await self._session.execute(
+                    select(PhoneVerificationChallenge)
+                    .where(
+                        PhoneVerificationChallenge.id
+                        == request.phone_verification_challenge_id
+                    )
+                    .with_for_update()
+                )
+            ).scalar_one_or_none()
+            if (
+                phone_challenge is None
+                or phone_challenge.purpose != "account_registration"
+                or phone_challenge.status != "verified"
+                or phone_challenge.consumed_at is not None
+                or phone_challenge.expires_at <= request.now
+                or phone_challenge.invitation_id is not None
+                or phone_challenge.employee_profile_id is not None
+                or phone_challenge.account_id is not None
+                or not hmac.compare_digest(phone_challenge.phone_digest, phone_digest)
+            ):
+                raise DeviceRegistrationChallengeUnavailable("challenge unavailable")
+
+            pending = (
+                await self._session.execute(
+                    select(DeviceRegistrationChallenge)
+                    .where(
+                        DeviceRegistrationChallenge.registration_context
+                        == "account_registration_v1",
+                        DeviceRegistrationChallenge.phone_verification_challenge_id
+                        == phone_challenge.id,
+                        DeviceRegistrationChallenge.app_instance_id
+                        == request.app_instance_id,
+                        DeviceRegistrationChallenge.status == "pending",
+                    )
+                    .with_for_update()
+                )
+            ).scalar_one_or_none()
+            if pending is not None:
+                if pending.expires_at > request.now:
+                    raise DeviceRegistrationChallengeUnavailable("challenge unavailable")
+                pending.status = "expired"
+                pending.updated_at = request.now
+                await self._session.flush()
+
+            challenge_id = uuid4()
+            nonce = secrets.token_bytes(32)
+            expires_at = request.now + self._ttl
+            challenge = DeviceRegistrationChallenge(
+                id=challenge_id,
+                invitation_id=None,
+                phone_verification_challenge_id=phone_challenge.id,
+                employee_profile_id=None,
+                registration_context="account_registration_v1",
+                app_instance_id=request.app_instance_id,
+                platform=request.platform,
+                public_key=canonical_key,
+                public_key_fingerprint=hashlib.sha256(canonical_key).digest(),
+                nonce_digest=self._account_nonce_digest(
+                    challenge_id,
+                    phone_challenge.id,
+                    request.app_instance_id,
+                    request.platform,
+                    nonce,
+                ),
+                status="pending",
+                expires_at=expires_at,
+                consumed_at=None,
+                created_at=request.now,
+                updated_at=request.now,
+            )
+            self._session.add(challenge)
+            await self._session.flush()
+            return IssuedAccountDeviceRegistrationChallenge(
+                device_challenge_id=challenge.id,
+                nonce=base64.urlsafe_b64encode(nonce).rstrip(b"=").decode("ascii"),
+                algorithm="ES256",
+                protocol="account-registration-v1",
+                expires_at=expires_at,
+            )
+
     async def verify_locked(
         self,
         *,
@@ -269,6 +404,7 @@ class DeviceRegistrationChallengeService:
         ).scalar_one_or_none()
         if (
             challenge is None
+            or challenge.registration_context != "invitation_registration_v1"
             or challenge.status != "pending"
             or challenge.expires_at <= now
             or challenge.invitation_id != invitation_id
@@ -310,6 +446,67 @@ class DeviceRegistrationChallengeService:
             ) from error
         return challenge
 
+    async def verify_account_registration_locked(
+        self,
+        *,
+        device_challenge_id: UUID,
+        nonce: bytes,
+        signature: bytes,
+        phone_challenge_id: UUID,
+        app_instance_id: UUID,
+        platform: str,
+        now: datetime,
+    ) -> DeviceRegistrationChallenge:
+        challenge = (
+            await self._session.execute(
+                select(DeviceRegistrationChallenge)
+                .where(DeviceRegistrationChallenge.id == device_challenge_id)
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        if (
+            challenge is None
+            or challenge.registration_context != "account_registration_v1"
+            or challenge.status != "pending"
+            or challenge.expires_at <= now
+            or challenge.invitation_id is not None
+            or challenge.employee_profile_id is not None
+            or challenge.phone_verification_challenge_id != phone_challenge_id
+            or challenge.app_instance_id != app_instance_id
+            or challenge.platform != platform
+            or not hmac.compare_digest(
+                challenge.nonce_digest,
+                self._account_nonce_digest(
+                    device_challenge_id,
+                    phone_challenge_id,
+                    app_instance_id,
+                    platform,
+                    nonce,
+                ),
+            )
+        ):
+            raise DeviceRegistrationChallengeUnavailable("challenge unavailable")
+        try:
+            key = serialization.load_der_public_key(challenge.public_key)
+            if not isinstance(key, ec.EllipticCurvePublicKey):
+                raise ValueError
+            key.verify(
+                signature,
+                canonical_account_registration_message(
+                    device_challenge_id=device_challenge_id,
+                    phone_challenge_id=phone_challenge_id,
+                    app_instance_id=app_instance_id,
+                    platform=platform,
+                    nonce=nonce,
+                ),
+                ec.ECDSA(hashes.SHA256()),
+            )
+        except (ValueError, TypeError, InvalidSignature) as error:
+            raise DeviceRegistrationChallengeUnavailable(
+                "challenge unavailable"
+            ) from error
+        return challenge
+
     def _validate_issue(
         self, request: IssueDeviceRegistrationChallenge
     ) -> tuple[str, bytes]:
@@ -317,6 +514,40 @@ class DeviceRegistrationChallengeService:
             request.invitation_code
         ):
             raise InvalidDeviceRegistrationChallengeRequest("invalid invitation code")
+        if not isinstance(request.phone_verification_challenge_id, UUID) or not isinstance(
+            request.app_instance_id, UUID
+        ):
+            raise InvalidDeviceRegistrationChallengeRequest("invalid identifier")
+        if not isinstance(request.platform, str) or request.platform not in _PLATFORMS:
+            raise InvalidDeviceRegistrationChallengeRequest("invalid platform")
+        if not isinstance(request.public_key, bytes) or not request.public_key:
+            raise InvalidDeviceRegistrationChallengeRequest("invalid public key")
+        if (
+            not isinstance(request.now, datetime)
+            or request.now.tzinfo is None
+            or request.now.utcoffset() is None
+        ):
+            raise InvalidDeviceRegistrationChallengeRequest("invalid timestamp")
+        try:
+            normalized_phone = PhoneVerificationService.normalize_e164(request.phone)
+            key = serialization.load_der_public_key(request.public_key)
+            if not isinstance(key, ec.EllipticCurvePublicKey) or not isinstance(
+                key.curve, ec.SECP256R1
+            ):
+                raise ValueError
+            canonical_key = key.public_bytes(
+                serialization.Encoding.DER,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+        except Exception as error:
+            raise InvalidDeviceRegistrationChallengeRequest(
+                "invalid challenge input"
+            ) from error
+        return normalized_phone, canonical_key
+
+    def _validate_account_issue(
+        self, request: IssueAccountDeviceRegistrationChallenge
+    ) -> tuple[str, bytes]:
         if not isinstance(request.phone_verification_challenge_id, UUID) or not isinstance(
             request.app_instance_id, UUID
         ):
@@ -361,6 +592,24 @@ class DeviceRegistrationChallengeService:
             canonical_signed_message(
                 device_challenge_id=challenge_id,
                 invitation_id=invitation_id,
+                phone_challenge_id=phone_challenge_id,
+                app_instance_id=app_instance_id,
+                platform=platform,
+                nonce=nonce,
+            )
+        ).digest()
+
+    @staticmethod
+    def _account_nonce_digest(
+        challenge_id: UUID,
+        phone_challenge_id: UUID,
+        app_instance_id: UUID,
+        platform: str,
+        nonce: bytes,
+    ) -> bytes:
+        return hashlib.sha256(
+            canonical_account_registration_message(
+                device_challenge_id=challenge_id,
                 phone_challenge_id=phone_challenge_id,
                 app_instance_id=app_instance_id,
                 platform=platform,

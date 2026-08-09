@@ -374,10 +374,19 @@ async def test_only_verified_challenge_is_available(context, status):
 ])
 async def test_invalid_runtime_or_phone_is_controlled_and_outer_transaction_works(context, change):
     error = InvalidInvitedEmployeeRegistration if change.get("phone") is None else InvitedEmployeeRegistrationUnavailable
+    count_before = (
+        await context.session.execute(
+            select(func.count()).select_from(AccountIdentity)
+        )
+    ).scalar_one()
     with pytest.raises(error):
         await make_service(context.session).register(request(context, **change))
     assert (await context.session.execute(select(1))).scalar_one() == 1
-    assert (await context.session.execute(select(func.count()).select_from(AccountIdentity))).scalar_one() == 0
+    assert (
+        await context.session.execute(
+            select(func.count()).select_from(AccountIdentity)
+        )
+    ).scalar_one() == count_before
 
 
 @pytest.mark.asyncio

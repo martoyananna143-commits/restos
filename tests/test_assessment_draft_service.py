@@ -489,13 +489,35 @@ async def test_full_replacement_has_fresh_ids_and_no_orphans(context):
     service = AssessmentDraftService(session)
     await service.save_draft_document(document(template, version))
     old_sections = set(
-        (await session.execute(select(AssessmentTemplateSection.id))).scalars()
+        (
+            await session.execute(
+                select(AssessmentTemplateSection.id).where(
+                    AssessmentTemplateSection.template_version_id == version.id
+                )
+            )
+        ).scalars()
     )
     old_items = set(
-        (await session.execute(select(AssessmentTemplateItem.id))).scalars()
+        (
+            await session.execute(
+                select(AssessmentTemplateItem.id).where(
+                    AssessmentTemplateItem.template_version_id == version.id
+                )
+            )
+        ).scalars()
     )
     old_options = set(
-        (await session.execute(select(AssessmentTemplateItemOption.id))).scalars()
+        (
+            await session.execute(
+                select(AssessmentTemplateItemOption.id)
+                .join(
+                    AssessmentTemplateItem,
+                    AssessmentTemplateItemOption.item_id
+                    == AssessmentTemplateItem.id,
+                )
+                .where(AssessmentTemplateItem.template_version_id == version.id)
+            )
+        ).scalars()
     )
     replacement = DraftSectionInput(
         "new-zone", "New", None, "zone", 7, Decimal("4"), None,
@@ -516,13 +538,35 @@ async def test_full_replacement_has_fresh_ids_and_no_orphans(context):
         )
     )
     new_sections = set(
-        (await session.execute(select(AssessmentTemplateSection.id))).scalars()
+        (
+            await session.execute(
+                select(AssessmentTemplateSection.id).where(
+                    AssessmentTemplateSection.template_version_id == version.id
+                )
+            )
+        ).scalars()
     )
     new_items = set(
-        (await session.execute(select(AssessmentTemplateItem.id))).scalars()
+        (
+            await session.execute(
+                select(AssessmentTemplateItem.id).where(
+                    AssessmentTemplateItem.template_version_id == version.id
+                )
+            )
+        ).scalars()
     )
     new_options = set(
-        (await session.execute(select(AssessmentTemplateItemOption.id))).scalars()
+        (
+            await session.execute(
+                select(AssessmentTemplateItemOption.id)
+                .join(
+                    AssessmentTemplateItem,
+                    AssessmentTemplateItemOption.item_id
+                    == AssessmentTemplateItem.id,
+                )
+                .where(AssessmentTemplateItem.template_version_id == version.id)
+            )
+        ).scalars()
     )
     assert old_sections.isdisjoint(new_sections)
     assert old_items.isdisjoint(new_items)

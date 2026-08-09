@@ -22,7 +22,7 @@ from app.settings import config
 
 EMAIL = "api@example.test"
 API_KEY = "test-api-key-not-real"
-SIGN = "RestOS"
+SIGN = "SMS Aero"
 BASE_URL = "https://gate.smsaero.test"
 
 
@@ -63,7 +63,7 @@ async def test_request_contract_auth_and_success():
     assert request.headers["authorization"] == f"Basic {expected_auth}"
     body = request.content.decode()
     assert "number=79990001122" in body
-    assert "sign=RestOS" in body
+    assert "sign=SMS+Aero" in body
     assert "%40restos.app+%23012345" in body
     assert "012345" in body
     assert API_KEY not in body

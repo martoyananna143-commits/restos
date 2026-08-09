@@ -178,8 +178,24 @@ async def test_accepts_and_persists_all_invitation_data(acceptance_context, monk
     result = await service(ctx).accept(accept_request(ctx))
     await ctx.session.flush()
     assignment = await ctx.session.get(EmployeeAssignment, result.employee_assignment_id)
-    working = set((await ctx.session.execute(select(AssignmentVenue.venue_id))).scalars())
-    scoped = set((await ctx.session.execute(select(AssignmentScopeVenue.venue_id))).scalars())
+    working = set(
+        (
+            await ctx.session.execute(
+                select(AssignmentVenue.venue_id).where(
+                    AssignmentVenue.assignment_id == result.employee_assignment_id
+                )
+            )
+        ).scalars()
+    )
+    scoped = set(
+        (
+            await ctx.session.execute(
+                select(AssignmentScopeVenue.venue_id).where(
+                    AssignmentScopeVenue.assignment_id == result.employee_assignment_id
+                )
+            )
+        ).scalars()
+    )
 
     assert compared and result.invitation_id == invitation.id
     assert result.company_id == ctx.company.id
@@ -422,7 +438,15 @@ async def test_changed_business_data_rolls_back_without_partial_state(acceptance
     assert ctx.profile.account_id is None
     assert ctx.profile.employment_status == "invited"
     assert invitation.status == "pending"
-    assert not list((await ctx.session.execute(select(EmployeeAssignment))).scalars())
+    assert not list(
+        (
+            await ctx.session.execute(
+                select(EmployeeAssignment).where(
+                    EmployeeAssignment.employee_profile_id == ctx.profile.id
+                )
+            )
+        ).scalars()
+    )
 
 
 @pytest.mark.asyncio
@@ -442,8 +466,30 @@ async def test_runtime_error_rolls_back_savepoint_and_keeps_outer_transaction_us
     with pytest.raises(RuntimeError, match="artificial late failure"):
         await invitation_service.accept(accept_request(ctx))
     await assert_no_partial_acceptance(ctx, invitation)
-    assert not list((await ctx.session.execute(select(AssignmentVenue))).scalars())
-    assert not list((await ctx.session.execute(select(AssignmentScopeVenue))).scalars())
+    assert not list(
+        (
+            await ctx.session.execute(
+                select(AssignmentVenue)
+                .join(
+                    EmployeeAssignment,
+                    AssignmentVenue.assignment_id == EmployeeAssignment.id,
+                )
+                .where(EmployeeAssignment.employee_profile_id == ctx.profile.id)
+            )
+        ).scalars()
+    )
+    assert not list(
+        (
+            await ctx.session.execute(
+                select(AssignmentScopeVenue)
+                .join(
+                    EmployeeAssignment,
+                    AssignmentScopeVenue.assignment_id == EmployeeAssignment.id,
+                )
+                .where(EmployeeAssignment.employee_profile_id == ctx.profile.id)
+            )
+        ).scalars()
+    )
     assert (await ctx.session.execute(select(1))).scalar_one() == 1
 
 

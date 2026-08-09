@@ -66,6 +66,7 @@ from app.settings import config
 AUTH_PREFIX = "/api/v1/auth/invitations"
 AUTH_PREFIXES = (
     AUTH_PREFIX,
+    "/api/v1/auth/account",
     "/api/v1/auth/sessions",
     "/api/v1/auth/web",
     "/api/v1/account/bootstrap",
@@ -337,6 +338,8 @@ def configure_account_auth_http_security(app: FastAPI) -> None:
 
     def is_private_account_path(path: str) -> bool:
         return (
+            path.startswith("/api/v1/auth/account/")
+            or
             path.startswith("/api/v1/auth/web/")
             or path == "/api/v1/account/bootstrap"
             or path == f"{AUTH_PREFIX}/register/web"

@@ -17,7 +17,7 @@ class PhoneVerificationChallenge(Base, TimestampMixin):
     __tablename__ = "phone_verification_challenges"
     __table_args__ = (
         CheckConstraint(
-            "purpose IN ('invitation_registration', 'login', 'password_reset', 'phone_change')",
+            "purpose IN ('invitation_registration', 'account_registration', 'login', 'password_reset', 'phone_change')",
             name="ck_phone_verification_challenges_purpose",
         ),
         CheckConstraint(

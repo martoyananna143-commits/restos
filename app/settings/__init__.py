@@ -125,6 +125,11 @@ class Config:
         self.DEFAULT_ADMIN_NAME = self.env.str("DEFAULT_ADMIN_NAME", default="Главный администратор")
         self.DEFAULT_ORG_NAME = self.env.str("DEFAULT_ORG_NAME", default="Моя организация")
         self.DEFAULT_ORG_CODE = self.env.str("DEFAULT_ORG_CODE", default="main")
+        self.LEGACY_DEFAULT_ADMIN_BOOTSTRAP_ENABLED = self.env.bool(
+            "LEGACY_DEFAULT_ADMIN_BOOTSTRAP_ENABLED",
+            default=self.env.str("APP_ENV", default="development")
+            != "production",
+        )
 
         # Superuser login — this account has cross-org access without needing
         # an employee record in each org. Defaults to the default admin login.
@@ -258,6 +263,8 @@ class Config:
                     "SMS_PROVIDER='smsaero' requires: "
                     + ", ".join(missing_sms_settings)
                 )
+            if self.SMS_AERO_SIGN != "SMS Aero":
+                errors.append("SMS_AERO_SIGN must be the approved sender 'SMS Aero'")
             parsed_sms_url = urlsplit(self.SMS_AERO_BASE_URL.strip())
             if (
                 parsed_sms_url.scheme != "https"

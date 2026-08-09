@@ -24,7 +24,13 @@ from app.infra.database.models.phone_verification_challenge import (
 )
 
 
-_PURPOSES = {"invitation_registration", "login", "password_reset", "phone_change"}
+_PURPOSES = {
+    "invitation_registration",
+    "account_registration",
+    "login",
+    "password_reset",
+    "phone_change",
+}
 _E164 = re.compile(r"^\+[1-9][0-9]{7,14}$")
 _SIX_ASCII_DIGITS = re.compile(r"^[0-9]{6}$")
 
@@ -391,9 +397,18 @@ class PhoneVerificationService:
         normalized = phone.strip()
         for character in " -()":
             normalized = normalized.replace(character, "")
+        # Russian domestic notation is accepted at the boundary and immediately
+        # canonicalized; only the resulting E.164 form is ever digested.
+        if re.fullmatch(r"8[0-9]{10}", normalized):
+            normalized = "+7" + normalized[1:]
         if not _E164.fullmatch(normalized):
             raise InvalidPhoneVerificationRequest("phone must be valid E.164")
         return normalized
+
+    def phone_digest(self, phone: str) -> bytes:
+        """Return the keyed canonical lookup digest without exposing the phone."""
+
+        return self._phone_digest(self.normalize_e164(phone))
 
     def _phone_digest(self, phone: str) -> bytes:
         return hmac.new(
