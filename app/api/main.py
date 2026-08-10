@@ -11,6 +11,8 @@ from app.api.routers import webapp
 from app.api.routers import web_auth, web_data
 from app.api.routers import account_invitation_auth
 from app.api.routers import account_standalone_auth
+from app.api.routers import account_first_company
+from app.api.routers import account_workforce
 from app.api.routers import account_sessions
 from app.api.routers import account_web_sessions
 from app.api.routers import account_passkeys
@@ -139,6 +141,8 @@ def create_app() -> FastAPI:
     app.include_router(web_data.router, prefix="/api")
     app.include_router(account_invitation_auth.router)
     app.include_router(account_standalone_auth.router)
+    app.include_router(account_first_company.router)
+    app.include_router(account_workforce.router)
     app.include_router(account_sessions.router)
     app.include_router(account_web_sessions.router)
     app.include_router(account_passkeys.router)

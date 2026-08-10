@@ -3,3 +3,7 @@ venv/
 README.MD
 ./src
 /src
+.git/
+**/__pycache__/
+.pytest_cache/
+resty_form_alpha/
