@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infra.database.models.account import Account, AccountIdentity
+from app.infra.database.models.account_legal_acceptance import AccountLegalAcceptance
 from app.infra.database.models.phone_verification_challenge import (
     PhoneVerificationChallenge,
 )
@@ -21,6 +22,13 @@ from app.internal.services.account_session_service import (
     AccountSessionService,
     RegisterDeviceAndIssueSession,
     RevokeAllAccountSessions,
+)
+from app.internal.services.account_legal_contract import (
+    ACCOUNT_REGISTRATION_CONTEXT,
+    PRIVACY_DOCUMENT_SHA256,
+    TERMS_DOCUMENT_SHA256,
+    AccountRegistrationAcceptance,
+    require_account_registration_acceptance,
 )
 from app.internal.services.device_registration_challenge_service import (
     DeviceRegistrationChallengeService,
@@ -62,6 +70,7 @@ class RegisterStandaloneAccount:
     device_challenge_id: UUID
     device_challenge_nonce: bytes
     device_challenge_signature: bytes
+    legal_acceptance: AccountRegistrationAcceptance
     now: datetime
 
 
@@ -124,6 +133,7 @@ class StandaloneAccountAuthService:
         self, request: RegisterStandaloneAccount
     ) -> AuthenticatedStandaloneAccount:
         phone = self._validate_common_device_input(request)
+        require_account_registration_acceptance(request.legal_acceptance)
         self._validate_password(request.password)
         if not isinstance(request.display_name, str) or not request.display_name.strip():
             raise InvalidStandaloneAccountAuthRequest("display_name is required")
@@ -177,6 +187,21 @@ class StandaloneAccountAuthService:
                     deleted_at=None,
                 )
                 self._session.add(account)
+                await self._session.flush()
+                self._session.add(
+                    AccountLegalAcceptance(
+                        id=uuid4(),
+                        account_id=account.id,
+                        context=ACCOUNT_REGISTRATION_CONTEXT,
+                        document_set_version=request.legal_acceptance.document_set_version,
+                        terms_version=request.legal_acceptance.terms_version,
+                        terms_document_sha256=TERMS_DOCUMENT_SHA256,
+                        privacy_version=request.legal_acceptance.privacy_version,
+                        privacy_document_sha256=PRIVACY_DOCUMENT_SHA256,
+                        accepted_at=request.now,
+                        created_at=request.now,
+                    )
+                )
                 await self._session.flush()
                 identity = AccountIdentity(
                     id=uuid4(),

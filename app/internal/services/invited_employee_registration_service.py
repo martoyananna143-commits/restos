@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infra.database.models.account import Account, AccountIdentity
+from app.infra.database.models.account_legal_acceptance import AccountLegalAcceptance
 from app.infra.database.models.employee_profile import EmployeeProfile
 from app.infra.database.models.invitation_v1 import Invitation
 from app.infra.database.models.phone_verification_challenge import (
@@ -23,6 +24,13 @@ from app.infra.database.models.phone_verification_challenge import (
 from app.internal.services.account_session_service import (
     AccountSessionService,
     RegisterDeviceAndIssueSession,
+)
+from app.internal.services.account_legal_contract import (
+    ACCOUNT_REGISTRATION_CONTEXT,
+    PRIVACY_DOCUMENT_SHA256,
+    TERMS_DOCUMENT_SHA256,
+    AccountRegistrationAcceptance,
+    require_account_registration_acceptance,
 )
 from app.internal.services.device_registration_challenge_service import (
     DeviceRegistrationChallengeService,
@@ -90,6 +98,7 @@ class RegisterInvitedEmployee:
     device_challenge_id: UUID
     device_challenge_nonce: bytes
     device_challenge_signature: bytes
+    legal_acceptance: AccountRegistrationAcceptance
     now: datetime
 
 
@@ -134,6 +143,7 @@ class InvitedEmployeeRegistrationService:
         self, request: RegisterInvitedEmployee
     ) -> RegisteredInvitedEmployee:
         normalized_phone = self._validate_input(request)
+        require_account_registration_acceptance(request.legal_acceptance)
         invitation_digest = hmac.new(
             self._invitation_pepper,
             request.invitation_code.encode("ascii"),
@@ -269,6 +279,21 @@ class InvitedEmployeeRegistrationService:
                 deleted_at=None,
             )
             self._session.add(account)
+            await self._session.flush()
+            self._session.add(
+                AccountLegalAcceptance(
+                    id=uuid4(),
+                    account_id=account_id,
+                    context=ACCOUNT_REGISTRATION_CONTEXT,
+                    document_set_version=request.legal_acceptance.document_set_version,
+                    terms_version=request.legal_acceptance.terms_version,
+                    terms_document_sha256=TERMS_DOCUMENT_SHA256,
+                    privacy_version=request.legal_acceptance.privacy_version,
+                    privacy_document_sha256=PRIVACY_DOCUMENT_SHA256,
+                    accepted_at=request.now,
+                    created_at=request.now,
+                )
+            )
             await self._session.flush()
             self._session.add(identity)
             await self._session.flush()

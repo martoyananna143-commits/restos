@@ -334,7 +334,14 @@ def test_http_request_code_uses_configured_smsaero_mock(monkeypatch):
     with TestClient(app) as http:
         response = http.post(
             "/api/v1/auth/invitations/sms/request",
-            json={"invitation_code": "123456", "phone": "+79990001122"},
+            json={
+                "invitation_code": "123456",
+                "phone": "+79990001122",
+                "personal_data_consent": True,
+                "personal_data_consent_version": "restos-pd-consent-2026-08-10-v1",
+                "authorization_sms_consent": True,
+                "authorization_sms_consent_version": "restos-auth-sms-consent-2026-08-10-v1",
+            },
         )
     assert response.status_code == 202
     assert len(requests) == 1

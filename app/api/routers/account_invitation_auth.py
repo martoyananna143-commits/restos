@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import re
-from typing import Annotated, Protocol
+from typing import Annotated, Literal, Protocol
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
@@ -32,6 +32,13 @@ from app.internal.services.account_access_token_service import (
     AccountAccessTokenConfigurationError,
     AccountAccessTokenService,
     IssueAccountAccessToken,
+)
+from app.internal.services.account_legal_contract import (
+    REGISTRATION_OTP_MESSAGE_TYPE,
+    AccountLegalVersionMismatch,
+    AccountRegistrationAcceptance,
+    RegistrationSmsConsent,
+    require_registration_sms_consent,
 )
 from app.internal.services.account_session_service import AccountSessionService
 from app.internal.services.device_registration_challenge_service import (
@@ -108,6 +115,10 @@ class SmsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     invitation_code: str = Field(min_length=6, max_length=6, pattern=r"^[0-9]{6}$")
     phone: str = Field(min_length=8, max_length=32)
+    personal_data_consent: Literal[True]
+    personal_data_consent_version: str = Field(min_length=1, max_length=100)
+    authorization_sms_consent: Literal[True]
+    authorization_sms_consent_version: str = Field(min_length=1, max_length=100)
 
 
 class SmsRequested(BaseModel):
@@ -136,6 +147,9 @@ class RegistrationRequest(BaseModel):
     device_challenge_id: UUID
     device_challenge_nonce: str = Field(min_length=43, max_length=43)
     device_challenge_signature: str = Field(min_length=8, max_length=256)
+    document_set_version: str = Field(min_length=1, max_length=100)
+    terms_version: str = Field(min_length=1, max_length=100)
+    privacy_version: str = Field(min_length=1, max_length=100)
 
 
 class DeviceChallengeRequest(BaseModel):
@@ -396,7 +410,12 @@ def configure_account_auth_http_security(app: FastAPI) -> None:
     "/sms/request",
     response_model=SmsRequested,
     status_code=status.HTTP_202_ACCEPTED,
-    responses={503: {"model": PublicError}},
+    responses={
+        400: {"model": PublicError},
+        409: {"model": PublicError},
+        429: {"model": PublicError},
+        503: {"model": PublicError},
+    },
 )
 async def request_sms(
     body: SmsRequest,
@@ -406,6 +425,16 @@ async def request_sms(
 ) -> SmsRequested:
     _no_store(response)
     now = datetime.now(timezone.utc)
+    consent = RegistrationSmsConsent(
+        personal_data_consent=body.personal_data_consent,
+        personal_data_consent_version=body.personal_data_consent_version,
+        authorization_sms_consent=body.authorization_sms_consent,
+        authorization_sms_consent_version=body.authorization_sms_consent_version,
+    )
+    try:
+        require_registration_sms_consent(consent)
+    except AccountLegalVersionMismatch as error:
+        raise _error(409, "legal_version_outdated") from error
     invitation_pepper = _secret(
         config.ACCOUNT_AUTH_INVITATION_PEPPER, "INVITATION_PEPPER"
     )
@@ -443,6 +472,8 @@ async def request_sms(
                 now=now,
                 invitation_id=invitation.id,
                 employee_profile_id=invitation.employee_profile_id,
+                registration_sms_consent=consent,
+                auth_sms_message_type=REGISTRATION_OTP_MESSAGE_TYPE,
             )
         )
         await session.commit()
@@ -455,6 +486,9 @@ async def request_sms(
     except (InvalidPhoneVerificationRequest, PhoneVerificationUnavailable) as error:
         await session.rollback()
         raise _error(400, "verification_unavailable") from error
+    except AccountLegalVersionMismatch as error:
+        await session.rollback()
+        raise _error(409, "legal_version_outdated") from error
     return SmsRequested(
         challenge_id=result.challenge_id,
         expires_at=result.expires_at,
@@ -504,7 +538,7 @@ async def verify_sms(
 @router.post(
     "/device/challenge",
     response_model=DeviceChallengeResponse,
-    responses={400: {"model": PublicError}},
+    responses={400: {"model": PublicError}, 409: {"model": PublicError}},
 )
 async def issue_device_challenge(
     body: DeviceChallengeRequest,
@@ -616,6 +650,11 @@ async def register(
                 device_challenge_id=body.device_challenge_id,
                 device_challenge_nonce=nonce,
                 device_challenge_signature=signature,
+                legal_acceptance=AccountRegistrationAcceptance(
+                    document_set_version=body.document_set_version,
+                    terms_version=body.terms_version,
+                    privacy_version=body.privacy_version,
+                ),
                 now=datetime.now(timezone.utc),
             )
         )
@@ -638,6 +677,9 @@ async def register(
     except (InvalidInvitedEmployeeRegistration, InvitedEmployeeRegistrationError) as error:
         await session.rollback()
         raise _error(400, "registration_unavailable") from error
+    except AccountLegalVersionMismatch as error:
+        await session.rollback()
+        raise _error(409, "legal_version_outdated") from error
     return RegistrationResponse(
         **result.__dict__,
         access_token=access.access_token,
@@ -651,6 +693,7 @@ async def register(
     responses={
         400: {"model": PublicError},
         403: {"model": PublicError},
+        409: {"model": PublicError},
         503: {"model": PublicError},
     },
 )

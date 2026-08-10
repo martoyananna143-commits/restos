@@ -32,6 +32,14 @@ from app.internal.services.account_access_token_service import (
     AccountAccessTokenService,
     IssueAccountAccessToken,
 )
+from app.internal.services.account_legal_contract import (
+    PASSWORD_RECOVERY_OTP_MESSAGE_TYPE,
+    REGISTRATION_OTP_MESSAGE_TYPE,
+    AccountLegalVersionMismatch,
+    AccountRegistrationAcceptance,
+    AuthorizationSmsConsent,
+    RegistrationSmsConsent,
+)
 from app.internal.services.account_session_service import AccountSessionService
 from app.internal.services.device_registration_challenge_service import (
     DeviceRegistrationChallengeError,
@@ -67,6 +75,10 @@ _PLATFORMS = {"ios", "android", "web", "desktop", "unknown"}
 class RegistrationSmsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     phone: str = Field(min_length=8, max_length=32)
+    personal_data_consent: Literal[True]
+    personal_data_consent_version: str = Field(min_length=1, max_length=100)
+    authorization_sms_consent: Literal[True]
+    authorization_sms_consent_version: str = Field(min_length=1, max_length=100)
 
 
 class SmsVerifyRequest(BaseModel):
@@ -109,6 +121,9 @@ class StandaloneRegistrationRequest(BaseModel):
     device_challenge_id: UUID
     device_challenge_nonce: str = Field(min_length=43, max_length=43)
     device_challenge_signature: str = Field(min_length=8, max_length=256)
+    document_set_version: str = Field(min_length=1, max_length=100)
+    terms_version: str = Field(min_length=1, max_length=100)
+    privacy_version: str = Field(min_length=1, max_length=100)
 
 
 class PasswordLoginRequest(BaseModel):
@@ -134,6 +149,8 @@ class AccountAuthResponse(BaseModel):
 class PasswordResetRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     phone: str = Field(min_length=8, max_length=32)
+    authorization_sms_consent: Literal[True]
+    authorization_sms_consent_version: str = Field(min_length=1, max_length=100)
 
 
 class PasswordResetCompleteRequest(BaseModel):
@@ -193,6 +210,9 @@ async def _request_code(
     account_id: UUID | None,
     session: AsyncSession,
     sender: SmsSender,
+    registration_sms_consent: RegistrationSmsConsent | None = None,
+    authorization_sms_consent: AuthorizationSmsConsent | None = None,
+    auth_sms_message_type: str | None = None,
 ) -> SmsRequested:
     try:
         result = await _verification_service(session, sender).request_code(
@@ -200,6 +220,9 @@ async def _request_code(
                 purpose=purpose,
                 phone=phone,
                 account_id=account_id,
+                registration_sms_consent=registration_sms_consent,
+                authorization_sms_consent=authorization_sms_consent,
+                auth_sms_message_type=auth_sms_message_type,
                 now=datetime.now(timezone.utc),
             )
         )
@@ -218,6 +241,9 @@ async def _request_code(
     except (InvalidPhoneVerificationRequest, PhoneVerificationUnavailable) as error:
         await session.rollback()
         raise _error(400, "verification_unavailable") from error
+    except AccountLegalVersionMismatch as error:
+        await session.rollback()
+        raise _error(409, "legal_version_outdated") from error
 
 
 async def _verify_code(
@@ -300,7 +326,12 @@ async def _response_with_token(
     "/registration/sms/request",
     response_model=SmsRequested,
     status_code=202,
-    responses={400: {"model": PublicError}, 429: {"model": PublicError}, 503: {"model": PublicError}},
+    responses={
+        400: {"model": PublicError},
+        409: {"model": PublicError},
+        429: {"model": PublicError},
+        503: {"model": PublicError},
+    },
 )
 async def request_registration_sms(
     body: RegistrationSmsRequest,
@@ -315,6 +346,13 @@ async def request_registration_sms(
         account_id=None,
         session=session,
         sender=sender,
+        registration_sms_consent=RegistrationSmsConsent(
+            personal_data_consent=body.personal_data_consent,
+            personal_data_consent_version=body.personal_data_consent_version,
+            authorization_sms_consent=body.authorization_sms_consent,
+            authorization_sms_consent_version=body.authorization_sms_consent_version,
+        ),
+        auth_sms_message_type=REGISTRATION_OTP_MESSAGE_TYPE,
     )
 
 
@@ -366,7 +404,12 @@ async def issue_registration_device_challenge(
 @router.post(
     "/registration/complete",
     response_model=AccountAuthResponse,
-    responses={400: {"model": PublicError}, 403: {"model": PublicError}, 503: {"model": PublicError}},
+    responses={
+        400: {"model": PublicError},
+        403: {"model": PublicError},
+        409: {"model": PublicError},
+        503: {"model": PublicError},
+    },
 )
 async def complete_registration(
     body: StandaloneRegistrationRequest,
@@ -388,6 +431,11 @@ async def complete_registration(
                 device_challenge_id=body.device_challenge_id,
                 device_challenge_nonce=_decode(body.device_challenge_nonce, urlsafe=True),
                 device_challenge_signature=_decode(body.device_challenge_signature, urlsafe=True),
+                legal_acceptance=AccountRegistrationAcceptance(
+                    document_set_version=body.document_set_version,
+                    terms_version=body.terms_version,
+                    privacy_version=body.privacy_version,
+                ),
                 now=datetime.now(timezone.utc),
             )
         )
@@ -400,6 +448,9 @@ async def complete_registration(
     except (InvalidStandaloneAccountAuthRequest, StandaloneAccountAuthError) as error:
         await session.rollback()
         raise _error(400, "registration_unavailable") from error
+    except AccountLegalVersionMismatch as error:
+        await session.rollback()
+        raise _error(409, "legal_version_outdated") from error
 
 
 @router.post(
@@ -441,7 +492,12 @@ async def password_login(
     "/password-reset/sms/request",
     response_model=SmsRequested,
     status_code=202,
-    responses={400: {"model": PublicError}, 429: {"model": PublicError}, 503: {"model": PublicError}},
+    responses={
+        400: {"model": PublicError},
+        409: {"model": PublicError},
+        429: {"model": PublicError},
+        503: {"model": PublicError},
+    },
 )
 async def request_password_reset_sms(
     body: PasswordResetRequest,
@@ -474,6 +530,11 @@ async def request_password_reset_sms(
         account_id=account_id,
         session=session,
         sender=sender,
+        authorization_sms_consent=AuthorizationSmsConsent(
+            authorization_sms_consent=body.authorization_sms_consent,
+            authorization_sms_consent_version=body.authorization_sms_consent_version,
+        ),
+        auth_sms_message_type=PASSWORD_RECOVERY_OTP_MESSAGE_TYPE,
     )
 
 

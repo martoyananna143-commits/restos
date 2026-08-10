@@ -22,10 +22,21 @@ from app.infra.database.models.account import (
     AccountIdentity,
     AccountSession,
 )
+from app.infra.database.models.account_legal_acceptance import AccountLegalAcceptance
 from app.infra.database.models.phone_verification_challenge import (
     PhoneVerificationChallenge,
 )
 from app.internal.services.account_session_service import AccountSessionService
+from app.internal.services.account_legal_contract import (
+    AUTH_SMS_CONSENT_VERSION,
+    DOCUMENT_SET_VERSION,
+    PD_CONSENT_VERSION,
+    PRIVACY_VERSION,
+    REGISTRATION_OTP_MESSAGE_TYPE,
+    TERMS_VERSION,
+    AccountRegistrationAcceptance,
+    RegistrationSmsConsent,
+)
 from app.internal.services.device_registration_challenge_service import (
     DeviceRegistrationChallengeService,
     IssueAccountDeviceRegistrationChallenge,
@@ -176,6 +187,11 @@ def register_request(ctx, **changes):
         device_challenge_id=ctx.device_challenge_id,
         device_challenge_nonce=ctx.nonce,
         device_challenge_signature=ctx.signature,
+        legal_acceptance=AccountRegistrationAcceptance(
+            document_set_version=DOCUMENT_SET_VERSION,
+            terms_version=TERMS_VERSION,
+            privacy_version=PRIVACY_VERSION,
+        ),
         now=ctx.now,
     )
     values.update(changes)
@@ -197,6 +213,13 @@ async def test_account_registration_request_and_verify_success(db_session):
         RequestPhoneVerificationCode(
             purpose="account_registration",
             phone="8 (999) 123-45-67",
+            registration_sms_consent=RegistrationSmsConsent(
+                personal_data_consent=True,
+                personal_data_consent_version=PD_CONSENT_VERSION,
+                authorization_sms_consent=True,
+                authorization_sms_consent_version=AUTH_SMS_CONSENT_VERSION,
+            ),
+            auth_sms_message_type=REGISTRATION_OTP_MESSAGE_TYPE,
             now=NOW,
         )
     )
@@ -228,6 +251,13 @@ async def test_registration_success_consumes_proofs_and_replay_is_rejected(db_se
     ).scalar_one()
     device = await db_session.get(AccountDevice, result.device_id)
     account_session = await db_session.get(AccountSession, result.session_id)
+    legal = (
+        await db_session.execute(
+            select(AccountLegalAcceptance).where(
+                AccountLegalAcceptance.account_id == account.id
+            )
+        )
+    ).scalar_one()
     assert account.display_name == "Pilot Account"
     assert account.password_hash and account.password_hash != PASSWORD
     assert identity.status == "verified" and identity.is_primary is True
@@ -236,6 +266,9 @@ async def test_registration_success_consumes_proofs_and_replay_is_rejected(db_se
     ).digest()
     assert not hasattr(identity, "phone")
     assert device.public_key == ctx.public_key and account_session.status == "active"
+    assert legal.context == "account_registration"
+    assert legal.document_set_version == DOCUMENT_SET_VERSION
+    assert legal.accepted_at == ctx.now
     assert ctx.phone_challenge.consumed_by_account_id == account.id
     with pytest.raises(StandaloneAccountAuthUnavailable):
         await ctx.auth.register(register_request(ctx))

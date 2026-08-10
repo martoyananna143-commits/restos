@@ -72,6 +72,16 @@ def headers():
     }
 
 
+def registration_sms_json():
+    return {
+        "phone": "+79991234567",
+        "personal_data_consent": True,
+        "personal_data_consent_version": "restos-pd-consent-2026-08-10-v1",
+        "authorization_sms_consent": True,
+        "authorization_sms_consent_version": "restos-auth-sms-consent-2026-08-10-v1",
+    }
+
+
 def auth_result():
     return AuthenticatedStandaloneAccount(
         account_id=uuid4(),
@@ -117,11 +127,11 @@ def test_csrf_origin_and_header_are_required(monkeypatch):
     with http:
         missing = http.post(
             "/api/v1/auth/account/registration/sms/request",
-            json={"phone": "+79991234567"},
+            json=registration_sms_json(),
         )
         wrong = http.post(
             "/api/v1/auth/account/registration/sms/request",
-            json={"phone": "+79991234567"},
+            json=registration_sms_json(),
             headers={
                 "Origin": "https://evil.example",
                 "X-RestOS-Web-Session": "1",
@@ -145,7 +155,7 @@ def test_disabled_sms_returns_controlled_503_and_rolls_back(monkeypatch):
     with http:
         response = http.post(
             "/api/v1/auth/account/registration/sms/request",
-            json={"phone": "+79991234567"},
+            json=registration_sms_json(),
             headers=headers(),
         )
     assert response.status_code == 503

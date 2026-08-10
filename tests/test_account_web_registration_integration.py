@@ -45,6 +45,11 @@ from app.internal.services.account_access_token_service import (
 from app.internal.services.device_registration_challenge_service import (
     canonical_signed_message,
 )
+from app.internal.services.account_legal_contract import (
+    DOCUMENT_SET_VERSION,
+    PRIVACY_VERSION,
+    TERMS_VERSION,
+)
 from app.internal.services.invited_employee_registration_service import (
     InvitedEmployeeRegistrationService,
 )
@@ -191,6 +196,9 @@ def _payload(context):
         "device_challenge_signature": base64.urlsafe_b64encode(signature)
         .rstrip(b"=")
         .decode(),
+        "document_set_version": DOCUMENT_SET_VERSION,
+        "terms_version": TERMS_VERSION,
+        "privacy_version": PRIVACY_VERSION,
     }
 
 

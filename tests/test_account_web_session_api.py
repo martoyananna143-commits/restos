@@ -325,6 +325,9 @@ def test_web_registration_wraps_native_contract_without_exposing_refresh(monkeyp
         "device_challenge_id": str(uuid4()),
         "device_challenge_nonce": "n" * 43,
         "device_challenge_signature": "signature",
+        "document_set_version": "restos-account-legal-2026-08-10-v1",
+        "terms_version": "restos-terms-2026-08-10-v1",
+        "privacy_version": "restos-privacy-2026-08-10-v1",
     }
     response = http.post(
         "/api/v1/auth/invitations/register/web",

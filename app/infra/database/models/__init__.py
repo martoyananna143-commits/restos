@@ -7,6 +7,7 @@ from app.infra.database.models.account import (
     AccountIdentity,
     AccountSession,
 )
+from app.infra.database.models.account_legal_acceptance import AccountLegalAcceptance
 from app.infra.database.models.account_webauthn_challenge import (
     AccountWebAuthnChallenge,
 )
@@ -66,6 +67,7 @@ __all__ = [
     "AccountIdentity",
     "AccountDevice",
     "AccountSession",
+    "AccountLegalAcceptance",
     "AccountWebAuthnChallenge",
     "AccessProfile",
     "AccessProfilePermission",

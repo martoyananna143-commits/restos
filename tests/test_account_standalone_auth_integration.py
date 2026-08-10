@@ -18,6 +18,13 @@ from app.infra.database.models.account import Account, AccountSession
 from app.internal.services.device_registration_challenge_service import (
     canonical_account_registration_message,
 )
+from app.internal.services.account_legal_contract import (
+    AUTH_SMS_CONSENT_VERSION,
+    DOCUMENT_SET_VERSION,
+    PD_CONSENT_VERSION,
+    PRIVACY_VERSION,
+    TERMS_VERSION,
+)
 
 
 class ControlledSmsSender:
@@ -72,7 +79,13 @@ async def test_full_registration_login_and_password_reset_http_flow(monkeypatch)
     ) as http:
         requested = await http.post(
             "/api/v1/auth/account/registration/sms/request",
-            json={"phone": phone},
+            json={
+                "phone": phone,
+                "personal_data_consent": True,
+                "personal_data_consent_version": PD_CONSENT_VERSION,
+                "authorization_sms_consent": True,
+                "authorization_sms_consent_version": AUTH_SMS_CONSENT_VERSION,
+            },
             headers=headers,
         )
         assert requested.status_code == 202 and len(sender.messages) == 1
@@ -125,6 +138,9 @@ async def test_full_registration_login_and_password_reset_http_flow(monkeypatch)
                 "device_challenge_signature": base64.urlsafe_b64encode(signature)
                 .rstrip(b"=")
                 .decode("ascii"),
+                "document_set_version": DOCUMENT_SET_VERSION,
+                "terms_version": TERMS_VERSION,
+                "privacy_version": PRIVACY_VERSION,
             },
             headers=headers,
         )
@@ -154,7 +170,11 @@ async def test_full_registration_login_and_password_reset_http_flow(monkeypatch)
 
         reset_requested = await http.post(
             "/api/v1/auth/account/password-reset/sms/request",
-            json={"phone": phone},
+            json={
+                "phone": phone,
+                "authorization_sms_consent": True,
+                "authorization_sms_consent_version": AUTH_SMS_CONSENT_VERSION,
+            },
             headers=headers,
         )
         assert reset_requested.status_code == 202 and len(sender.messages) == 2

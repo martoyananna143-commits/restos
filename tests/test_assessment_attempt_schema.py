@@ -16,7 +16,7 @@ def test_assessment_attempt_tables_are_registered():
         "assessment_attempts",
         "assessment_attempt_answers",
     }.issubset(Base.metadata.tables)
-    assert len(Base.metadata.tables) == 39
+    assert len(Base.metadata.tables) == 40
 
 
 def test_assignment_schema_has_safe_foreign_keys_and_state_checks():

@@ -6,7 +6,7 @@ from app.infra.database.models import AssessmentAssignment, Base
 
 
 def test_management_reuses_existing_assignment_table():
-    assert len(Base.metadata.tables) == 39
+    assert len(Base.metadata.tables) == 40
     assert "assessment_assignments" in Base.metadata.tables
 
 

@@ -22,6 +22,19 @@ from app.infra.database.models.invitation_v1 import Invitation
 from app.infra.database.models.phone_verification_challenge import (
     PhoneVerificationChallenge,
 )
+from app.internal.services.account_legal_contract import (
+    AUTH_SMS_CONSENT_VERSION,
+    PASSWORD_RECOVERY_OTP_MESSAGE_TYPE,
+    PASSWORD_RECOVERY_SMS_COPY_SHA256,
+    PD_CONSENT_DOCUMENT_SHA256,
+    PD_CONSENT_VERSION,
+    REGISTRATION_OTP_MESSAGE_TYPE,
+    REGISTRATION_SMS_COPY_SHA256,
+    AuthorizationSmsConsent,
+    RegistrationSmsConsent,
+    require_authorization_sms_consent,
+    require_registration_sms_consent,
+)
 
 
 _PURPOSES = {
@@ -78,6 +91,9 @@ class RequestPhoneVerificationCode:
     account_id: UUID | None = None
     invitation_id: UUID | None = None
     employee_profile_id: UUID | None = None
+    registration_sms_consent: RegistrationSmsConsent | None = None
+    authorization_sms_consent: AuthorizationSmsConsent | None = None
+    auth_sms_message_type: str | None = None
 
 
 @dataclass(frozen=True)
@@ -160,6 +176,7 @@ class PhoneVerificationService:
         self._validate_request_types(request)
         phone = self.normalize_e164(request.phone)
         phone_digest = self._phone_digest(phone)
+        self._validate_legal_consent(request)
         try:
             async with self._session.begin_nested():
                 await self._validate_context(request)
@@ -213,6 +230,35 @@ class PhoneVerificationService:
                     verified_at=None,
                     locked_at=None,
                     cancelled_at=None,
+                    consumed_at=None,
+                    consumed_by_account_id=None,
+                    pd_consent_version=(
+                        PD_CONSENT_VERSION
+                        if request.registration_sms_consent is not None
+                        else None
+                    ),
+                    pd_consent_document_sha256=(
+                        PD_CONSENT_DOCUMENT_SHA256
+                        if request.registration_sms_consent is not None
+                        else None
+                    ),
+                    pd_consent_accepted_at=(
+                        request.now
+                        if request.registration_sms_consent is not None
+                        else None
+                    ),
+                    auth_sms_consent_version=(
+                        AUTH_SMS_CONSENT_VERSION
+                        if request.auth_sms_message_type is not None
+                        else None
+                    ),
+                    auth_sms_consent_copy_sha256=self._sms_copy_hash(
+                        request.auth_sms_message_type
+                    ),
+                    auth_sms_consent_accepted_at=(
+                        request.now if request.auth_sms_message_type is not None else None
+                    ),
+                    auth_sms_message_type=request.auth_sms_message_type,
                     created_at=request.now,
                     updated_at=request.now,
                 )
@@ -389,6 +435,46 @@ class PhoneVerificationService:
             raise InvalidPhoneVerificationRequest(
                 "invitation and employee profile are required"
             )
+
+    @staticmethod
+    def _validate_legal_consent(request: RequestPhoneVerificationCode) -> None:
+        if request.purpose in {"account_registration", "invitation_registration"}:
+            if (
+                request.registration_sms_consent is None
+                or request.authorization_sms_consent is not None
+                or request.auth_sms_message_type != REGISTRATION_OTP_MESSAGE_TYPE
+            ):
+                raise InvalidPhoneVerificationRequest(
+                    "registration consent is required"
+                )
+            require_registration_sms_consent(request.registration_sms_consent)
+            return
+        if request.purpose == "password_reset":
+            if (
+                request.registration_sms_consent is not None
+                or request.authorization_sms_consent is None
+                or request.auth_sms_message_type
+                != PASSWORD_RECOVERY_OTP_MESSAGE_TYPE
+            ):
+                raise InvalidPhoneVerificationRequest("SMS consent is required")
+            require_authorization_sms_consent(request.authorization_sms_consent)
+            return
+        if (
+            request.registration_sms_consent is not None
+            or request.authorization_sms_consent is not None
+            or request.auth_sms_message_type is not None
+        ):
+            raise InvalidPhoneVerificationRequest(
+                "consent is unavailable for this verification purpose"
+            )
+
+    @staticmethod
+    def _sms_copy_hash(message_type: str | None) -> bytes | None:
+        if message_type == REGISTRATION_OTP_MESSAGE_TYPE:
+            return REGISTRATION_SMS_COPY_SHA256
+        if message_type == PASSWORD_RECOVERY_OTP_MESSAGE_TYPE:
+            return PASSWORD_RECOVERY_SMS_COPY_SHA256
+        return None
 
     @staticmethod
     def normalize_e164(phone: str) -> str:

@@ -96,15 +96,41 @@ def invitation():
     )
 
 
+def sms_request_json():
+    return {
+        "invitation_code": "123456",
+        "phone": "+79990001122",
+        "personal_data_consent": True,
+        "personal_data_consent_version": "restos-pd-consent-2026-08-10-v1",
+        "authorization_sms_consent": True,
+        "authorization_sms_consent_version": "restos-auth-sms-consent-2026-08-10-v1",
+    }
+
+
 def test_unknown_invitation_is_non_enumerating(monkeypatch):
     http, _, sender = client(monkeypatch)
     with http:
         response = http.post(
             "/api/v1/auth/invitations/sms/request",
-            json={"invitation_code": "123456", "phone": "+79990001122"},
+            json=sms_request_json(),
         )
     assert response.status_code == 202
     assert response.json()["challenge_id"]
+    assert sender.messages == []
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_unknown_invitation_cannot_bypass_legal_version_gate(monkeypatch):
+    payload = sms_request_json()
+    payload["authorization_sms_consent_version"] = "stale-version"
+    http, _, sender = client(monkeypatch)
+    with http:
+        response = http.post(
+            "/api/v1/auth/invitations/sms/request",
+            json=payload,
+        )
+    assert response.status_code == 409
+    assert response.json() == {"detail": {"code": "legal_version_outdated"}}
     assert sender.messages == []
     assert response.headers["cache-control"] == "no-store"
 
@@ -126,7 +152,7 @@ def test_request_success_commits_and_returns_public_shape(monkeypatch):
     with http:
         response = http.post(
             "/api/v1/auth/invitations/sms/request",
-            json={"invitation_code": "123456", "phone": "+79990001122"},
+            json=sms_request_json(),
         )
     assert response.status_code == 202
     assert response.json()["challenge_id"] == str(expected.challenge_id)
@@ -154,7 +180,7 @@ def test_request_maps_controlled_errors(monkeypatch, error, status_code, code):
     with http:
         response = http.post(
             "/api/v1/auth/invitations/sms/request",
-            json={"invitation_code": "123456", "phone": "+79990001122"},
+            json=sms_request_json(),
         )
     assert response.status_code == status_code
     assert response.json() == {"detail": {"code": code}}
@@ -272,6 +298,9 @@ def registration_json():
         "device_challenge_id": str(uuid4()),
         "device_challenge_nonce": "bm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm4",
         "device_challenge_signature": "c2lnbmF0dXJl",
+        "document_set_version": "restos-account-legal-2026-08-10-v1",
+        "terms_version": "restos-terms-2026-08-10-v1",
+        "privacy_version": "restos-privacy-2026-08-10-v1",
     }
 
 
@@ -427,7 +456,7 @@ def test_unexpected_500_is_safe_and_not_cacheable(monkeypatch):
     with http:
         response = http.post(
             "/api/v1/auth/invitations/sms/request",
-            json={"invitation_code": "123456", "phone": "+79990001122"},
+            json=sms_request_json(),
         )
     assert response.status_code == 500
     assert response.json() == {"detail": {"code": "internal_error"}}

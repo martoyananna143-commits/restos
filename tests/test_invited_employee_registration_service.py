@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.infra.database.models.access_profile import AccessProfile
 from app.infra.database.models.account import Account, AccountDevice, AccountIdentity, AccountSession
+from app.infra.database.models.account_legal_acceptance import AccountLegalAcceptance
 from app.infra.database.models.company import Company
 from app.infra.database.models.employee_assignment import AssignmentScopeVenue, AssignmentVenue, EmployeeAssignment
 from app.infra.database.models.employee_profile import EmployeeProfile
@@ -32,6 +33,12 @@ from app.infra.database.models.venue import Venue
 from app.api.routers import account_invitation_auth as auth
 from app.internal.services.access_decision_service import AccessDecisionService
 from app.internal.services.account_session_service import AccountSessionService
+from app.internal.services.account_legal_contract import (
+    DOCUMENT_SET_VERSION,
+    PRIVACY_VERSION,
+    TERMS_VERSION,
+    AccountRegistrationAcceptance,
+)
 from app.internal.services.invited_employee_registration_service import (
     BcryptPasswordHasher,
     InvalidInvitedEmployeeRegistration,
@@ -204,6 +211,11 @@ def request(ctx, phone: str = PHONE, code: str = CODE, **changes):
         device_challenge_id=ctx.device_challenge.id,
         device_challenge_nonce=ctx.device_nonce,
         device_challenge_signature=signature, now=NOW,
+        legal_acceptance=AccountRegistrationAcceptance(
+            document_set_version=DOCUMENT_SET_VERSION,
+            terms_version=TERMS_VERSION,
+            privacy_version=PRIVACY_VERSION,
+        ),
     )
     values.update(changes)
     return RegisterInvitedEmployee(**values)
@@ -328,6 +340,15 @@ async def test_http_device_challenge_rejects_signature_with_wrong_invitation_id(
 @pytest.mark.asyncio
 async def test_success_is_complete_secret_safe_and_challenge_one_time(context):
     result = await make_service(context.session).register(request(context))
+    legal = (
+        await context.session.execute(
+            select(AccountLegalAcceptance).where(
+                AccountLegalAcceptance.account_id == result.account_id
+            )
+        )
+    ).scalar_one()
+    assert legal.context == "account_registration"
+    assert legal.document_set_version == DOCUMENT_SET_VERSION
     account = await context.session.get(Account, result.account_id)
     identity = (await context.session.execute(select(AccountIdentity).where(AccountIdentity.account_id == result.account_id))).scalar_one()
     assignment = await context.session.get(EmployeeAssignment, result.employee_assignment_id)
