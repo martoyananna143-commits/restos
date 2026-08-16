@@ -1,12 +1,12 @@
 """Schema contract tests for Account assessment management."""
 
-from sqlalchemy import Index
+from sqlalchemy import CheckConstraint, Index
 
 from app.infra.database.models import AssessmentAssignment, Base
 
 
 def test_management_reuses_existing_assignment_table():
-    assert len(Base.metadata.tables) == 40
+    assert len(Base.metadata.tables) == 55
     assert "assessment_assignments" in Base.metadata.tables
 
 
@@ -33,6 +33,26 @@ def test_active_assignment_partial_unique_index_is_exact():
     ]
     assert str(index.dialect_options["postgresql"]["where"]) == (
         "status IN ('assigned', 'in_progress')"
+    )
+
+
+def test_assignment_purpose_separates_employee_evaluation_and_walkthrough():
+    purpose = AssessmentAssignment.__table__.c.purpose
+    venue = AssessmentAssignment.__table__.c.venue_id
+    assert purpose.nullable is False
+    assert purpose.server_default.arg == "employee_evaluation"
+    assert venue.nullable is True
+    constraints = {
+        value.name: str(value.sqltext)
+        for value in AssessmentAssignment.__table__.constraints
+        if isinstance(value, CheckConstraint) and value.name
+    }
+    assert constraints["ck_assessment_assignments_purpose"] == (
+        "purpose IN ('employee_evaluation', 'manager_measurement', "
+        "'operational_walkthrough')"
+    )
+    assert constraints["ck_assessment_assignments_operational_venue"] == (
+        "purpose != 'operational_walkthrough' OR venue_id IS NOT NULL"
     )
 
 

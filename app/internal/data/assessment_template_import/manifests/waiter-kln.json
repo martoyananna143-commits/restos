@@ -1,0 +1,1352 @@
+{
+  "schema_version": 1,
+  "source": {
+    "filename": "НОВЫЙ ИСПРАВЛЕННЫЙ КЛН-корректировка официант - Камелот, новый .xlsx",
+    "sha256": "e0e34ffcb0304fc3db9f0c9b790acc8613d54cc76488ef1b2bba6d08b584048a",
+    "provenance": "read_only_methodology_source"
+  },
+  "template": {
+    "code": "waiter-kln",
+    "name": "КЛН официанта",
+    "activity_type": "evaluation",
+    "description": "Company-private draft imported from reviewed methodology source.",
+    "methodology": {
+      "code": "waiter-kln-methodology",
+      "title": "КЛН официанта",
+      "body": "Взвешенная оценка по критериям Да/Нет. Отсутствующие исторические результаты и персональные данные не импортируются.",
+      "version": 1
+    },
+    "scoring": {
+      "algorithm": "weighted_v1",
+      "version": 1,
+      "config": {
+        "rounding": "half_up",
+        "score_scale": 100
+      }
+    },
+    "sections": [
+      {
+        "code": "vstrecha-gostya",
+        "title": "Встреча гостя",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "vneshniy-vid-oficianta-sootvestvuet-standartu-kompanii",
+            "prompt": "Внешний вид официанта соотвествует стандарту компании",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-druzhelyuben-gostepreimen-i-radushen",
+            "prompt": "Официант дружелюбен, гостепреимен и радушен",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-privetsvuet-gostey-v-zavedenii-ustanavlivaet-vizualnyy-kontakt-propuskaet-gostey",
+            "prompt": "Официант приветсвует гостей в заведении, устанавливает визуальный контакт, пропускает гостей на пути",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-predstavilsya-pered-gostyami-i-predlozhil-nachat-zakaz",
+            "prompt": "Официант представился перед гостями и предложил начать заказ",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-derzhit-zritelnyy-kontakt-s-gostem",
+            "prompt": "Официант держит зрительный контакт с гостем",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-prinosit-napitki-v-techenii-3-minut",
+            "prompt": "Официант приносит напитки в течении 3 минут",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-ispolzuet-tehniku-small-talk-s-gostem-esli-eto-umestno",
+            "prompt": "Официант использует технику Small Talk с гостем, если это уместно",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "obschenie-oficianta-s-gostem-vedetsya-v-partnerskoy-i-vezhlivoy-forme",
+            "prompt": "Общение официанта с гостем ведется в партнерской и вежливой форме",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "prinyatie-zakaza",
+        "title": "Принятие заказа",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "oficiant-podoshel-k-stolu-srazu-v-techenii-1-2-minut",
+            "prompt": "Официант подошел к столу сразу (в течении 1-2 минут)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-obschaetsya-s-gostyami-legko-sozdaet-druzhelyubnuyu-atmosferu-rech-razgovornaya",
+            "prompt": "Официант общается с гостями легко, создает дружелюбную атмосферу, речь разговорная",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "5.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "5.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "5.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-ispolzuet-voronku-prodazh-tehniki-prodazh",
+            "prompt": "Официант использует воронку продаж, техники продаж",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "economics",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-predlagaet-pozicii-go-list",
+            "prompt": "Официант предлагает позиции go-list",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "economics",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-ispolzuet-krasochnoe-opisanie",
+            "prompt": "Официант использует красочное описание",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "5.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "5.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "5.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-utochnyaet-u-gostey-allergeny",
+            "prompt": "Официант уточняет у гостей аллергены",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-uverenno-otvechaet-na-voprosy-po-menyu",
+            "prompt": "Официант уверенно отвечает на вопросы по меню",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-dubliruet-zakaz-dlya-gostey",
+            "prompt": "Официант дублирует заказ для гостей",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-ozvuchivaet-vremya-ozhidaniya-blyuda",
+            "prompt": "Официант озвучивает время ожидания блюда",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-utochnyaet-kursy-podachi-dlya-blyud-i-napitkov",
+            "prompt": "Официант уточняет курсы подачи для блюд и напитков",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-zabiraet-menyu-po-umolchaniyu",
+            "prompt": "Официант забирает меню по умолчанию",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-blagodarit-gostey-za-zakaz-i-zhelaet-priyatnogo-otdyha",
+            "prompt": "Официант благодарит гостей за заказ и желает приятного отдыха",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-snimaet-raciyu-pri-prieme-zakaza",
+            "prompt": "Официант снимает рацию при приеме заказа",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-utochnyaet-po-edinym-i-razdelnym-schetam-v-nachale-obsluzhivaniya",
+            "prompt": "Официант уточняет по единым и раздельным счетам в начале обслуживания",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-zabivaet-zakaz-v-mobilnyy-oficiant",
+            "prompt": "Официант забивает заказ в мобильный официант",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "obsluzhivanie-gostya",
+        "title": "Обслуживание гостя",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "oficiant-rabotaet-po-shagam-servisa",
+            "prompt": "Официант работает по шагам сервиса",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-podderzhivaet-chistotu-stola-vo-vremya-obsluzhivaniya-svoevremenno-zachischaya-st",
+            "prompt": "Официант поддерживает чистоту стола во время обслуживания, своевременно зачищая стол",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-osuschestvlyaet-servirovku-pered-podachey-blyud-napitkov",
+            "prompt": "Официант осуществляет сервировку перед подачей блюд/напитков",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-podaet-blyuda-otkrytoy-rukoy",
+            "prompt": "Официант подает блюда открытой рукой",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-rasskazyvaet-gostyam-legendy-istorii-o-blyudah-i-napitkah",
+            "prompt": "Официант рассказывает гостям легенды/истории о блюдах и напитках",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": null,
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": null,
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": null,
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": null,
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-razlivaet-napitki-dlya-kazhdogo-gostya-esli-eto-udobno-gostyam",
+            "prompt": "Официант разливает напитки для каждого гостя, если это удобно гостям",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-delaet-svoevremennyy-chek-bek-soblyudaya-komfort-gostya-ne-beret-chek-bek-vo-vrem",
+            "prompt": "Официант делает своевременный чек-бек, соблюдая комфорт гостя (не берет чек-бэк во время общения гостей или во время того, как гость ест)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-peredaet-os-ot-gostya-menedzheru",
+            "prompt": "Официант передает ОС от гостя менеджеру",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-sovershaet-dop-prodazhi-obnovlyaet-napitki-predlagaet-dop-hleb-sous",
+            "prompt": "Официант совершает доп.продажи (обновляет напитки/предлагает доп хлеб/соус)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "economics",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-umeet-identificirovat-emocii-gostey-operedelyaet-tipologiyu-gostya-i-motiv-posesc",
+            "prompt": "Официант умеет идентифицировать эмоции гостей, опеределяет типологию гостя и мотив посещения",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": null,
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": null,
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": null,
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-reshaet-konflikty-po-tehnikam-feel",
+            "prompt": "Официант решает конфликты по техникам FEEL",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-peredaet-menedzheru-informaciyu-o-konflikte",
+            "prompt": "Официант передает менеджеру информацию о конфликте",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-svoevremenno-vybivaet-i-vynosit-kursy",
+            "prompt": "Официант своевременно выбивает и выносит курсы",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-predlagaet-desert-i-didzhestiv",
+            "prompt": "Официант предлагает десерт и диджестив",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "raschet-gostya",
+        "title": "Расчет Гостя",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "oficiant-utochnyaet-tip-oplaty-nalichnye-ili-karta",
+            "prompt": "Официант уточняет тип оплаты (наличные или карта)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-proizvodit-raschet-gostya-posle-pechati-fiskalnogo-cheka-v-techenii-3-h-minut",
+            "prompt": "Официант производит расчет гостя после печати фискального чека в течении 3-х минут",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-govorit-v-raciyu-hostes-chto-stol-raschityvaetsya",
+            "prompt": "Официант говорит в рацию хостес, что стол расчитывается",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-s-ulybkoy-i-ustanoviv-zritelnyy-kontakt-proschaetsya-s-gostem",
+            "prompt": "Официант с улыбкой и установив зрительный контакт прощается с гостем",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-ne-ubiraet-svoy-stol-ves-fokus-na-uhodyaschego-gostya",
+            "prompt": "Официант не убирает свой стол, весь фокус на уходящего гостя",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-ubiraet-i-podgotvalivaet-stol-dlya-gostey-v-techenii-5-ti-minut",
+            "prompt": "Официант убирает и подготваливает стол для гостей в течении 5-ти минут",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

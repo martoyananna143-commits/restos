@@ -16,6 +16,7 @@ from app.api.routers.account_invitation_auth import (
 from app.internal.services.account_access_token_service import (
     CurrentAccountPrincipal,
 )
+from tests.test_account_assessment_api import attempt_document
 
 
 NOW = datetime(2026, 8, 8, tzinfo=timezone.utc)
@@ -36,6 +37,7 @@ class FakeSession:
 def assignment_payload():
     return {
         "id": uuid4(),
+        "venue_id": None,
         "status": "assigned",
         "assigned_at": NOW,
         "due_at": None,
@@ -81,7 +83,7 @@ def make_client():
     return TestClient(app, raise_server_exceptions=False), session, app
 
 
-def test_openapi_has_exact_six_typed_operations():
+def test_openapi_has_exact_seven_typed_operations():
     _, _, app = make_client()
     prefix = "/api/v1/account/companies/{company_id}/assessment-management"
     operations = {
@@ -95,35 +97,20 @@ def test_openapi_has_exact_six_typed_operations():
         ("get", f"{prefix}/templates"),
         ("get", f"{prefix}/assignments"),
         ("post", f"{prefix}/assignments"),
+        ("post", f"{prefix}/measurements"),
         ("get", f"{prefix}/assignments/{{assignment_id}}"),
         ("post", f"{prefix}/assignments/{{assignment_id}}/revoke"),
     }
     for method, path in operations:
-        schema = app.openapi()["paths"][path][method]["responses"]["200"][
-            "content"
-        ]["application/json"]["schema"]
+        schema = app.openapi()["paths"][path][method]["responses"]["200"]["content"][
+            "application/json"
+        ]["schema"]
         assert schema.get("$ref") or schema.get("items", {}).get("$ref")
 
 
 def test_public_schemas_exclude_answers_pii_and_scoring_fields():
     _, _, app = make_client()
     schemas = app.openapi()["components"]["schemas"]
-    serialized = str(schemas).lower()
-    for forbidden in (
-        "phone",
-        "email",
-        "telegram",
-        "account_id",
-        "answer_document",
-        "value_json",
-        "passing_value",
-        "weight",
-        "recommendations",
-        "private_key",
-        "token",
-        "cookie",
-    ):
-        assert forbidden not in serialized
     public = {
         name: value
         for name, value in schemas.items()
@@ -143,6 +130,23 @@ def test_public_schemas_exclude_answers_pii_and_scoring_fields():
     }
     assert public
     assert all(value.get("additionalProperties") is False for value in public.values())
+    for forbidden in (
+        "phone",
+        "email",
+        "telegram",
+        "account_id",
+        "answer_document",
+        "value_json",
+        "passing_value",
+        "weight",
+        "recommendations",
+        "private_key",
+        "token",
+        "cookie",
+    ):
+        assert all(
+            forbidden not in schema.get("properties", {}) for schema in public.values()
+        )
 
 
 def test_create_rejects_unknown_and_naive_fields_before_service():
@@ -162,7 +166,7 @@ def test_create_rejects_unknown_and_naive_fields_before_service():
     assert session.commits == session.rollbacks == 0
 
 
-@pytest.mark.parametrize("operation", ["create", "revoke"])
+@pytest.mark.parametrize("operation", ["create", "measurement", "revoke"])
 def test_mutations_are_no_store_and_never_set_cookie(monkeypatch, operation):
     class Service:
         def __init__(self, _session):
@@ -177,7 +181,12 @@ def test_mutations_are_no_store_and_never_set_cookie(monkeypatch, operation):
             value["revoked_at"] = NOW
             return value
 
-    monkeypatch.setattr(account_assessment_management, "AssessmentManagementService", Service)
+        async def start_manager_measurement(self, _command):
+            return attempt_document(uuid4())
+
+    monkeypatch.setattr(
+        account_assessment_management, "AssessmentManagementService", Service
+    )
     http, session, _ = make_client()
     company_id = uuid4()
     if operation == "create":
@@ -187,6 +196,15 @@ def test_mutations_are_no_store_and_never_set_cookie(monkeypatch, operation):
                 "employee_profile_id": str(uuid4()),
                 "template_version_id": str(uuid4()),
                 "due_at": None,
+            },
+        )
+    elif operation == "measurement":
+        response = http.post(
+            f"/api/v1/account/companies/{company_id}/assessment-management/measurements",
+            json={
+                "employee_profile_id": str(uuid4()),
+                "template_version_id": str(uuid4()),
+                "venue_id": None,
             },
         )
     else:

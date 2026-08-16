@@ -1,0 +1,3431 @@
+{
+  "schema_version": 1,
+  "source": {
+    "filename": "SM, Бланк оценки сервиса ресторана, Камелот - новый .xlsx",
+    "sha256": "13b24f5ebf320d7bc7ed2c0313dd99b8b0f44c8408ce688c7e3406f47dea8e4d",
+    "provenance": "read_only_methodology_source"
+  },
+  "template": {
+    "code": "restaurant-service-walkthrough",
+    "name": "Оценка сервиса ресторана",
+    "activity_type": "walkthrough",
+    "description": "Company-private operational walkthrough from reviewed methodology source.",
+    "methodology": {
+      "code": "restaurant-service-walkthrough-methodology",
+      "title": "Оценка сервиса ресторана",
+      "body": "Каждое завершённое заполнение является отдельным обходом. Исторические ответы, даты, комментарии и персональные данные не импортируются.",
+      "version": 1
+    },
+    "scoring": {
+      "algorithm": "weighted_v1",
+      "version": 1,
+      "config": {
+        "rounding": "half_up",
+        "score_scale": 100
+      }
+    },
+    "sections": [
+      {
+        "code": "service-design-prostranstvo-zal",
+        "title": "Service Design · Пространство зал",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "vse-sotrudniki-sootvetstvuyut-standartu-vneshnego-vida-menedzher-smeny-hostes-oficiant-bar",
+            "prompt": "Все сотрудники соответствуют стандарту внешнего вида: менеджер смены, хостес, официант, бармен, бар-менеджер, старшие бармены, клининг",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "vse-sotrudniki-rabotayut-s-raciyami-i-mobilnym-oficiantom-raciya-est-na-razdache-kuhni-i-u",
+            "prompt": "Все сотрудники работают с рациями и мобильным официантом - рация есть на раздаче кухни и у бармена, отдающего заказы в стол",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "ubornye-podgotovleny-po-chek-listu-v-techenie-dnya-podderzhivaetsya-sostoyanie-po-chek-lis",
+            "prompt": "Уборные подготовлены по чек- листу, в течение дня поддерживается состояние по чек-листу",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "zal-gotov-do-otkrytiya-restorana-po-standartu-sootvetstviya-chek-listu-otkrytiya-zakrytiya",
+            "prompt": "Зал готов до открытия ресторана по стандарту соответствия, чек-листу открытия/ закрытия",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-techenie-smeny-vypolneny-zadachi-po-cheku-dnya-po-zalu-i-baru",
+            "prompt": "В течение смены выполнены задачи по чеку дня по залу и бару",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-techenie-smeny-naznacheny-dezhurnye-po-rabote-s-razdachey-bara-kuhni-bekom",
+            "prompt": "В течение смены назначены дежурные по работе с раздачей бара/ кухни, бэком",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "barnaya-zona-gotova-po-chek-listu-otkrytiya-zakrytiya-standartu-sootvetstviya",
+            "prompt": "Барная зона готова по чек-листу открытия/ закрытия, стандарту соответствия",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-konce-smeny-zal-restorana-podgotovlen-na-30-po-chek-listu",
+            "prompt": "В конце смены зал ресторана подготовлен на 30% по чек- листу",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-design-prostranstvo-oborudovanie",
+        "title": "Service Design · Пространство оборудование",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "sanitarnoe-sostoyanie-ho-udovletvoritelnoe-zagryazneniya-otsutstvuyut",
+            "prompt": "Санитарное состояние ХО удовлетворительное, загрязнения отсутствуют",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "food_safety",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sostoyanie-uplotnitelnyh-rezinok-udovletvoritelnoe",
+            "prompt": "Состояние уплотнительных резинок удовлетворительное",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "uborka-i-razmorozka-ho-proizvoditsya-v-sootvetstvii-s-grafikom",
+            "prompt": "Уборка и разморозка ХО производится в соответствии с графиком",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "otsutstvuet-perezatarka-v-ho-dostup-ko-vsey-produkcii-svobodnyy",
+            "prompt": "Отсутствует перезатарка в ХО, доступ ко всей продукции свободный",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "produkciya-hranitsya-v-sootvetstvii-s-pravilami-tovarnogo-sosedstva",
+            "prompt": "Продукция хранится в соответствии с правилами товарного соседства",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "food_safety",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "soblyudaetsya-pravilo-rotacii-syrya-po-principu-fifo",
+            "prompt": "Соблюдается правило ротации сырья по принципу FIFO",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "food_safety",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "kazhdyy-pf-imeet-markirovku-s-ukazaniem-naimenovaniya-daty-vremeni",
+            "prompt": "Каждый пф имеет маркировку с указанием наименования, даты, времени",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "soblyudeny-sroki-godnosti-pischevoy-produkcii-i-pf-informaciya-po-srokam-godnosti-razmesch",
+            "prompt": "Соблюдены сроки годности пищевой продукции и пф, информация по срокам годности размещена на холодильном оборудовании",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "vsya-peretarennaya-i-vskrytaya-produkciya-zakryta-kryshkoy",
+            "prompt": "Вся перетаренная и вскрытая продукция закрыта крышкой",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "odnorazovaya-i-vtorichnaya-upakovka-ne-ispolzuetsya-dlya-hraneniya-syrya-i-polufabrikatov",
+            "prompt": "Одноразовая и вторичная упаковка не используется для хранения сырья и полуфабрикатов",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-transportnoy-tare-nichego-ne-hranitsya-i-ona-ne-ispolzuetsya",
+            "prompt": "В транспортной таре ничего не хранится и она не используется",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-design-prostranstvo-razdevalka",
+        "title": "Service Design · Пространство раздевалка",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "razdevalka-ne-zahlamlena",
+            "prompt": "Раздевалка не захламлена",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "organizovano-razdelnoe-hranenie-sanitarnoy-i-verhney-odezhdy",
+            "prompt": "Организовано раздельное хранение санитарной и верхней одежды",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "food_safety",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "obuv-ne-hranitsya-na-polu-hranenie-organizovano-na-polke-v-shkafchike",
+            "prompt": "Обувь не хранится на полу, хранение организовано на полке (в шкафчике)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "utyug-gladilnaya-doska-i-zerkalo-dlya-personala-v-nalichii-ispravny",
+            "prompt": "Утюг, гладильная доска и зеркало для персонала в наличии, исправны",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-design-prostranstvo-san-uzel-personal",
+        "title": "Service Design · Пространство сан узел персонал",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "na-vhode-v-san-uzel-imeetsya-instrukciya-po-posescheniyu-san-uzla-est-kryuchok-dlya-udobst",
+            "prompt": "На входе в сан узел имеется инструкция по посещению сан узла, есть крючок для удобства смены санитарной одежды",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "food_safety",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sotrudniki-znayut-kakim-obrazom-proishodit-poseschenie-tualeta",
+            "prompt": "Сотрудники знают каким образом происходит посещение туалета",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "imeetsya-rakovina-dlya-mytya-ruk",
+            "prompt": "Имеется раковина для мытья рук",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "imeetsya-dispenser-s-mylom-promarkirovan-sredstva-v-dostatochnnom-kol-ve",
+            "prompt": "Имеется диспенсер с мылом (промаркирован, средства в достаточнном кол-ве)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "imeetsya-dispenser-s-dez-sredstvom-promarkirovan-sredstva-v-dostatochnnom-kol-ve",
+            "prompt": "Имеется диспенсер с дез средством (промаркирован, средства в достаточнном кол-ве)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sotrudniki-znayut-kakim-obrazom-proishodit-obrabotka-ruk-posle-posescheniya-tualeta",
+            "prompt": "Сотрудники знают, каким образом происходит обработка рук после посещения туалета",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "est-odnorazovye-polotenca-dispensenr-dlya-polotenec-zapolnen-minimum-na-polovinu-sushilka",
+            "prompt": "Есть одноразовые полотенца (диспенсенр для полотенец заполнен минимум на половину) /сушилка для рук (сушилка находится в рабочем состоянии)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "imeetsya-beskontaktnoe-vedro-s-kryshkoy-vedro-promarkirovano-dlya-tbo",
+            "prompt": "Имеется бесконтактное ведро с крышкой (ведро промаркировано для ТБО)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-san-uzle-podderzhivaetsya-chistota-steny-pol-chistye-unitaz-chistyy-imeetsya-v-nalichii",
+            "prompt": "В сан узле поддерживается чистота: стены, пол чистые, унитаз чистый (имеется в наличии ершик)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "dlya-uborki-tualeta-vydelen-uborochny-inventar-shvabra-i-vedro",
+            "prompt": "Для уборки туалета выделен уборочнй инвентарь, швабра и ведро",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-design-prostranstvo-bar",
+        "title": "Service Design · Пространство бар",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "razdelochnye-stoly-polki-vitriny-mesta-dlya-hraneniya-barnoy-posudy-chistye-imeyut-celostn",
+            "prompt": "Разделочные столы, полки, витрины, места для хранения барной посуды чистые, имеют целостное гигиеническое покрытие.",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "barnaya-stoyka-bez-povrezhdeniy-chistaya-obstavlena-v-sootvetstvii-so-standartami",
+            "prompt": "Барная стойка без повреждений, чистая, обставлена в соответствии со стандартами",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "otsutstvie-lishnih-predmetov-na-barnoy-stoyke-nichego-net-lishnego-dlya-vzglyada-gostya",
+            "prompt": "Отсутствие лишних предметов на барной стойке, ничего нет лишнего для взгляда гостя",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "vse-provoda-ubrany-net-pilotov-elektrooborudovanie-ne-predstavlyaet-ugrozy-dlya-zhizni-i-z",
+            "prompt": "Все провода убраны, нет пилотов, электрооборудование не представляет угрозы для жизни и здоровья сотрудников и/или гостей. Освещение работает полностью",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "est-mesto-dlya-myt-ruk-rakovina-oborudovana-dispenserom-dlya-myla-dispenserom-dlya-dez-sre",
+            "prompt": "Есть место для мыть рук: раковина оборудована диспенсером для мыла, диспенсером для дез средства, полотенцами для рук и ведром с педалью)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "barnoe-i-kofeynoe-oborudovanie-kofemashina-kofemolka-sokovyzhimalka-v-rabochem-sostoyanii",
+            "prompt": "Барное и кофейное оборудование (кофемашина, кофемолка, соковыжималка) в рабочем состоянии. Оборудование чистое",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "barnyy-inventar-chistyy-nedeformirovannyy-promarkirovan-i-ispolzuetsya-soglasno-instrukcii",
+            "prompt": "Барный инвентарь чистый, недеформированный, промаркирован и используется согласно инструкции",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "him-sredstva-dlya-obsluzhivaniya-kofe-mashiny-v-nalichii",
+            "prompt": "Хим. средства для обслуживания кофе-машины в наличии",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "pol-steny-stellazhi-chistye-proizvoditsya-uborka-soglasno-grafika-vo-vremya-generalnoy-ubo",
+            "prompt": "Пол, стены, стеллажи чистые, производится уборка согласно графика. Во время генеральной уборки производится разморозка и мытье холодильников",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "otkrytie-i-zakrytie-provoditsya-v-sootvetstvii-s-chl",
+            "prompt": "Открытие и закрытие проводится в соответствии с ЧЛ",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "vydeleno-mesto-dlya-hranenie-lichnyh-veschey-otsutstvuet-hranenie-lichnyh-veschey-na-polka",
+            "prompt": "Выделено место для хранение личных вещей, отсутствует хранение личных вещей на полках и производственных столах",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "soblyudeny-usloviya-hraneniya-imeetsya-kontrolnyy-termometr-i-vedetsya-zhurnal-ucheta-temp",
+            "prompt": "Соблюдены условия хранения, имеется контрольный термометр и ведется журнал учета температруры",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "vsya-produkciya-hranitsya-v-bare-v-gastroemkostyah-s-kryshkoy-banki-s-chaem-zakryty-kryshk",
+            "prompt": "Вся продукция хранится в баре в гастроемкостях с крышкой. Банки с чаем закрыты крышкой. Емкости для хранения не имеют сколов и недеформированы",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sotrudniki-znayut-sroki-hraneniya-produkcii-i-pf-vyborochno-2-pozicii",
+            "prompt": "Сотрудники знают сроки хранения продукции и ПФ (выборочно 2 позиции)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-nalichii-aktualnyy-ttk-napitkov-ttk-razmeschen-v-zone-vidimosti-sotrudnikov",
+            "prompt": "В наличии актуальный ТТК напитков, ТТК размещен в зоне видимости сотрудников",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "proveden-zamer-skorosti-otdachi-2-3-pozicii-vremya-sootvetstvuet-tt",
+            "prompt": "Проведен замер скорости отдачи (2-3 позиции). Время соответствует TT",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sotrudniki-znayut-tehnologiyu-prigotovleniya-blyud-i-ingridienty-vyborochno-2-pozicii",
+            "prompt": "Сотрудники знают технологию приготовления блюд и ингридиенты (выборочно 2 позиции)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "otsutstvuet-stop-list-ili-kazhdaya-poziciya-v-nem-obosnovana-eto-yavlyaetsya-zaplanirovann",
+            "prompt": "Отсутствует стоп-лист или каждая позиция в нем обоснована (это является запланированным решением БМ и согласовано с управляющим)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sotrudniki-vladeyut-informaciey-s-poslednego-sobraniya",
+            "prompt": "Сотрудники владеют информацией с последнего собрания",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-nalichii-aktualnye-akty-spisaniya-i-peremescheniya",
+            "prompt": "В наличии актуальные акты списания и перемещения",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sotrudniki-izgotavlivayut-pf-cherez-vesy",
+            "prompt": "Сотрудники изготавливают ПФ через весы",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-design-shagi-servisa-bronirovanie",
+        "title": "Service Design · Шаги сервиса: бронирование",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "pri-bronirovanii-sotrudnik-privetstvuet-gostya",
+            "prompt": "При бронировании сотрудник приветствует гостя",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sotrudnik-radushen-s-gostem-vo-vremya-telefonnogo-bronirovaniya",
+            "prompt": "Сотрудник радушен с гостем во время телефонного бронирования",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sotrudnik-vyyavil-vsyu-informaciyu-dlya-broni-motiv-vizita-kol-vo-gostey-kontakty",
+            "prompt": "Сотрудник выявил всю информацию для брони (мотив визита, кол-во гостей, контакты)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sotrudnik-predlozhil-sdelat-predzakaz-i-prinyal-ego-po-standartu-prinyatiya-zakaza",
+            "prompt": "Сотрудник предложил сделать предзаказ и принял его по стандарту принятия заказа",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sotrudnik-produbliroval-informaciyu-po-broni-i-predzakazu-pri-ego-nalichii",
+            "prompt": "Сотрудник продублировал информацию по брони и предзаказу при его наличии",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sotrudnik-sootvetstvuet-klyuchevym-harakteristikam-brenda-pozitivnyy-veselyy-vedet-legkiy",
+            "prompt": "Сотрудник соответствует ключевым характеристикам бренда (позитивный, веселый, ведет легкий разговор с гостем, почти по свойски)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sotrudnik-rasskazal-pro-sistemu-depozita",
+            "prompt": "Сотрудник рассказал про систему депозита",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-design-shagi-servisa-vstrecha-gostya",
+        "title": "Service Design · Шаги сервиса: встреча гостя",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "sotrudnik-privetstvuet-gostya",
+            "prompt": "Сотрудник приветствует гостя",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sotrudnik-vyyavlyaet-po-standartu-informaciyu-po-bronirovaniyu",
+            "prompt": "Сотрудник выявляет по стандарту информацию по бронированию",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-beret-chek-bek-na-vyhode",
+            "prompt": "Хостес берет чек-бек на выходе",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-provodit-ekskursiyu-i-delaet-rasskaz-o-restorane",
+            "prompt": "Хостес проводит экскурсию и делает рассказ о ресторане",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-pomogaet-s-vyborom-aperitiva",
+            "prompt": "Официант помогает с выбором аперитива",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-design-shagi-servisa-prinyatie-zakaza-obsluzhivanie-raschet",
+        "title": "Service Design · Шаги сервиса: принятие заказа/обслуживание/расчет",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "oficiant-rabotaet-po-standartam-kompanii",
+            "prompt": "Официант работает по стандартам компании",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-primenyaet-tehniki-prodazh-dlya-uvelicheniya-napolnyaemosti-cheka",
+            "prompt": "Официант применяет техники продаж для увеличения наполняемости чека",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-predlagaet-go-list",
+            "prompt": "Официант предлагает GO- лист",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-obschaetsya-s-gostem-legko-v-razgovornom-stile-ponimaet-i-chuvstvuet-tipologiyu-g",
+            "prompt": "Официант общается с гостем легко, в разговорном стиле, понимает и чувствует типологию гостей",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oficiant-rekomenduet-gostyu-menyu-s-krasochnym-opisaniem-mozhet-sorientirovat-po-menyu",
+            "prompt": "Официант рекомендует гостю меню с красочным описанием, может сориентировать по меню",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-design-lyubov",
+        "title": "Service Design · Любовь",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "v-restorane-vse-sotrudniki-gostepriimny",
+            "prompt": "В ресторане все сотрудники гостеприимны",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-est-pozitivnaya-simvolika-i-simvolizaciya-uspeha",
+            "prompt": "В ресторане есть позитивная символика и символизация успеха",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-konflikty-reshayutsya-effektivno-gosti-uhodyat-vlyublennymi-v-restoran-i-sotru",
+            "prompt": "В ресторане конфликты решаются эффективно, гости уходят влюбленными в ресторан и сотрудников",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-menedzher-reshaet-konflikt-vnutri-komandy-effektivno",
+            "prompt": "В ресторане менеджер решает конфликт внутри команды эффективно",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-design-vkus",
+        "title": "Service Design · Вкус",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "v-restorane-razrabotany-fb-bb-wb",
+            "prompt": "В ресторане разработаны FB/ BB/ WB",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-zapuscheno-obuchenie-po-vkusu-cherez-fbc",
+            "prompt": "В ресторане запущено обучение по вкусу через FBC",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-zapuschena-attestaciya-sotrudnikov-po-vkusu-cherez-menyu-zamer",
+            "prompt": "В ресторане запущена аттестация сотрудников по вкусу через меню -замер",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "blyudo-vyhodit-na-stol-po-standartu-v-bare-net-uvelicheniya-vremeni-ozhidaniya-blyud-ili-n",
+            "prompt": "Блюдо выходит на стол по стандарту, в баре нет увеличения времени ожидания блюд или напитков",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-design-prodazhi",
+        "title": "Service Design · Продажи",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "v-restorane-sformirovany-plany-po-prodazham-s-celevymi-pokazatelyami-napolnyaemost-i-gou-l",
+            "prompt": "В ресторане сформированы планы по продажам с целевыми показателями (наполняемость и гоу лист)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-sformirovan-effektivnyy-go-list",
+            "prompt": "В ресторане сформирован эффективный GO- лист",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-sformirovany-reytingi-po-prodazham-oni-vyvedeny-na-dashbordy-na-inf-doske",
+            "prompt": "В ресторане сформированы рейтинги по продажам, они выведены на дашборды на инф доске",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-aktiviruet-prodazhi-na-smene-znaet-napolnyaemost-stolov-obschaetsya-s-oficiantam",
+            "prompt": "Менеджер активирует продажи на смене (знает наполняемость столов, общается с официантам по вариации доп. продаж)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-zapuskayutsya-geymifikaciya-konkurs-po-uvelicheniyu-prodazh-na-smenu-ili-drugo",
+            "prompt": "В ресторане запускаются геймификация, конкурс по увеличению продаж на смену или другой период",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "servisnye-sotrudniki-rabotayut-s-chekom-na-uvelichenie-napolnyaemosti-cheka",
+            "prompt": "Сервисные сотрудники работают с чеком на увеличение наполняемости чека",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "servisnye-sotrudniki-znayut-i-rekomenduyut-go-list",
+            "prompt": "Сервисные сотрудники знают и рекомендуют GO- лист",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-zapuschena-effektivnaya-motivaciya-po-prodazham-na-urovne-menedzhera-i-servisn",
+            "prompt": "В ресторане запущена эффективная мотивация по продажам на уровне менеджера и сервисных сотрудников",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "upravlyayuschiy-i-menedzher-ezhednevno-delayut-otchety-v-mozg",
+            "prompt": "Управляющий и менеджер ежедневно делают отчеты в MOZG",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-management-postanovka",
+        "title": "Service Management · Постановка",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "upravlyayuschiy-provodit-vstrechi-s-menedzherami-ezhenedelno",
+            "prompt": "Управляющий проводит встречи с менеджерами еженедельно",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-provodit-sobranie-smeny-itci-po-pravilam-kompanii",
+            "prompt": "Менеджер проводит собрание смены ITCI по правилам компании",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-provodit-itci-dlya-vecherney-smeny-promezhutochnye-itogi-smeny",
+            "prompt": "Менеджер проводит ITCI для вечерней смены (промежуточные итоги смены)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-prohodyat-siti-obschee-sobranie-restorana-ezhemesyachno-data-izvestna-zaranee",
+            "prompt": "В ресторане проходят SITI (общее собрание ресторана) ежемесячно, дата известна заранее и озвучена сотрудникам",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "upravlyayuschiy-kontroliruet-rabotu-sotrudnikov-s-mobilnym-oficiantom-i-raciyami",
+            "prompt": "Управляющий контролирует работу сотрудников с мобильным официантом и рациями",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "upravlyayuschiy-rabotaet-s-soprotivleniem-pri-vnedrenii-novogo",
+            "prompt": "Управляющий работает с сопротивлением при внедрении нового",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sformirovan-i-rabotaet-treker-upravlyayuschego-na-nedelyu-v-bitrix24",
+            "prompt": "Сформирован и работает трекер управляющего на неделю в Bitrix24",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sformirovan-i-rabotaet-treker-menedzhera-i-bm-na-den-upravlyayuschiy-neskolko-raz-v-den-os",
+            "prompt": "Сформирован и работает трекер менеджера и БМ на день, управляющий несколько раз в день осуществляет сверку работы по трекеру менеджера и БМ",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-management-obuchenie",
+        "title": "Service Management · Обучение",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "kalendar-obucheniya-aktualnyy-zpolnyaetsya-ezhenedelno-po-sleduyuschim-aktivnostyam-kln-it",
+            "prompt": "Календарь обучения актуальный, зполняется еженедельно по следующим активностям (КЛН, ITCI, кросс-тренинг, мобильный тренинг, мотивационная встреча, обучение вкусу кухни и бара)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "kln-korrektirovka-zapolnyaetsya-ezhednevno-na-vseh-sotrudnikov-smeny",
+            "prompt": "КЛН корректировка заполняется ежедневно на всех сотрудников смены",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-konce-nedeli-menedzher-provodit-vstrechu-s-oficiantami-po-pokazatelyam-i-promezhutochnom",
+            "prompt": "В конце недели менеджер проводит встречу с официантами по показателям и промежуточному проценту",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "veduschie-kross-treninga-attestovany-i-obucheny",
+            "prompt": "Ведущие кросс тренинга аттестованы и обучены",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-kompanii-zapuscheny-master-klassy-po-dopolnitelnomu-obuchenyu",
+            "prompt": "В компании запущены мастер-классы по дополнительному обученю",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-management-kontrol",
+        "title": "Service Management · Контроль",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "v-kompanii-treker-upravlyayuschego-vedetsya-v-bitrikse24-aktualnyy-soglasovan-s-od-podgoto",
+            "prompt": "В компании трекер управляющего ведется в Битриксе24, актуальный, согласован с ОД, подготовлен по красным линиям",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-vse-sotrudniki-imeyut-dostup-k-baze-znaniy-polzuyutsya-standartami-i-mogut-k-n",
+            "prompt": "В ресторане все сотрудники имеют доступ к базе знаний, пользуются стандартами и могут к ним обратиться в любой момент",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-upravlyayuschiy-prohodit-bolshoy-obhod-kazhduyu-nedelyu",
+            "prompt": "В ресторане управляющий проходит большой обход каждую неделю",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-zapuschena-vosmerka-menedzhera-smeny-i-provoditsya-po-standartam",
+            "prompt": "В ресторане запущена восьмерка менеджера смены и проводится по стандартам",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-menedzher-umeet-rabotat-s-raznymi-blokami-vosmerok-primenyaya-v-raznyh-situaci",
+            "prompt": "В ресторане менеджер умеет работать с разными блоками восьмерок, применяя в разных ситуациях актуальные блоки",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-i-bm-ispolzuet-tehniki-upravleniya-smenoy-kos-fps-korrektirovka-zdes-i-seychas",
+            "prompt": "Менеджер и БМ использует техники управления сменой: КОС, ФПС, корректировка здесь и сейчас",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-i-bm-predostavlyaet-obratnuyu-svyaz-sotrudnikam-po-rabote-konstruktivno-v-poziti",
+            "prompt": "Менеджер и БМ предоставляет обратную связь сотрудникам по работе, конструктивно, в позитивном ключе",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-management-ocenka",
+        "title": "Service Management · Оценка",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "v-restorane-zapuschena-ocenka-servisa-cherez-blanki-ocenki-dashbord-pokazateley-kln-korrek",
+            "prompt": "В ресторане запущена оценка сервиса через бланки оценки, дашборд показателей, КЛН корректировки",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-zapuschen-sbor-obratnoy-svyazi-cherez-zhurnal-obratnoy-svyazi-cherez-sotrudnik",
+            "prompt": "В ресторане запущен сбор обратной связи через журнал обратной связи через сотрудников зала и бара",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-zapuschena-analitika-po-otzyvam",
+            "prompt": "В ресторане запущена аналитика по отзывам",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-management-uluchshenie",
+        "title": "Service Management · Улучшение",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "v-restorane-sformirovan-ppr-po-otzyvam-blankam-ocenki-zhos-ekonomike-i-operacionnym-proces",
+            "prompt": "В ресторане сформирован ППР по отзывам, бланкам оценки, ЖОС, экономике и операционным процессам",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-sformirovan-spisok-zadach-i-vedetsya-v-bitrix24",
+            "prompt": "В ресторане сформирован список задач и ведется в Bitrix24",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-kompanii-ezhemesyachno-provoditsya-komitet-po-servisu-hr-processam-proizvodstvennym-proc",
+            "prompt": "В компании ежемесячно проводится комитет по сервису, HR процессам, производственным процессам и экономике",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "service-management-liderstvo",
+        "title": "Service Management · Лидерство",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "v-restorane-komanda-voodushevlena-i-vklyuchena-v-rabotu",
+            "prompt": "В ресторане команда воодушевлена и включена в работу",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-upravlyayuschiy-derzhit-poziciyu-starshego",
+            "prompt": "В ресторане управляющий держит позицию старшего",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-restorane-menedzhery-derzhat-poziciyu-starshih",
+            "prompt": "В ресторане менеджеры держат позицию старших",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {
+              "comment_on_negative": true
+            },
+            "options": [],
+            "metrics": [
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -13,7 +13,7 @@ from datetime import datetime
 import re
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,11 +25,27 @@ from app.infra.database.models.assessment_template import (
     AssessmentTemplateSection,
     AssessmentTemplateVersion,
 )
+from app.infra.database.models.assessment_metric import (
+    AssessmentItemMetricMapping,
+    AssessmentMetricDefinition,
+    AssessmentScoringPolicy,
+)
 from app.infra.database.models.company import Company
 
 
 _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _CHOICE_TYPES = {"single_choice", "multi_choice"}
+_WEIGHTED_TYPES = {"boolean", "score", "integer", "decimal", "single_choice"}
+_CANONICAL_METRICS = {
+    "taste",
+    "speed",
+    "order",
+    "service",
+    "people",
+    "space",
+    "economics",
+    "food_safety",
+}
 
 
 class AssessmentTemplateError(Exception):
@@ -172,9 +188,7 @@ class AssessmentTemplateService:
                 raise AssessmentTemplatePublicationInvalid(
                     "methodology content is incomplete"
                 )
-            if (methodology.owner_type == "system") != (
-                methodology.company_id is None
-            ):
+            if (methodology.owner_type == "system") != (methodology.company_id is None):
                 raise AssessmentTemplatePublicationInvalid(
                     "methodology owner context is invalid"
                 )
@@ -200,10 +214,7 @@ class AssessmentTemplateService:
             version = (
                 await self._session.execute(
                     select(AssessmentTemplateVersion)
-                    .where(
-                        AssessmentTemplateVersion.id
-                        == request.template_version_id
-                    )
+                    .where(AssessmentTemplateVersion.id == request.template_version_id)
                     .with_for_update()
                 )
             ).scalar_one_or_none()
@@ -249,9 +260,7 @@ class AssessmentTemplateService:
         if request.local_description is not None and not isinstance(
             request.local_description, str
         ):
-            raise InvalidAssessmentTemplateRequest(
-                "local_description must be a string"
-            )
+            raise InvalidAssessmentTemplateRequest("local_description must be a string")
         try:
             async with self._session.begin_nested():
                 company = (
@@ -281,12 +290,8 @@ class AssessmentTemplateService:
                     raise AssessmentTemplateSourceInvalid(
                         "library source is unavailable"
                     )
-                library = await self._lock_library_source_template(
-                    source.template_id
-                )
-                methodology = await self._published_methodology(
-                    source.methodology_id
-                )
+                library = await self._lock_library_source_template(source.template_id)
+                methodology = await self._published_methodology(source.methodology_id)
                 if methodology.owner_type != "system":
                     raise AssessmentTemplateSourceInvalid(
                         "library methodology is not system-owned"
@@ -330,9 +335,7 @@ class AssessmentTemplateService:
                 )
                 self._session.add_all([new_template, draft])
                 await self._session.flush()
-                counts = await self._clone_structure(
-                    source.id, draft.id, request.now
-                )
+                counts = await self._clone_structure(source.id, draft.id, request.now)
                 await self._session.flush()
                 return AdoptedLibraryTemplate(
                     new_template.id,
@@ -349,31 +352,29 @@ class AssessmentTemplateService:
                 ) from error
             raise
 
-    async def create_next_draft(
-        self, request: CreateNextDraft
-    ) -> CreatedTemplateDraft:
+    async def create_next_draft(self, request: CreateNextDraft) -> CreatedTemplateDraft:
         self._validate_uuid("template_id", request.template_id)
         self._validate_uuid(
             "source_published_version_id", request.source_published_version_id
         )
         self._validate_now(request.now)
-        if request.change_note is not None and not isinstance(
-            request.change_note, str
-        ):
+        if request.change_note is not None and not isinstance(request.change_note, str):
             raise InvalidAssessmentTemplateRequest("change_note must be a string")
         try:
             async with self._session.begin_nested():
                 template = await self._lock_template(request.template_id)
                 versions = (
-                    await self._session.execute(
-                        select(AssessmentTemplateVersion)
-                        .where(
-                            AssessmentTemplateVersion.template_id == template.id
+                    (
+                        await self._session.execute(
+                            select(AssessmentTemplateVersion)
+                            .where(AssessmentTemplateVersion.template_id == template.id)
+                            .order_by(AssessmentTemplateVersion.version)
+                            .with_for_update()
                         )
-                        .order_by(AssessmentTemplateVersion.version)
-                        .with_for_update()
                     )
-                ).scalars().all()
+                    .scalars()
+                    .all()
+                )
                 if any(version.status == "draft" for version in versions):
                     raise AssessmentTemplateDraftExists(
                         "template already has a draft version"
@@ -409,9 +410,7 @@ class AssessmentTemplateService:
                 )
                 self._session.add(draft)
                 await self._session.flush()
-                counts = await self._clone_structure(
-                    source.id, draft.id, request.now
-                )
+                counts = await self._clone_structure(source.id, draft.id, request.now)
                 await self._session.flush()
                 return CreatedTemplateDraft(
                     template.id, draft.id, draft.version, *counts
@@ -499,9 +498,7 @@ class AssessmentTemplateService:
             or methodology.deleted_at is not None
             or methodology.status != "published"
         ):
-            raise AssessmentTemplatePublicationInvalid(
-                "methodology is not published"
-            )
+            raise AssessmentTemplatePublicationInvalid("methodology is not published")
         return methodology
 
     async def _validate_company_source(
@@ -513,8 +510,7 @@ class AssessmentTemplateService:
         source = (
             await self._session.execute(
                 select(AssessmentTemplateVersion).where(
-                    AssessmentTemplateVersion.id
-                    == template.source_library_version_id
+                    AssessmentTemplateVersion.id == template.source_library_version_id
                 )
             )
         ).scalar_one_or_none()
@@ -545,19 +541,27 @@ class AssessmentTemplateService:
 
     async def _validate_structure(self, version_id: UUID) -> None:
         sections = (
-            await self._session.execute(
-                select(AssessmentTemplateSection).where(
-                    AssessmentTemplateSection.template_version_id == version_id
+            (
+                await self._session.execute(
+                    select(AssessmentTemplateSection).where(
+                        AssessmentTemplateSection.template_version_id == version_id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         items = (
-            await self._session.execute(
-                select(AssessmentTemplateItem).where(
-                    AssessmentTemplateItem.template_version_id == version_id
+            (
+                await self._session.execute(
+                    select(AssessmentTemplateItem).where(
+                        AssessmentTemplateItem.template_version_id == version_id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if not sections or not items:
             raise AssessmentTemplatePublicationInvalid(
                 "template structure requires sections and items"
@@ -588,14 +592,18 @@ class AssessmentTemplateService:
                 seen.add(current)
                 current = parents.get(current)
         options = (
-            await self._session.execute(
-                select(AssessmentTemplateItemOption).where(
-                    AssessmentTemplateItemOption.item_id.in_(
-                        [item.id for item in items]
+            (
+                await self._session.execute(
+                    select(AssessmentTemplateItemOption).where(
+                        AssessmentTemplateItemOption.item_id.in_(
+                            [item.id for item in items]
+                        )
                     )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         by_item: dict[UUID, list[AssessmentTemplateItemOption]] = {}
         for option in options:
             by_item.setdefault(option.item_id, []).append(option)
@@ -604,9 +612,7 @@ class AssessmentTemplateService:
                 or not self._nonempty(option.label)
                 or option.sort_order < 0
             ):
-                raise AssessmentTemplatePublicationInvalid(
-                    "item option is invalid"
-                )
+                raise AssessmentTemplatePublicationInvalid("item option is invalid")
         for item in items:
             item_options = by_item.get(item.id, [])
             if (
@@ -634,31 +640,82 @@ class AssessmentTemplateService:
                         )
                     )
                 )
-                or (
-                    item.response_type in _CHOICE_TYPES
-                    and len(item_options) < 2
+                or (item.response_type in _CHOICE_TYPES and len(item_options) < 2)
+                or (item.response_type not in _CHOICE_TYPES and item_options)
+            ):
+                raise AssessmentTemplatePublicationInvalid("item structure is invalid")
+        policy = await self._session.get(AssessmentScoringPolicy, version_id)
+        if policy is not None:
+            if policy.algorithm != "weighted_v1" or policy.version != 1:
+                raise AssessmentTemplatePublicationInvalid(
+                    "weighted scoring policy is invalid"
                 )
-                or (
-                    item.response_type not in _CHOICE_TYPES and item_options
+            for item in items:
+                if (
+                    item.response_type not in _WEIGHTED_TYPES
+                    or item.weight is None
+                    or item.weight <= 0
+                    or (
+                        item.response_type
+                        in {"score", "integer", "decimal", "single_choice"}
+                        and (
+                            item.min_value is None
+                            or item.max_value is None
+                            or item.max_value <= item.min_value
+                        )
+                    )
+                ):
+                    raise AssessmentTemplatePublicationInvalid(
+                        "weighted item configuration is incomplete"
+                    )
+                if item.response_type == "single_choice" and any(
+                    option.numeric_value is None for option in by_item.get(item.id, [])
+                ):
+                    raise AssessmentTemplatePublicationInvalid(
+                        "weighted choice options require numeric values"
+                    )
+            mapping_rows = (
+                await self._session.execute(
+                    select(AssessmentItemMetricMapping, AssessmentMetricDefinition)
+                    .join(
+                        AssessmentMetricDefinition,
+                        AssessmentMetricDefinition.id
+                        == AssessmentItemMetricMapping.metric_definition_id,
+                    )
+                    .where(
+                        AssessmentItemMetricMapping.template_version_id == version_id
+                    )
                 )
+            ).all()
+            mapped_items = {mapping.item_id for mapping, _ in mapping_rows}
+            if mapped_items != {item.id for item in items} or any(
+                definition.status != "active"
+                or definition.code not in _CANONICAL_METRICS
+                or mapping.contribution_weight is None
+                or mapping.contribution_weight <= 0
+                for mapping, definition in mapping_rows
             ):
                 raise AssessmentTemplatePublicationInvalid(
-                    "item structure is invalid"
+                    "weighted metric mapping is incomplete"
                 )
 
     async def _clone_structure(
         self, source_version_id: UUID, target_version_id: UUID, now: datetime
     ) -> tuple[int, int, int]:
         sections = (
-            await self._session.execute(
-                select(AssessmentTemplateSection)
-                .where(
-                    AssessmentTemplateSection.template_version_id
-                    == source_version_id
+            (
+                await self._session.execute(
+                    select(AssessmentTemplateSection)
+                    .where(
+                        AssessmentTemplateSection.template_version_id
+                        == source_version_id
+                    )
+                    .order_by(AssessmentTemplateSection.sort_order)
                 )
-                .order_by(AssessmentTemplateSection.sort_order)
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         section_map = {section.id: uuid4() for section in sections}
         pending = list(sections)
         while pending:
@@ -695,15 +752,18 @@ class AssessmentTemplateService:
                 pending.remove(section)
             await self._session.flush()
         items = (
-            await self._session.execute(
-                select(AssessmentTemplateItem)
-                .where(
-                    AssessmentTemplateItem.template_version_id
-                    == source_version_id
+            (
+                await self._session.execute(
+                    select(AssessmentTemplateItem)
+                    .where(
+                        AssessmentTemplateItem.template_version_id == source_version_id
+                    )
+                    .order_by(AssessmentTemplateItem.sort_order)
                 )
-                .order_by(AssessmentTemplateItem.sort_order)
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         item_map = {item.id: uuid4() for item in items}
         self._session.add_all(
             [
@@ -732,12 +792,16 @@ class AssessmentTemplateService:
         )
         await self._session.flush()
         options = (
-            await self._session.execute(
-                select(AssessmentTemplateItemOption).where(
-                    AssessmentTemplateItemOption.item_id.in_(list(item_map))
+            (
+                await self._session.execute(
+                    select(AssessmentTemplateItemOption).where(
+                        AssessmentTemplateItemOption.item_id.in_(list(item_map))
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         self._session.add_all(
             [
                 AssessmentTemplateItemOption(
@@ -754,6 +818,44 @@ class AssessmentTemplateService:
                 for option in options
             ]
         )
+        policy = await self._session.get(AssessmentScoringPolicy, source_version_id)
+        if policy is not None:
+            self._session.add(
+                AssessmentScoringPolicy(
+                    template_version_id=target_version_id,
+                    algorithm=policy.algorithm,
+                    version=policy.version,
+                    config=deepcopy(policy.config),
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            mappings = (
+                (
+                    await self._session.execute(
+                        select(AssessmentItemMetricMapping).where(
+                            AssessmentItemMetricMapping.template_version_id
+                            == source_version_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            self._session.add_all(
+                [
+                    AssessmentItemMetricMapping(
+                        template_version_id=target_version_id,
+                        item_id=item_map[mapping.item_id],
+                        metric_definition_id=mapping.metric_definition_id,
+                        contribution_weight=mapping.contribution_weight,
+                        direction=mapping.direction,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    for mapping in mappings
+                ]
+            )
         return len(sections), len(items), len(options)
 
     @staticmethod

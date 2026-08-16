@@ -1,0 +1,335 @@
+{
+  "schema_version": 1,
+  "source": {
+    "filename": "КЛН Руководителей_Камелот.xlsx",
+    "sha256": "b19824ecac962517df729aa7270aca97ce77a191f211136e3e10007660e63c16",
+    "provenance": "read_only_methodology_source"
+  },
+  "template": {
+    "code": "bar-practicum",
+    "name": "Практикум бара",
+    "activity_type": "evaluation",
+    "description": "Company-private draft imported from reviewed methodology source.",
+    "methodology": {
+      "code": "bar-practicum-methodology",
+      "title": "Практикум бара",
+      "body": "Взвешенная оценка по критериям Да/Нет. Отсутствующие исторические результаты и персональные данные не импортируются.",
+      "version": 1
+    },
+    "scoring": {
+      "algorithm": "weighted_v1",
+      "version": 1,
+      "config": {
+        "rounding": "half_up",
+        "score_scale": 100
+      }
+    },
+    "sections": [
+      {
+        "code": "praktikum-bara",
+        "title": "Практикум бара",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "podgotovlen-inventar-dlya-provedeniya-uprazhneniya-inventar-posuda-produkt-razdatochnyy-ma",
+            "prompt": "Подготовлен инвентарь для проведения упражнения (инвентарь, посуда, продукт, раздаточный материал, все сотрудники смены участвуют)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "ozvuchena-tema-kross-treninga",
+            "prompt": "Озвучена тема кросс-тренинга",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oboznachena-cel-kross-treninga-chto-i-zachem-budem-otrabatyvat",
+            "prompt": "Обозначена цель кросс-тренинга (что и зачем будем отрабатывать)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "progovoril-uslovie-smysl-uprazhneniya-algoritm-provedeniya",
+            "prompt": "Проговорил условие (смысл упражнения, алгоритм проведения)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oboznacheno-vremya-provedeniya-ssh-mr-ustanavlivaet-vremya-provedeniya-kross-treninga",
+            "prompt": "Обозначено время проведения (СШ/МР устанавливает время проведения кросс-тренинга)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "spiker-kontroliruet-vypolnenie-zadaniya-korrektiruet",
+            "prompt": "Спикер контролирует выполнение задания, корректирует",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "proveril-rezultaty-komandy",
+            "prompt": "Проверил результаты команды",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "vyvody-stimuliruet-otvety-vyvody-ot-uchastnikov",
+            "prompt": "Выводы (стимулирует ответы/выводы от участников)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "poluchena-obratnaya-svyaz-chto-ponyali",
+            "prompt": "Получена обратная связь \"Что поняли?\"",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "progovoril-rezultat-chto-teper-budem-delat-inache-kak-teper-budem-delat",
+            "prompt": "Проговорил результат: \"Что теперь будем делать иначе? Как теперь будем делать?\"",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "oboznachil-kontrol-segodnya-zavtra-my-s-ssh-budem-kontrolirovat",
+            "prompt": "Обозначил контроль \"Сегодня/завтра мы с СШ будем контролировать\"",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "kross-proveden-v-sootvetstvii-s-planom-po-teme-napolnenie-usloviya",
+            "prompt": "Кросс проведен в соответствии с планом по теме (наполнение, условия)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "otrabotal-vozrazheniya",
+            "prompt": "Отработал возражения",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -166,7 +166,7 @@ class AssessmentCatalogService:
                 else published.methodology_id if published is not None else None
             )
             methodology = (
-                await self._published_methodology(methodology_id)
+                await self._available_methodology(methodology_id)
                 if methodology_id is not None
                 else None
             )
@@ -254,6 +254,21 @@ class AssessmentCatalogService:
                 select(AssessmentMethodology).where(
                     AssessmentMethodology.id == methodology_id,
                     AssessmentMethodology.status == "published",
+                    AssessmentMethodology.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        if methodology is None:
+            raise AssessmentCatalogNotFound("assessment is unavailable")
+        return methodology
+
+    async def _available_methodology(
+        self, methodology_id: UUID
+    ) -> AssessmentMethodology:
+        methodology = (
+            await self._session.execute(
+                select(AssessmentMethodology).where(
+                    AssessmentMethodology.id == methodology_id,
                     AssessmentMethodology.deleted_at.is_(None),
                 )
             )

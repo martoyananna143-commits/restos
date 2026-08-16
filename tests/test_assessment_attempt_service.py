@@ -65,7 +65,9 @@ def test_choice_answers_require_owned_unique_options():
     first, second = uuid4(), uuid4()
     current = service()
     assert current._normalize_value("single_choice", first, {first}) == str(first)
-    assert current._normalize_value("multi_choice", [first, second], {first, second}) == [str(first), str(second)]
+    assert current._normalize_value(
+        "multi_choice", [first, second], {first, second}
+    ) == [str(first), str(second)]
     with pytest.raises(AssessmentAttemptInvalid):
         current._normalize_value("multi_choice", [first, first], {first})
     with pytest.raises(AssessmentAttemptInvalid):
@@ -100,79 +102,136 @@ async def seed_context(session: AsyncSession):
     session.add(account)
     await session.flush()
     company = Company(
-        owner_account_id=account.id, name="Pilot", code=f"pilot-{suffix}",
-        timezone="UTC", locale="ru-RU", status="active",
+        owner_account_id=account.id,
+        name="Pilot",
+        code=f"pilot-{suffix}",
+        timezone="UTC",
+        locale="ru-RU",
+        status="active",
     )
     session.add(company)
     await session.flush()
     profile = EmployeeProfile(
-        company_id=company.id, account_id=account.id, full_name="Employee",
-        employment_status="active", meta={},
+        company_id=company.id,
+        account_id=account.id,
+        full_name="Employee",
+        employment_status="active",
+        meta={},
     )
     access = AccessProfile(
-        company_id=company.id, name="Employee", code=f"employee-{suffix}",
-        maximum_scope="self", is_system=False, is_active=True, version=1,
+        company_id=company.id,
+        name="Employee",
+        code=f"employee-{suffix}",
+        maximum_scope="self",
+        is_system=False,
+        is_active=True,
+        version=1,
     )
     session.add_all([profile, access])
     await session.flush()
     position = Position(
-        company_id=company.id, name="Employee", code=f"position-{suffix}",
-        default_access_profile_id=access.id, is_active=True, sort_order=0,
+        company_id=company.id,
+        name="Employee",
+        code=f"position-{suffix}",
+        default_access_profile_id=access.id,
+        is_active=True,
+        sort_order=0,
     )
     session.add(position)
     await session.flush()
     membership = EmployeeAssignment(
-        company_id=company.id, employee_profile_id=profile.id,
-        position_id=position.id, access_profile_id=access.id,
-        scope_type="self", is_primary=True, status="active", starts_at=NOW,
+        company_id=company.id,
+        employee_profile_id=profile.id,
+        position_id=position.id,
+        access_profile_id=access.id,
+        scope_type="self",
+        is_primary=True,
+        status="active",
+        starts_at=NOW,
     )
     methodology = AssessmentMethodology(
-        owner_type="company", company_id=company.id, code=f"method-{suffix}",
-        title="Method", body="Employee-safe method", version=1,
-        status="published", published_at=NOW,
+        owner_type="company",
+        company_id=company.id,
+        code=f"method-{suffix}",
+        title="Method",
+        body="Employee-safe method",
+        version=1,
+        status="published",
+        published_at=NOW,
     )
     template = AssessmentTemplate(
-        scope="company", company_id=company.id, code=f"template-{suffix}",
-        name="Pilot assessment", activity_type="evaluation", status="active",
+        scope="company",
+        company_id=company.id,
+        code=f"template-{suffix}",
+        name="Pilot assessment",
+        activity_type="evaluation",
+        status="active",
     )
     session.add_all([membership, methodology, template])
     await session.flush()
     version = AssessmentTemplateVersion(
-        template_id=template.id, version=1, status="published",
-        methodology_id=methodology.id, published_at=NOW,
+        template_id=template.id,
+        version=1,
+        status="published",
+        methodology_id=methodology.id,
+        published_at=NOW,
     )
     session.add(version)
     await session.flush()
     section = AssessmentTemplateSection(
-        template_version_id=version.id, code=f"section-{suffix}", title="Section",
-        section_kind="section", sort_order=0,
+        template_version_id=version.id,
+        code=f"section-{suffix}",
+        title="Section",
+        section_kind="section",
+        sort_order=0,
     )
     session.add(section)
     await session.flush()
     required = AssessmentTemplateItem(
-        template_version_id=version.id, section_id=section.id,
-        code=f"required-{suffix}", prompt="Required?", response_type="boolean",
-        is_required=True, sort_order=0, evidence_mode="none",
-        criticality="normal", config={},
+        template_version_id=version.id,
+        section_id=section.id,
+        code=f"required-{suffix}",
+        prompt="Required?",
+        response_type="boolean",
+        is_required=True,
+        sort_order=0,
+        evidence_mode="none",
+        criticality="normal",
+        config={},
     )
     optional = AssessmentTemplateItem(
-        template_version_id=version.id, section_id=section.id,
-        code=f"optional-{suffix}", prompt="Comment", response_type="text",
-        is_required=False, sort_order=1, evidence_mode="none",
-        criticality="normal", config={"placeholder": "Optional"},
+        template_version_id=version.id,
+        section_id=section.id,
+        code=f"optional-{suffix}",
+        prompt="Comment",
+        response_type="text",
+        is_required=False,
+        sort_order=1,
+        evidence_mode="none",
+        criticality="normal",
+        config={"placeholder": "Optional"},
     )
     session.add_all([required, optional])
     await session.flush()
     assignment = AssessmentAssignment(
-        company_id=company.id, employee_profile_id=profile.id,
-        template_version_id=version.id, status="assigned", assigned_at=NOW,
+        company_id=company.id,
+        employee_profile_id=profile.id,
+        template_version_id=version.id,
+        status="assigned",
+        assigned_at=NOW,
         due_at=NOW + timedelta(days=7),
     )
     session.add(assignment)
     await session.flush()
     return SimpleNamespace(
-        account=account, company=company, profile=profile, version=version,
-        required=required, optional=optional, assignment=assignment,
+        account=account,
+        company=company,
+        profile=profile,
+        template=template,
+        version=version,
+        required=required,
+        optional=optional,
+        assignment=assignment,
     )
 
 
@@ -196,34 +255,105 @@ async def db_context():
 async def test_create_replace_conflict_submit_and_idempotency(db_context):
     session, context = db_context
     service = AssessmentAttemptService(session)
-    created = await service.create_or_resume(context.account.id, context.assignment.id, NOW)
+    created = await service.create_or_resume(
+        context.account.id, context.assignment.id, NOW
+    )
     assert created["revision"] == 0
-    assert (await service.create_or_resume(context.account.id, context.assignment.id, NOW))["id"] == created["id"]
+    assert (
+        await service.create_or_resume(context.account.id, context.assignment.id, NOW)
+    )["id"] == created["id"]
     with pytest.raises(AssessmentAttemptIncomplete):
         await service.submit(context.account.id, created["id"], NOW)
-    saved = await service.replace_draft(ReplaceDraft(
-        context.account.id, created["id"], 0,
-        [AnswerInput(context.required.id, "boolean", True), AnswerInput(context.optional.id, "text", " note ")],
-        NOW,
-    ))
+    saved = await service.replace_draft(
+        ReplaceDraft(
+            context.account.id,
+            created["id"],
+            0,
+            [
+                AnswerInput(context.required.id, "boolean", True),
+                AnswerInput(context.optional.id, "text", " note "),
+            ],
+            NOW,
+        )
+    )
     assert saved["revision"] == 1
     assert len(saved["answers"]) == 2
     with pytest.raises(AssessmentAttemptRevisionConflict) as conflict:
-        await service.replace_draft(ReplaceDraft(context.account.id, created["id"], 0, [], NOW))
+        await service.replace_draft(
+            ReplaceDraft(context.account.id, created["id"], 0, [], NOW)
+        )
     assert conflict.value.current_revision == 1
     assert len(conflict.value.answers) == 2
-    replaced = await service.replace_draft(ReplaceDraft(
-        context.account.id, created["id"], 1,
-        [AnswerInput(context.required.id, "boolean", False)], NOW,
-    ))
+    replaced = await service.replace_draft(
+        ReplaceDraft(
+            context.account.id,
+            created["id"],
+            1,
+            [AnswerInput(context.required.id, "boolean", False)],
+            NOW,
+        )
+    )
     assert replaced["revision"] == 2
     assert len(replaced["answers"]) == 1
     receipt = await service.submit(context.account.id, created["id"], NOW)
     assert receipt == await service.submit(context.account.id, created["id"], NOW)
     assert receipt == {
-        "scoring_algorithm": "completion_v1", "submitted_at": NOW.isoformat(),
-        "answered_count": 1, "required_count": 1, "total_count": 2,
+        "scoring_algorithm": "completion_v1",
+        "submitted_at": NOW.isoformat(),
+        "answered_count": 1,
+        "required_count": 1,
+        "total_count": 2,
     }
+    assert (await session.execute(select(1))).scalar_one() == 1
+
+
+@pytest.mark.asyncio
+async def test_section_navigation_order_is_revisioned_non_scoring_ui_metadata(db_context):
+    session, context = db_context
+    second_section = AssessmentTemplateSection(
+        template_version_id=context.version.id,
+        code=f"second-{uuid4().hex[:12]}",
+        title="Second section",
+        section_kind="section",
+        sort_order=1,
+    )
+    session.add(second_section)
+    await session.flush()
+    service = AssessmentAttemptService(session)
+    created = await service.create_or_resume(
+        context.account.id, context.assignment.id, NOW
+    )
+    saved = await service.replace_draft(
+        ReplaceDraft(
+            context.account.id,
+            created["id"],
+            0,
+            [],
+            NOW,
+            [second_section.id, context.required.section_id],
+        )
+    )
+    assert saved["revision"] == 1
+    assert saved["answers"] == []
+    assert saved["ui_metadata"] == {
+        "section_order": [str(second_section.id), str(context.required.section_id)]
+    }
+    stored = await session.get(AssessmentAttempt, created["id"])
+    assert stored.ui_metadata_json == saved["ui_metadata"]
+    resumed = await service.read_attempt(context.account.id, created["id"], NOW)
+    assert resumed["document"]["sections"][0]["id"] == context.required.section_id
+    assert resumed["ui_metadata"] == saved["ui_metadata"]
+    with pytest.raises(AssessmentAttemptInvalid):
+        await service.replace_draft(
+            ReplaceDraft(
+                context.account.id,
+                created["id"],
+                1,
+                [],
+                NOW,
+                [second_section.id, second_section.id],
+            )
+        )
     assert (await session.execute(select(1))).scalar_one() == 1
 
 
@@ -234,22 +364,31 @@ async def test_assignment_validation_uses_version_owning_template(db_context):
     await service._validate_assignment_template(context.assignment)
     suffix = uuid4().hex[:12]
     foreign_company = Company(
-        owner_account_id=context.account.id, name="Foreign company",
-        code=f"foreign-company-{suffix}", timezone="UTC", locale="ru-RU",
+        owner_account_id=context.account.id,
+        name="Foreign company",
+        code=f"foreign-company-{suffix}",
+        timezone="UTC",
+        locale="ru-RU",
         status="active",
     )
     session.add(foreign_company)
     await session.flush()
     foreign_template = AssessmentTemplate(
-        scope="company", company_id=foreign_company.id,
-        code=f"foreign-template-{suffix}", name="Foreign",
-        activity_type="evaluation", status="active",
+        scope="company",
+        company_id=foreign_company.id,
+        code=f"foreign-template-{suffix}",
+        name="Foreign",
+        activity_type="evaluation",
+        status="active",
     )
     session.add(foreign_template)
     await session.flush()
     foreign_version = AssessmentTemplateVersion(
-        template_id=foreign_template.id, version=1, status="published",
-        methodology_id=context.version.methodology_id, published_at=NOW,
+        template_id=foreign_template.id,
+        version=1,
+        status="published",
+        methodology_id=context.version.methodology_id,
+        published_at=NOW,
     )
     session.add(foreign_version)
     await session.flush()
@@ -279,16 +418,22 @@ async def test_concurrent_create_resume_has_one_attempt():
 
     async def worker():
         async with AsyncSession(engine, expire_on_commit=False) as session:
-            value = await AssessmentAttemptService(session).create_or_resume(account_id, assignment_id, NOW)
+            value = await AssessmentAttemptService(session).create_or_resume(
+                account_id, assignment_id, NOW
+            )
             await session.commit()
             return value["id"]
 
     ids = await asyncio.gather(*(worker() for _ in range(10)))
     assert len(set(ids)) == 1
     async with AsyncSession(engine) as verify:
-        count = (await verify.execute(select(func.count()).select_from(AssessmentAttempt).where(
-            AssessmentAttempt.assignment_id == assignment_id
-        ))).scalar_one()
+        count = (
+            await verify.execute(
+                select(func.count())
+                .select_from(AssessmentAttempt)
+                .where(AssessmentAttempt.assignment_id == assignment_id)
+            )
+        ).scalar_one()
         assert count == 1
     await engine.dispose()
 
@@ -301,10 +446,15 @@ async def committed_attempt(engine, *, with_required_answer=False):
             context.account.id, context.assignment.id, NOW
         )
         if with_required_answer:
-            attempt = await service.replace_draft(ReplaceDraft(
-                context.account.id, attempt["id"], 0,
-                [AnswerInput(context.required.id, "boolean", True)], NOW,
-            ))
+            attempt = await service.replace_draft(
+                ReplaceDraft(
+                    context.account.id,
+                    attempt["id"],
+                    0,
+                    [AnswerInput(context.required.id, "boolean", True)],
+                    NOW,
+                )
+            )
         values = SimpleNamespace(
             account_id=context.account.id,
             assignment_id=context.assignment.id,
@@ -336,7 +486,9 @@ async def test_ten_worker_same_revision_autosave_has_one_complete_winner():
             try:
                 value = await AssessmentAttemptService(session).replace_draft(
                     ReplaceDraft(
-                        context.account_id, context.attempt_id, context.revision,
+                        context.account_id,
+                        context.attempt_id,
+                        context.revision,
                         [
                             AnswerInput(context.required_id, "boolean", index % 2 == 0),
                             AnswerInput(context.optional_id, "text", f"tree-{index}"),
@@ -363,7 +515,9 @@ async def test_ten_worker_same_revision_autosave_has_one_complete_winner():
         )
         assert loaded["revision"] == 1
         assert len(loaded["answers"]) == 2
-        answer_by_item = {answer["item_id"]: answer["value"] for answer in loaded["answers"]}
+        answer_by_item = {
+            answer["item_id"]: answer["value"] for answer in loaded["answers"]
+        }
         assert answer_by_item[context.optional_id] == f"tree-{winner[1]}"
         assert answer_by_item[context.required_id] is (winner[1] % 2 == 0)
     await engine.dispose()
@@ -379,8 +533,11 @@ async def test_independent_attempts_save_without_cross_blocking():
         async with AsyncSession(engine, expire_on_commit=False) as session:
             result = await AssessmentAttemptService(session).replace_draft(
                 ReplaceDraft(
-                    context.account_id, context.attempt_id, 0,
-                    [AnswerInput(context.required_id, "boolean", value)], NOW,
+                    context.account_id,
+                    context.attempt_id,
+                    0,
+                    [AnswerInput(context.required_id, "boolean", value)],
+                    NOW,
                 )
             )
             await session.commit()

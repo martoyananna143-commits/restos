@@ -18,16 +18,20 @@ from app.infra.database.models import (
     AssessmentTemplate,
     AssessmentTemplateItem,
     AssessmentTemplateVersion,
+    AssignmentVenue,
     EmployeeAssignment,
     EmployeeProfile,
     Position,
+    Venue,
 )
 from app.internal.services.access_decision_service import AccessDecisionService
+from app.internal.services.assessment_attempt_service import AssessmentAttemptService
 
 
 READ_PERMISSION = "assessment.assignment.read"
 MANAGE_PERMISSION = "assessment.assignment.manage"
 ACTIVE_ASSIGNMENT_INDEX = "uq_assessment_assignments_active_employee_version"
+EMPLOYEE_ASSIGNMENT_ACTIVITY_TYPES = {"evaluation", "test", "attestation"}
 
 
 class AssessmentManagementPermissionDenied(Exception):
@@ -60,7 +64,18 @@ class CreateAssignment:
     company_id: UUID
     employee_profile_id: UUID
     template_version_id: UUID
+    venue_id: UUID | None
     due_at: datetime | None
+    now: datetime
+
+
+@dataclass(frozen=True)
+class StartManagerMeasurement:
+    account_id: UUID
+    company_id: UUID
+    subject_employee_profile_id: UUID
+    template_version_id: UUID
+    venue_id: UUID | None
     now: datetime
 
 
@@ -80,9 +95,9 @@ class AssessmentManagementService:
         limit: int,
         after: UUID | None,
     ) -> list[dict[str, Any]]:
-        await self._require_read(account_id, company_id, now)
+        venue_scope = await self._require_read(account_id, company_id, now)
         if after is not None and not await self._employee_cursor_exists(
-            company_id, after, now
+            company_id, after, now, venue_scope
         ):
             raise AssessmentManagementNotFound("employee cursor not found")
         statement = (
@@ -112,6 +127,12 @@ class AssessmentManagementService:
             )
         if after is not None:
             statement = statement.where(EmployeeProfile.id > after)
+        if venue_scope is not None:
+            statement = statement.where(
+                EmployeeProfile.id.in_(
+                    self._employees_for_venues(company_id, venue_scope, now)
+                )
+            )
         rows = (await self._session.execute(statement)).all()
         return [
             {
@@ -132,8 +153,7 @@ class AssessmentManagementService:
                 select(AssessmentTemplate, AssessmentTemplateVersion)
                 .join(
                     AssessmentTemplateVersion,
-                    AssessmentTemplateVersion.template_id
-                    == AssessmentTemplate.id,
+                    AssessmentTemplateVersion.template_id == AssessmentTemplate.id,
                 )
                 .where(
                     AssessmentTemplate.company_id == company_id,
@@ -141,6 +161,9 @@ class AssessmentManagementService:
                     AssessmentTemplate.status == "active",
                     AssessmentTemplate.deleted_at.is_(None),
                     AssessmentTemplateVersion.status == "published",
+                    AssessmentTemplate.activity_type.in_(
+                        EMPLOYEE_ASSIGNMENT_ACTIVITY_TYPES
+                    ),
                 )
                 .order_by(
                     AssessmentTemplate.name,
@@ -171,7 +194,7 @@ class AssessmentManagementService:
         limit: int,
         after: UUID | None,
     ) -> list[dict[str, Any]]:
-        await self._require_read(account_id, company_id, now)
+        venue_scope = await self._require_read(account_id, company_id, now)
         if after is not None and not await self._assignment_cursor_exists(
             company_id, after
         ):
@@ -179,6 +202,8 @@ class AssessmentManagementService:
         statement = self._assignment_projection().where(
             AssessmentAssignment.company_id == company_id
         )
+        if venue_scope is not None:
+            statement = statement.where(AssessmentAssignment.venue_id.in_(venue_scope))
         if status is not None:
             statement = statement.where(AssessmentAssignment.status == status)
         if after is not None:
@@ -197,12 +222,17 @@ class AssessmentManagementService:
         assignment_id: UUID,
         now: datetime,
     ) -> dict[str, Any]:
-        await self._require_read(account_id, company_id, now)
+        venue_scope = await self._require_read(account_id, company_id, now)
         row = (
             await self._session.execute(
                 self._assignment_projection().where(
                     AssessmentAssignment.id == assignment_id,
                     AssessmentAssignment.company_id == company_id,
+                    *(
+                        []
+                        if venue_scope is None
+                        else [AssessmentAssignment.venue_id.in_(venue_scope)]
+                    ),
                 )
             )
         ).one_or_none()
@@ -219,10 +249,45 @@ class AssessmentManagementService:
         )
         if due_at is not None and due_at <= now:
             raise AssessmentManagementInvalid("due_at must be in the future")
-        await self._require_manage(command.account_id, command.company_id, now)
+        venue_scope = await self._require_manage(
+            command.account_id, command.company_id, now
+        )
+        self._require_venue_scope(command.venue_id, venue_scope)
         employee = await self._lock_employee(
             command.company_id, command.employee_profile_id, now
         )
+        if command.venue_id is not None:
+            venue = (
+                await self._session.execute(
+                    select(Venue.id)
+                    .join(
+                        AssignmentVenue,
+                        (AssignmentVenue.venue_id == Venue.id)
+                        & (AssignmentVenue.company_id == Venue.company_id),
+                    )
+                    .join(
+                        EmployeeAssignment,
+                        (EmployeeAssignment.id == AssignmentVenue.assignment_id)
+                        & (EmployeeAssignment.company_id == AssignmentVenue.company_id),
+                    )
+                    .where(
+                        Venue.id == command.venue_id,
+                        Venue.company_id == command.company_id,
+                        Venue.status == "active",
+                        Venue.deleted_at.is_(None),
+                        EmployeeAssignment.employee_profile_id == employee.id,
+                        EmployeeAssignment.status == "active",
+                        EmployeeAssignment.starts_at <= now,
+                        (
+                            EmployeeAssignment.ends_at.is_(None)
+                            | (EmployeeAssignment.ends_at > now)
+                        ),
+                        EmployeeAssignment.deleted_at.is_(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if venue is None:
+                raise AssessmentManagementNotFound("assessment venue not found")
         await self._lock_template(command.company_id, command.template_version_id)
         assigner_profile_id = (
             await self._session.execute(
@@ -236,11 +301,13 @@ class AssessmentManagementService:
         ).scalar_one_or_none()
         assignment = AssessmentAssignment(
             company_id=command.company_id,
+            venue_id=command.venue_id,
             employee_profile_id=employee.id,
             template_version_id=command.template_version_id,
             assigned_by_employee_profile_id=assigner_profile_id,
             assigned_by_account_id=command.account_id,
             status="assigned",
+            purpose="employee_evaluation",
             assigned_at=now,
             due_at=due_at,
         )
@@ -258,6 +325,90 @@ class AssessmentManagementService:
             command.account_id, command.company_id, assignment.id, now
         )
 
+    async def start_manager_measurement(
+        self, command: StartManagerMeasurement
+    ) -> dict[str, Any]:
+        """Start or resume a manager-executed KЛН for one scoped employee."""
+
+        now = self._aware(command.now, "now")
+        venue_scope = await self._require_manage(
+            command.account_id, command.company_id, now
+        )
+        self._require_venue_scope(command.venue_id, venue_scope)
+        subject = await self._lock_employee(
+            command.company_id, command.subject_employee_profile_id, now
+        )
+        executor = await self._lock_executor(
+            command.account_id, command.company_id, now
+        )
+        if command.venue_id is not None:
+            venue = await self._session.scalar(
+                select(Venue.id).where(
+                    Venue.id == command.venue_id,
+                    Venue.company_id == command.company_id,
+                    Venue.status == "active",
+                    Venue.deleted_at.is_(None),
+                )
+            )
+            if venue is None:
+                raise AssessmentManagementNotFound(
+                    "assessment management resource not found"
+                )
+            if not await self._employee_works_at_venue(
+                command.company_id, subject.id, command.venue_id, now
+            ):
+                raise AssessmentManagementNotFound(
+                    "assessment management resource not found"
+                )
+        await self._lock_template(command.company_id, command.template_version_id)
+        existing = await self._session.scalar(
+            select(AssessmentAssignment).where(
+                AssessmentAssignment.company_id == command.company_id,
+                AssessmentAssignment.employee_profile_id == subject.id,
+                AssessmentAssignment.template_version_id
+                == command.template_version_id,
+                AssessmentAssignment.purpose == "manager_measurement",
+                AssessmentAssignment.status.in_(("assigned", "in_progress")),
+            )
+        )
+        if existing is None:
+            existing = AssessmentAssignment(
+                company_id=command.company_id,
+                venue_id=command.venue_id,
+                employee_profile_id=subject.id,
+                template_version_id=command.template_version_id,
+                assigned_by_employee_profile_id=executor.id,
+                assigned_by_account_id=command.account_id,
+                status="assigned",
+                purpose="manager_measurement",
+                assigned_at=now,
+                due_at=None,
+            )
+            try:
+                async with self._session.begin_nested():
+                    self._session.add(existing)
+                    await self._session.flush()
+            except IntegrityError as error:
+                if self._constraint_name(error) != ACTIVE_ASSIGNMENT_INDEX:
+                    raise
+                existing = await self._session.scalar(
+                    select(AssessmentAssignment).where(
+                        AssessmentAssignment.company_id == command.company_id,
+                        AssessmentAssignment.employee_profile_id == subject.id,
+                        AssessmentAssignment.template_version_id
+                        == command.template_version_id,
+                        AssessmentAssignment.purpose == "manager_measurement",
+                        AssessmentAssignment.status.in_(("assigned", "in_progress")),
+                    )
+                )
+                if existing is None:
+                    raise AssessmentManagementDuplicate(
+                        "duplicate active manager measurement"
+                    ) from error
+        return await AssessmentAttemptService(self._session).create_or_resume(
+            command.account_id, existing.id, now
+        )
+
     async def revoke_assignment(
         self,
         account_id: UUID,
@@ -266,7 +417,7 @@ class AssessmentManagementService:
         now: datetime,
     ) -> dict[str, Any]:
         checked_now = self._aware(now, "now")
-        await self._require_manage(account_id, company_id, checked_now)
+        venue_scope = await self._require_manage(account_id, company_id, checked_now)
         attempt_id = (
             await self._session.execute(
                 select(AssessmentAttempt.id).where(
@@ -292,6 +443,7 @@ class AssessmentManagementService:
         ).scalar_one_or_none()
         if assignment is None:
             raise AssessmentManagementNotFound("assessment assignment not found")
+        self._require_venue_scope(assignment.venue_id, venue_scope)
         if attempt_id is None:
             await self._session.execute(
                 select(AssessmentAttempt.id)
@@ -299,9 +451,7 @@ class AssessmentManagementService:
                 .with_for_update()
             )
         if assignment.status == "completed":
-            raise AssessmentManagementAlreadyCompleted(
-                "assessment already completed"
-            )
+            raise AssessmentManagementAlreadyCompleted("assessment already completed")
         if assignment.status == "revoked":
             return await self.assignment_detail(
                 account_id, company_id, assignment_id, checked_now
@@ -317,32 +467,50 @@ class AssessmentManagementService:
 
     async def _require_read(
         self, account_id: UUID, company_id: UUID, now: datetime
-    ) -> None:
+    ) -> set[UUID] | None:
         access = AccessDecisionService(self._session)
         if not (
-            await access.can_in_company(
-                account_id, company_id, READ_PERMISSION, now
-            )
+            await access.can_in_company(account_id, company_id, READ_PERMISSION, now)
             or await access.can_in_company(
                 account_id, company_id, MANAGE_PERMISSION, now
             )
         ):
-            raise AssessmentManagementPermissionDenied("permission denied")
+            venue_ids = await access.list_accessible_venue_ids(
+                account_id, company_id, READ_PERMISSION, now
+            ) | await access.list_accessible_venue_ids(
+                account_id, company_id, MANAGE_PERMISSION, now
+            )
+            if not venue_ids:
+                raise AssessmentManagementPermissionDenied("permission denied")
+            return venue_ids
+        return None
 
     async def _require_manage(
         self, account_id: UUID, company_id: UUID, now: datetime
-    ) -> None:
-        if not await AccessDecisionService(self._session).can_in_company(
+    ) -> set[UUID] | None:
+        access = AccessDecisionService(self._session)
+        if await access.can_in_company(account_id, company_id, MANAGE_PERMISSION, now):
+            return None
+        venue_ids = await access.list_accessible_venue_ids(
             account_id, company_id, MANAGE_PERMISSION, now
-        ):
+        )
+        if not venue_ids:
             raise AssessmentManagementPermissionDenied("permission denied")
+        return venue_ids
+
+    @staticmethod
+    def _require_venue_scope(
+        venue_id: UUID | None, venue_scope: set[UUID] | None
+    ) -> None:
+        if venue_scope is not None and (venue_id is None or venue_id not in venue_scope):
+            raise AssessmentManagementNotFound(
+                "assessment management resource not found"
+            )
 
     @staticmethod
     def _aware(value: datetime, name: str) -> datetime:
         if value.tzinfo is None or value.utcoffset() is None:
-            raise AssessmentManagementInvalid(
-                f"{name} must be timezone-aware"
-            )
+            raise AssessmentManagementInvalid(f"{name} must be timezone-aware")
         return value.astimezone(timezone.utc)
 
     @staticmethod
@@ -364,9 +532,7 @@ class AssessmentManagementService:
         return None
 
     @staticmethod
-    def _active_employee_predicate(
-        company_id: UUID, now: datetime
-    ) -> tuple[Any, ...]:
+    def _active_employee_predicate(company_id: UUID, now: datetime) -> tuple[Any, ...]:
         return (
             EmployeeProfile.company_id == company_id,
             EmployeeProfile.employment_status == "active",
@@ -382,7 +548,11 @@ class AssessmentManagementService:
         )
 
     async def _employee_cursor_exists(
-        self, company_id: UUID, employee_id: UUID, now: datetime
+        self,
+        company_id: UUID,
+        employee_id: UUID,
+        now: datetime,
+        venue_scope: set[UUID] | None,
     ) -> bool:
         statement = (
             select(EmployeeProfile.id)
@@ -396,9 +566,48 @@ class AssessmentManagementService:
                 *self._active_employee_predicate(company_id, now),
             )
         )
+        if venue_scope is not None:
+            statement = statement.where(
+                EmployeeProfile.id.in_(
+                    self._employees_for_venues(company_id, venue_scope, now)
+                )
+            )
+        return (await self._session.execute(statement)).scalar_one_or_none() is not None
+
+    @staticmethod
+    def _employees_for_venues(
+        company_id: UUID, venue_ids: set[UUID], now: datetime
+    ):
         return (
-            await self._session.execute(statement)
-        ).scalar_one_or_none() is not None
+            select(EmployeeAssignment.employee_profile_id)
+            .join(
+                AssignmentVenue,
+                (AssignmentVenue.assignment_id == EmployeeAssignment.id)
+                & (AssignmentVenue.company_id == EmployeeAssignment.company_id),
+            )
+            .where(
+                EmployeeAssignment.company_id == company_id,
+                EmployeeAssignment.status == "active",
+                EmployeeAssignment.deleted_at.is_(None),
+                EmployeeAssignment.starts_at <= now,
+                (EmployeeAssignment.ends_at.is_(None))
+                | (EmployeeAssignment.ends_at > now),
+                AssignmentVenue.company_id == company_id,
+                AssignmentVenue.venue_id.in_(venue_ids),
+            )
+        )
+
+    async def _employee_works_at_venue(
+        self,
+        company_id: UUID,
+        employee_profile_id: UUID,
+        venue_id: UUID,
+        now: datetime,
+    ) -> bool:
+        statement = self._employees_for_venues(company_id, {venue_id}, now).where(
+            EmployeeAssignment.employee_profile_id == employee_profile_id
+        ).limit(1)
+        return (await self._session.execute(statement)).scalar_one_or_none() is not None
 
     async def _assignment_cursor_exists(
         self, company_id: UUID, assignment_id: UUID
@@ -416,23 +625,55 @@ class AssessmentManagementService:
         self, company_id: UUID, employee_id: UUID, now: datetime
     ) -> EmployeeProfile:
         row = (
-            await self._session.execute(
-                select(EmployeeProfile)
-                .join(
-                    EmployeeAssignment,
-                    EmployeeAssignment.employee_profile_id == EmployeeProfile.id,
+            (
+                await self._session.execute(
+                    select(EmployeeProfile)
+                    .join(
+                        EmployeeAssignment,
+                        EmployeeAssignment.employee_profile_id == EmployeeProfile.id,
+                    )
+                    .join(Position, Position.id == EmployeeAssignment.position_id)
+                    .where(
+                        EmployeeProfile.id == employee_id,
+                        *self._active_employee_predicate(company_id, now),
+                    )
+                    .with_for_update(of=EmployeeProfile)
                 )
-                .join(Position, Position.id == EmployeeAssignment.position_id)
-                .where(
-                    EmployeeProfile.id == employee_id,
-                    *self._active_employee_predicate(company_id, now),
-                )
-                .with_for_update(of=EmployeeProfile)
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         if row is None:
             raise AssessmentManagementNotFound(
                 "assessment management resource not found"
+            )
+        return row
+
+    async def _lock_executor(
+        self, account_id: UUID, company_id: UUID, now: datetime
+    ) -> EmployeeProfile:
+        row = (
+            (
+                await self._session.execute(
+                    select(EmployeeProfile)
+                    .join(
+                        EmployeeAssignment,
+                        EmployeeAssignment.employee_profile_id == EmployeeProfile.id,
+                    )
+                    .join(Position, Position.id == EmployeeAssignment.position_id)
+                    .where(
+                        EmployeeProfile.account_id == account_id,
+                        *self._active_employee_predicate(company_id, now),
+                    )
+                    .with_for_update(of=EmployeeProfile)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if row is None:
+            raise AssessmentManagementPermissionDenied(
+                "active measurement executor is unavailable"
             )
         return row
 
@@ -442,8 +683,7 @@ class AssessmentManagementService:
                 select(AssessmentTemplateVersion.id)
                 .join(
                     AssessmentTemplate,
-                    AssessmentTemplateVersion.template_id
-                    == AssessmentTemplate.id,
+                    AssessmentTemplateVersion.template_id == AssessmentTemplate.id,
                 )
                 .where(
                     AssessmentTemplateVersion.id == version_id,
@@ -452,6 +692,9 @@ class AssessmentManagementService:
                     AssessmentTemplate.scope == "company",
                     AssessmentTemplate.status == "active",
                     AssessmentTemplate.deleted_at.is_(None),
+                    AssessmentTemplate.activity_type.in_(
+                        EMPLOYEE_ASSIGNMENT_ACTIVITY_TYPES
+                    ),
                 )
                 .with_for_update(of=AssessmentTemplateVersion)
             )
@@ -537,17 +780,24 @@ class AssessmentManagementService:
         if (
             assignment.status == "completed"
             and isinstance(row.result_json, dict)
-            and row.result_json.get("scoring_algorithm") == "completion_v1"
+            and row.result_json.get("scoring_algorithm")
+            in {"completion_v1", "weighted_v1"}
         ):
             completion = {
-                "scoring_algorithm": "completion_v1",
+                "scoring_algorithm": row.result_json["scoring_algorithm"],
                 "submitted_at": row.submitted_at,
                 "answered_count": row.answered_count,
                 "required_count": row.required_count,
                 "total_count": row.total_count,
+                "scoring_version": row.result_json.get("scoring_version"),
+                "score_percent": row.result_json.get("score_percent"),
+                "coverage": row.result_json.get("coverage"),
+                "critical_failure_count": row.result_json.get("critical_failure_count"),
+                "stop_factor_count": row.result_json.get("stop_factor_count"),
             }
         return {
             "id": assignment.id,
+            "venue_id": assignment.venue_id,
             "status": assignment.status,
             "assigned_at": assignment.assigned_at,
             "due_at": assignment.due_at,

@@ -25,7 +25,9 @@ from app.internal.services.assessment_management_service import (
     AssessmentManagementService,
     AssessmentManagementStateConflict,
     CreateAssignment,
+    StartManagerMeasurement,
 )
+from app.api.routers.account_assessments import AttemptDocumentResponse
 
 
 router = APIRouter(
@@ -92,11 +94,16 @@ class AssignmentTemplate(StrictModel):
 
 
 class CompletionReceipt(StrictModel):
-    scoring_algorithm: Literal["completion_v1"]
+    scoring_algorithm: Literal["completion_v1", "weighted_v1"]
     submitted_at: datetime
     answered_count: int = Field(ge=0)
     required_count: int = Field(ge=0)
     total_count: int = Field(ge=0)
+    scoring_version: int | None = Field(default=None, ge=1)
+    score_percent: str | None = None
+    coverage: str | None = None
+    critical_failure_count: int | None = Field(default=None, ge=0)
+    stop_factor_count: int | None = Field(default=None, ge=0)
 
 
 class AssignmentProgress(StrictModel):
@@ -111,6 +118,7 @@ class AssignmentProgress(StrictModel):
 
 class ManagerAssignmentResponse(StrictModel):
     id: UUID
+    venue_id: UUID | None
     status: Literal["assigned", "in_progress", "completed", "revoked"]
     assigned_at: datetime
     due_at: datetime | None
@@ -124,16 +132,21 @@ class ManagerAssignmentResponse(StrictModel):
 class CreateAssignmentRequest(StrictModel):
     employee_profile_id: UUID
     template_version_id: UUID
+    venue_id: UUID | None = None
     due_at: datetime | None = None
 
     @field_validator("due_at")
     @classmethod
     def due_at_is_aware(cls, value: datetime | None) -> datetime | None:
-        if value is not None and (
-            value.tzinfo is None or value.utcoffset() is None
-        ):
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
             raise ValueError("due_at must be timezone-aware")
         return value
+
+
+class StartManagerMeasurementRequest(StrictModel):
+    employee_profile_id: UUID
+    template_version_id: UUID
+    venue_id: UUID | None = None
 
 
 ERRORS = {
@@ -212,9 +225,7 @@ async def list_management_employees(
         raise _controlled(error) from error
 
 
-@router.get(
-    "/templates", response_model=list[TemplateVersionSummary], responses=ERRORS
-)
+@router.get("/templates", response_model=list[TemplateVersionSummary], responses=ERRORS)
 async def list_management_templates(
     company_id: UUID,
     response: Response,
@@ -265,9 +276,7 @@ async def list_management_assignments(
         raise _controlled(error) from error
 
 
-@router.post(
-    "/assignments", response_model=ManagerAssignmentResponse, responses=ERRORS
-)
+@router.post("/assignments", response_model=ManagerAssignmentResponse, responses=ERRORS)
 async def create_management_assignment(
     company_id: UUID,
     request: CreateAssignmentRequest,
@@ -285,7 +294,41 @@ async def create_management_assignment(
                 company_id=company_id,
                 employee_profile_id=request.employee_profile_id,
                 template_version_id=request.template_version_id,
+                venue_id=request.venue_id,
                 due_at=request.due_at,
+                now=datetime.now(timezone.utc),
+            )
+        )
+        await session.commit()
+        return value
+    except Exception as error:
+        await session.rollback()
+        raise _controlled(error) from error
+
+
+@router.post(
+    "/measurements",
+    response_model=AttemptDocumentResponse,
+    responses=ERRORS,
+)
+async def start_management_measurement(
+    company_id: UUID,
+    request: StartManagerMeasurementRequest,
+    response: Response,
+    principal: Annotated[
+        CurrentAccountPrincipal, Depends(get_current_account_principal)
+    ],
+    session: Annotated[AsyncSession, Depends(get_account_auth_session)],
+) -> dict[str, Any]:
+    _no_store(response)
+    try:
+        value = await AssessmentManagementService(session).start_manager_measurement(
+            StartManagerMeasurement(
+                account_id=principal.account_id,
+                company_id=company_id,
+                subject_employee_profile_id=request.employee_profile_id,
+                template_version_id=request.template_version_id,
+                venue_id=request.venue_id,
                 now=datetime.now(timezone.utc),
             )
         )

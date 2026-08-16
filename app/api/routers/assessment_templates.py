@@ -327,6 +327,13 @@ async def adopt(
                 now=datetime.now(timezone.utc),
             )
         )
+        await AssessmentTemplateService(session).publish_template_version(
+            PublishTemplateVersion(
+                template_id=result.company_template_id,
+                template_version_id=result.draft_version_id,
+                now=datetime.now(timezone.utc),
+            )
+        )
         await session.commit()
         return result.__dict__
     except HTTPException:

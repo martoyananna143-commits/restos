@@ -20,7 +20,6 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
-    LargeBinary,
     Numeric,
     String,
     Text,
@@ -71,9 +70,7 @@ class AssessmentMethodology(Base, TimestampMixin, SoftDeleteMixin):
             "code",
             "version",
             unique=True,
-            postgresql_where=text(
-                "deleted_at IS NULL AND owner_type = 'system'"
-            ),
+            postgresql_where=text("deleted_at IS NULL AND owner_type = 'system'"),
         ),
         Index(
             "uq_assessment_methodologies_company_code_version",
@@ -81,13 +78,13 @@ class AssessmentMethodology(Base, TimestampMixin, SoftDeleteMixin):
             "code",
             "version",
             unique=True,
-            postgresql_where=text(
-                "deleted_at IS NULL AND owner_type = 'company'"
-            ),
+            postgresql_where=text("deleted_at IS NULL AND owner_type = 'company'"),
         ),
     )
 
-    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
     owner_type: Mapped[str] = mapped_column(String(20), nullable=False)
     company_id: Mapped[Optional[UUID]] = mapped_column(
         PGUUID(as_uuid=True),
@@ -163,7 +160,9 @@ class AssessmentTemplate(Base, TimestampMixin, SoftDeleteMixin):
         ),
     )
 
-    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
     scope: Mapped[str] = mapped_column(String(20), nullable=False)
     company_id: Mapped[Optional[UUID]] = mapped_column(
         PGUUID(as_uuid=True),
@@ -218,7 +217,9 @@ class AssessmentTemplateVersion(Base, TimestampMixin):
         ),
     )
 
-    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
     template_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("assessment_templates.id", ondelete="CASCADE"),
@@ -296,7 +297,9 @@ class AssessmentTemplateSection(Base, TimestampMixin):
         ),
     )
 
-    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
     template_version_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("assessment_template_versions.id", ondelete="CASCADE"),
@@ -316,6 +319,11 @@ class AssessmentTemplateSection(Base, TimestampMixin):
 class AssessmentTemplateItem(Base, TimestampMixin):
     __tablename__ = "assessment_template_items"
     __table_args__ = (
+        UniqueConstraint(
+            "id",
+            "template_version_id",
+            name="uq_assessment_template_items_id_version",
+        ),
         UniqueConstraint(
             "template_version_id",
             "code",
@@ -378,7 +386,9 @@ class AssessmentTemplateItem(Base, TimestampMixin):
         ),
     )
 
-    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
     template_version_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("assessment_template_versions.id", ondelete="CASCADE"),
@@ -427,7 +437,9 @@ class AssessmentTemplateItemOption(Base, TimestampMixin):
         ),
     )
 
-    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid4
+    )
     item_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("assessment_template_items.id", ondelete="CASCADE"),

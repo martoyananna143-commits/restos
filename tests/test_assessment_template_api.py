@@ -253,6 +253,9 @@ def test_adopt_commits_and_returns_counts(monkeypatch):
                 option_count=0,
             )
 
+        async def publish_template_version(self, request):
+            return SimpleNamespace(template_id=request.template_id)
+
     monkeypatch.setattr(assessment_templates, "AssessmentTemplateService", Templates)
     http, session = client(monkeypatch)
     source_id = uuid4()

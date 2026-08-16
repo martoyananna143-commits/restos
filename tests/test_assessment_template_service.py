@@ -21,6 +21,9 @@ from app.infra.database.models.assessment_template import (
     AssessmentTemplateVersion,
 )
 from app.infra.database.models.company import Company
+from app.internal.services.assessment_catalog_service import (
+    AssessmentCatalogService,
+)
 from app.internal.services.assessment_template_service import (
     AdoptLibraryTemplate,
     AssessmentMethodologyNotFound,
@@ -240,6 +243,35 @@ async def test_publish_methodology(context):
     assert result.published_at == NOW
     assert value.code == "service-standard"
     assert value.title == "Title"
+
+
+@pytest.mark.asyncio
+async def test_company_catalog_lists_blocked_draft_methodology(context):
+    method = methodology(
+        status="draft",
+        owner_type="company",
+        company_id=context.company.id,
+    )
+    company_template = template(
+        scope="company",
+        company_id=context.company.id,
+        code=f"blocked-{uuid4().hex[:8]}",
+    )
+    context.session.add_all([method, company_template])
+    await context.session.flush()
+    draft = version(company_template.id, method.id, status="draft")
+    context.session.add(draft)
+    await context.session.flush()
+
+    rows = await AssessmentCatalogService(
+        context.session
+    ).list_company_templates(context.company.id)
+
+    assert len(rows) == 1
+    assert rows[0]["template_id"] == company_template.id
+    assert rows[0]["latest_draft"]["version_id"] == draft.id
+    assert rows[0]["latest_published"] is None
+    assert rows[0]["methodology"]["id"] == method.id
 
 
 @pytest.mark.asyncio

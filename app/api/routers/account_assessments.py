@@ -1,6 +1,6 @@
 """Authenticated employee assessment assignment and attempt HTTP boundary."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -10,13 +10,17 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.account_auth import get_current_account_principal
-from app.api.routers.account_invitation_auth import PublicError, get_account_auth_session
+from app.api.routers.account_invitation_auth import (
+    PublicError,
+    get_account_auth_session,
+)
 from app.internal.services.account_access_token_service import CurrentAccountPrincipal
 from app.internal.services.assessment_attempt_service import (
     AnswerInput,
     AssessmentAttemptIncomplete,
     AssessmentAttemptInvalid,
     AssessmentAttemptNotFound,
+    AssessmentAssignmentPeriodInvalid,
     AssessmentAttemptReadOnly,
     AssessmentAttemptRevisionConflict,
     AssessmentAttemptService,
@@ -36,25 +40,36 @@ class AnswerRequest(StrictModel):
     item_id: UUID
     answer_type: str = Field(min_length=1, max_length=30)
     value: Any
+    comment: str | None = Field(default=None, max_length=10_000)
 
 
 class ReplaceDraftRequest(StrictModel):
     expected_revision: int = Field(ge=0)
     answers: list[AnswerRequest] = Field(max_length=5_000)
+    section_order: list[UUID] | None = Field(default=None, max_length=1_000)
 
 
 class AttemptAnswerResponse(StrictModel):
     item_id: UUID
     answer_type: Literal[
-        "boolean", "score", "integer", "decimal", "text",
-        "single_choice", "multi_choice", "date", "time",
+        "boolean",
+        "score",
+        "integer",
+        "decimal",
+        "text",
+        "single_choice",
+        "multi_choice",
+        "date",
+        "time",
     ]
     value: bool | int | str | list[UUID]
+    comment: str | None
 
 
 class AssessmentInputConfigResponse(StrictModel):
     placeholder: str | None = None
     max_length: int | None = Field(default=None, ge=0)
+    critical_threshold: str | None = None
 
 
 class AssessmentOptionResponse(StrictModel):
@@ -68,11 +83,31 @@ class AssessmentItemResponse(StrictModel):
     prompt: str
     guidance: str | None
     answer_type: Literal[
-        "boolean", "score", "integer", "decimal", "text",
-        "single_choice", "multi_choice", "date", "time",
+        "boolean",
+        "score",
+        "integer",
+        "decimal",
+        "text",
+        "single_choice",
+        "multi_choice",
+        "date",
+        "time",
     ]
     required: bool
     sort_order: int
+    weight: str | None
+    min_value: str | None
+    max_value: str | None
+    passing_value: str | None
+    evidence_mode: Literal[
+        "none",
+        "optional_photo",
+        "required_photo",
+        "optional_comment",
+        "required_comment",
+        "photo_and_comment",
+    ]
+    criticality: Literal["normal", "critical", "stop_factor"]
     config: AssessmentInputConfigResponse
     options: list[AssessmentOptionResponse]
 
@@ -94,9 +129,11 @@ class AssessmentTemplateDocumentResponse(StrictModel):
 class AssessmentAssignmentSummaryResponse(StrictModel):
     id: UUID
     company_id: UUID
+    venue_id: UUID | None
     status: Literal["assigned", "in_progress", "completed", "revoked"]
     assigned_at: datetime
     due_at: datetime | None
+    submitted_at: datetime | None
     template_name: str
     template_version: int
     read_only: bool
@@ -104,6 +141,10 @@ class AssessmentAssignmentSummaryResponse(StrictModel):
 
 class AssessmentAssignmentDetailResponse(AssessmentAssignmentSummaryResponse):
     document: AssessmentTemplateDocumentResponse
+
+
+class AttemptUiMetadataResponse(StrictModel):
+    section_order: list[UUID] = Field(default_factory=list, max_length=1_000)
 
 
 class AttemptDocumentResponse(StrictModel):
@@ -118,9 +159,12 @@ class AttemptDocumentResponse(StrictModel):
     read_only_reason: Literal["submitted", "revoked", "expired"] | None
     document: AssessmentTemplateDocumentResponse
     answers: list[AttemptAnswerResponse]
+    ui_metadata: AttemptUiMetadataResponse = Field(
+        default_factory=lambda: AttemptUiMetadataResponse()
+    )
 
 
-class AssessmentCompletionResponse(StrictModel):
+class AssessmentCompletionV1Response(StrictModel):
     scoring_algorithm: Literal["completion_v1"]
     submitted_at: datetime
     answered_count: int = Field(ge=0)
@@ -128,18 +172,45 @@ class AssessmentCompletionResponse(StrictModel):
     total_count: int = Field(ge=0)
 
 
-class AssessmentSubmissionResponse(AssessmentCompletionResponse):
-    pass
+class AssessmentWeightedSectionResponse(StrictModel):
+    section_id: UUID
+    section_code: str
+    title: str
+    score_percent: str | None
+    coverage: str
+    critical_failure_count: int = Field(ge=0)
+    stop_factor_count: int = Field(ge=0)
 
 
-class AssessmentResultResponse(AssessmentCompletionResponse):
-    pass
+class AssessmentWeightedV1Response(StrictModel):
+    scoring_algorithm: Literal["weighted_v1"]
+    scoring_version: Literal[1]
+    submitted_at: datetime
+    numerator: str
+    denominator: str
+    score_percent: str
+    coverage: str
+    answered_count: int = Field(ge=0)
+    required_count: int = Field(ge=0)
+    total_count: int = Field(ge=0)
+    eligible_count: int = Field(ge=0)
+    excluded_count: int = Field(ge=0)
+    critical_failure_count: int = Field(ge=0)
+    stop_factor_count: int = Field(ge=0)
+    sections: list[AssessmentWeightedSectionResponse]
+
+
+AssessmentSubmissionResponse = (
+    AssessmentCompletionV1Response | AssessmentWeightedV1Response
+)
+AssessmentResultResponse = AssessmentSubmissionResponse
 
 
 class RevisionConflictDetail(StrictModel):
     code: str
     current_revision: int
     answers: list[AttemptAnswerResponse]
+    ui_metadata: AttemptUiMetadataResponse
 
 
 class RevisionConflictResponse(StrictModel):
@@ -177,11 +248,30 @@ def _no_store(response: Response) -> None:
 )
 async def list_assignments(
     response: Response,
-    principal: Annotated[CurrentAccountPrincipal, Depends(get_current_account_principal)],
+    principal: Annotated[
+        CurrentAccountPrincipal, Depends(get_current_account_principal)
+    ],
     session: Annotated[AsyncSession, Depends(get_account_auth_session)],
+    company_id: UUID | None = None,
+    history_period: Literal[
+        "today", "yesterday", "previous_week", "previous_month", "custom"
+    ]
+    | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> list[dict[str, Any]]:
     _no_store(response)
-    return await AssessmentAttemptService(session).list_assignments(principal.account_id, datetime.now(timezone.utc))
+    try:
+        return await AssessmentAttemptService(session).list_assignments(
+            principal.account_id,
+            datetime.now(timezone.utc),
+            company_id=company_id,
+            history_period=history_period,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except AssessmentAssignmentPeriodInvalid as error:
+        raise _error("invalid_assessment_period", status.HTTP_422_UNPROCESSABLE_ENTITY) from error
 
 
 @router.get(
@@ -192,12 +282,16 @@ async def list_assignments(
 async def get_assignment(
     assignment_id: UUID,
     response: Response,
-    principal: Annotated[CurrentAccountPrincipal, Depends(get_current_account_principal)],
+    principal: Annotated[
+        CurrentAccountPrincipal, Depends(get_current_account_principal)
+    ],
     session: Annotated[AsyncSession, Depends(get_account_auth_session)],
 ) -> dict[str, Any]:
     _no_store(response)
     try:
-        return await AssessmentAttemptService(session).assignment_detail(principal.account_id, assignment_id, datetime.now(timezone.utc))
+        return await AssessmentAttemptService(session).assignment_detail(
+            principal.account_id, assignment_id, datetime.now(timezone.utc)
+        )
     except Exception as error:
         raise _controlled(error) from error
 
@@ -214,12 +308,16 @@ async def get_assignment(
 async def create_or_resume_attempt(
     assignment_id: UUID,
     response: Response,
-    principal: Annotated[CurrentAccountPrincipal, Depends(get_current_account_principal)],
+    principal: Annotated[
+        CurrentAccountPrincipal, Depends(get_current_account_principal)
+    ],
     session: Annotated[AsyncSession, Depends(get_account_auth_session)],
 ) -> dict[str, Any]:
     _no_store(response)
     try:
-        value = await AssessmentAttemptService(session).create_or_resume(principal.account_id, assignment_id, datetime.now(timezone.utc))
+        value = await AssessmentAttemptService(session).create_or_resume(
+            principal.account_id, assignment_id, datetime.now(timezone.utc)
+        )
         await session.commit()
         return value
     except Exception as error:
@@ -235,12 +333,16 @@ async def create_or_resume_attempt(
 async def get_attempt(
     attempt_id: UUID,
     response: Response,
-    principal: Annotated[CurrentAccountPrincipal, Depends(get_current_account_principal)],
+    principal: Annotated[
+        CurrentAccountPrincipal, Depends(get_current_account_principal)
+    ],
     session: Annotated[AsyncSession, Depends(get_account_auth_session)],
 ) -> dict[str, Any]:
     _no_store(response)
     try:
-        return await AssessmentAttemptService(session).read_attempt(principal.account_id, attempt_id, datetime.now(timezone.utc))
+        return await AssessmentAttemptService(session).read_attempt(
+            principal.account_id, attempt_id, datetime.now(timezone.utc)
+        )
     except Exception as error:
         raise _controlled(error) from error
 
@@ -257,19 +359,29 @@ async def replace_attempt_draft(
     attempt_id: UUID,
     request: ReplaceDraftRequest,
     response: Response,
-    principal: Annotated[CurrentAccountPrincipal, Depends(get_current_account_principal)],
+    principal: Annotated[
+        CurrentAccountPrincipal, Depends(get_current_account_principal)
+    ],
     session: Annotated[AsyncSession, Depends(get_account_auth_session)],
 ) -> Any:
     _no_store(response)
     service = AssessmentAttemptService(session)
     try:
-        value = await service.replace_draft(ReplaceDraft(
-            account_id=principal.account_id,
-            attempt_id=attempt_id,
-            expected_revision=request.expected_revision,
-            answers=[AnswerInput(value.item_id, value.answer_type, value.value) for value in request.answers],
-            now=datetime.now(timezone.utc),
-        ))
+        value = await service.replace_draft(
+            ReplaceDraft(
+                account_id=principal.account_id,
+                attempt_id=attempt_id,
+                expected_revision=request.expected_revision,
+                answers=[
+                    AnswerInput(
+                        value.item_id, value.answer_type, value.value, value.comment
+                    )
+                    for value in request.answers
+                ],
+                now=datetime.now(timezone.utc),
+                section_order=request.section_order,
+            )
+        )
         await session.commit()
         return value
     except AssessmentAttemptRevisionConflict as error:
@@ -285,6 +397,7 @@ async def replace_attempt_draft(
                         {**answer, "item_id": str(answer["item_id"])}
                         for answer in error.answers
                     ],
+                    "ui_metadata": error.ui_metadata,
                 }
             },
         )
@@ -305,12 +418,16 @@ async def replace_attempt_draft(
 async def submit_attempt(
     attempt_id: UUID,
     response: Response,
-    principal: Annotated[CurrentAccountPrincipal, Depends(get_current_account_principal)],
+    principal: Annotated[
+        CurrentAccountPrincipal, Depends(get_current_account_principal)
+    ],
     session: Annotated[AsyncSession, Depends(get_account_auth_session)],
 ) -> dict[str, Any]:
     _no_store(response)
     try:
-        value = await AssessmentAttemptService(session).submit(principal.account_id, attempt_id, datetime.now(timezone.utc))
+        value = await AssessmentAttemptService(session).submit(
+            principal.account_id, attempt_id, datetime.now(timezone.utc)
+        )
         await session.commit()
         return value
     except Exception as error:
@@ -326,11 +443,15 @@ async def submit_attempt(
 async def get_attempt_result(
     attempt_id: UUID,
     response: Response,
-    principal: Annotated[CurrentAccountPrincipal, Depends(get_current_account_principal)],
+    principal: Annotated[
+        CurrentAccountPrincipal, Depends(get_current_account_principal)
+    ],
     session: Annotated[AsyncSession, Depends(get_account_auth_session)],
 ) -> dict[str, Any]:
     _no_store(response)
     try:
-        return await AssessmentAttemptService(session).result(principal.account_id, attempt_id, datetime.now(timezone.utc))
+        return await AssessmentAttemptService(session).result(
+            principal.account_id, attempt_id, datetime.now(timezone.utc)
+        )
     except Exception as error:
         raise _controlled(error) from error

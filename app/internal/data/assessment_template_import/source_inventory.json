@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "filename": "_Оценка вкуса и скорости_Дебри.xlsx",
+      "sha256": "5dc8d0f7d9a3f1bd748bad19cba312533106629b5af3fcf6028740e2c9407436",
+      "provenance": "read_only_methodology_source",
+      "usage": "repeatable_taste_speed_measurement"
+    },
+    {
+      "filename": "Бланк аналитики отзывов общий 2026.xlsx",
+      "sha256": "a73781bf5a4eea18a6b85a72a705c28cfa656ebab4e615df063b1ff8ba87d94b",
+      "provenance": "read_only_methodology_source",
+      "usage": "review_journal_design_only"
+    },
+    {
+      "filename": "КЛН повара_Камелот.xlsx",
+      "sha256": "6bdcdcb35a6003769552209e6439bb6c56f9ac968120da6bdeb650db592e064e",
+      "provenance": "read_only_methodology_source",
+      "usage": "cook_evaluation"
+    },
+    {
+      "filename": "КЛН Руководителей_Камелот.xlsx",
+      "sha256": "b19824ecac962517df729aa7270aca97ce77a191f211136e3e10007660e63c16",
+      "provenance": "read_only_methodology_source",
+      "usage": "kitchen_and_bar_practicums"
+    },
+    {
+      "filename": "НОВЫЙ ИСПРАВЛЕННЫЙ КЛН-корректировка официант - Камелот, новый .xlsx",
+      "sha256": "e0e34ffcb0304fc3db9f0c9b790acc8613d54cc76488ef1b2bba6d08b584048a",
+      "provenance": "read_only_methodology_source",
+      "usage": "waiter_evaluation_draft_missing_weights"
+    },
+    {
+      "filename": "SM, КЛН_ITCI,  Камелот - новый .xlsx",
+      "sha256": "43d2993f09a616ead491b412ef48ccc778392f786d9d4f45da17d4b59aaa33d9",
+      "provenance": "read_only_methodology_source",
+      "usage": "itci_evaluation_primary_30_items"
+    },
+    {
+      "filename": "SM, Бланк оценки сервиса ресторана, Камелот - новый .xlsx",
+      "sha256": "13b24f5ebf320d7bc7ed2c0313dd99b8b0f44c8408ce688c7e3406f47dea8e4d",
+      "provenance": "read_only_methodology_source",
+      "usage": "restaurant_service_walkthrough"
+    },
+    {
+      "filename": "НОВЫЙ ИСПРАВЛЕННЫЙ КЛН-корректировка хостес .xlsx",
+      "sha256": "065b9e74097bb7cdda55d3d36df7840b89d5c91bcaef226ab5f6abfabef80938",
+      "provenance": "read_only_methodology_source",
+      "usage": "hostess_evaluation"
+    },
+    {
+      "filename": "БО производства WP_Дебри.xlsx",
+      "sha256": "933fca2cb9b9b8b043e2085c547193bc9af6b2fefbe2392f2abe1537238c15bd",
+      "provenance": "read_only_methodology_source",
+      "usage": "production_walkthrough"
+    }
+  ]
+}

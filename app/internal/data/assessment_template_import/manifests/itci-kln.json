@@ -1,0 +1,813 @@
+{
+  "schema_version": 1,
+  "source": {
+    "filename": "SM, КЛН_ITCI,  Камелот - новый .xlsx",
+    "sha256": "43d2993f09a616ead491b412ef48ccc778392f786d9d4f45da17d4b59aaa33d9",
+    "provenance": "read_only_methodology_source"
+  },
+  "template": {
+    "code": "itci-kln",
+    "name": "КЛН ITCI",
+    "activity_type": "evaluation",
+    "description": "Company-private draft imported from reviewed methodology source.",
+    "methodology": {
+      "code": "itci-kln-methodology",
+      "title": "КЛН ITCI",
+      "body": "Взвешенная оценка по критериям Да/Нет. Отсутствующие исторические результаты и персональные данные не импортируются.",
+      "version": 1
+    },
+    "scoring": {
+      "algorithm": "weighted_v1",
+      "version": 1,
+      "config": {
+        "rounding": "half_up",
+        "score_scale": 100
+      }
+    },
+    "sections": [
+      {
+        "code": "podgotovka",
+        "title": "Подготовка",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "menedzher-restorana-podgotovilsya-k-sobraniyu-zaranee-est-plan-provedeniya-sobraniya-pered",
+            "prompt": "Менеджер ресторана подготовился к собранию заранее, есть план проведения собрания. Перед собранием менеджер прогнал собрание с управляющим.",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "pooschraetsya-veselaya-i-pozitivnaya-atmosfera-esche-do-nachala-sobraniya-muzyka-filmy-ser",
+            "prompt": "Поощрается веселая и позитивная атмосфера ещё до начала собрания (музыка, фильмы, сериалы и тд)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "mesto-provedeniya-sobraniya-podgotovleno-est-kuda-zapisyvat-informaciyu-mesta-dlya-vsey-ko",
+            "prompt": "Место проведения собрания подготовлено, есть куда записывать информацию, места для всей команды достаточно",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "provedenie",
+        "title": "Проведение",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "sobranie-nachali-vovremya-bez-zaderzhek-ili-chut-ranshe",
+            "prompt": "Собрание начали вовремя без задержек или чуть раньше",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-poprivetstvoval-uchastnikov-cenyatsya-individualnye-ritualy-s-sotrudnikami",
+            "prompt": "Менеджер поприветствовал участников, ценятся индивидуальные ритуалы с сотрудниками",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "rech-menedzhera-yarkaya-motiviruyuschaya-i-zaryazhayuschaya-pozitivom-na-den",
+            "prompt": "Речь менеджера яркая, мотивирующая и заряжающая позитивом на день",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-informiruet-komandu-ob-aktualnoy-informacii-bara-zala-pozitivnyh-i-negativnyh-ot",
+            "prompt": "Менеджер информирует команду об актуальной информации бара, зала: позитивных и негативных отзывах за прошлую смену, план/ факт по выручке за месяц на вчерашний день, план по выручке на сегодняшний день, успехи прошлого дня",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "economics",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "aktualnaya-informaciya-sobrana-dlya-vseh-dolzhnostey-hostes-oficianty-barmeny",
+            "prompt": "Актуальная информация собрана для всех должностей: хостес, официанты, бармены",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-postavil-aktualnye-zadachi-po-servisu-na-den",
+            "prompt": "Менеджер поставил актуальные задачи по сервису на день",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-stavit-celi-po-prodazham-napolnyaemosti-cheka-go-list",
+            "prompt": "Менеджер ставит цели по продажам/наполняемости чека/ go-list",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "economics",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-stavit-celi-po-tehnike-smart",
+            "prompt": "Менеджер ставит цели по технике SMART",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "zadachi-po-servisu-i-ekonomike-zatragivayut-vse-dolzhnosti-oficianty-barmeny-hostes",
+            "prompt": "Задачи по сервису и экономике затрагивают все должности: официанты, бармены, хостес",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "economics",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "upravlenie-sobraniem",
+        "title": "Управление собранием",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "pri-nalichii-vozrazheniy-menedzher-ih-otrabotal",
+            "prompt": "При наличии возражений, менеджер их отработал",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "upravlyaet-vnimaniem-vseh-sotrudnikov",
+            "prompt": "Управляет вниманием всех сотрудников",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sobranie-otrazhaet-cennosti-i-khb-sobranie-veseloe-dopuskayutsya-shutki-smeh-i-obsuzhdeniy",
+            "prompt": "Собрание отражает ценности и КХБ - собрание веселое, допускаются шутки, смех и обсуждения без помех для проведения собрания",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "perehod-k-kross-treningu",
+        "title": "Переход к кросс-тренингу",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "menedzher-oboznachil-perehod-k-kross-treningu-dlya-komandy",
+            "prompt": "Менеджер обозначил переход к кросс-тренингу для команды",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-oboznachil-temu-kross-treninga-i-argumentiroval-vybor-etoy-temy-segodnya",
+            "prompt": "Менеджер обозначил тему кросс-тренинга и аргументировал выбор этой темы сегодня",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "teoreticheskaya-chast",
+        "title": "Теоретическая часть",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "menedzher-zaranee-otpravil-standart-video-zadachu-foto-dlya-provedeniya-mini-lekcii",
+            "prompt": "Менеджер заранее отправил стандарт/ видео/ задачу/ фото, для проведения мини-лекции",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-provel-revyu-po-standartu",
+            "prompt": "Менеджер провел ревью по стандарту",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "standart-vybrannyy-dlya-otrabotki-aktualnyy",
+            "prompt": "Стандарт, выбранный для отработки актуальный",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "provedenie-praktiki",
+        "title": "Проведение практики",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "podgotovlen-inventar-dlya-provedeniya-uprazhneniya",
+            "prompt": "Подготовлен инвентарь для проведения упражнения",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-podrobno-i-konkretno-rasskazal-usloviya-smysl-uprazhneniya-algoritm-provedeniya",
+            "prompt": "Менеджер подробно и конкретно рассказал условия, смысл упражнения, алгоритм проведения",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-kontroliruet-vypolnenie-zadaniya-vnosit-korrektirovki-zdes-i-seychas",
+            "prompt": "Менеджер контролирует выполнение задания, вносит корректировки здесь и сейчас",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-ustanavlivaet-vremya-provedeniya-kross-treninga",
+            "prompt": "Менеджер устанавливает время проведения кросс- тренинга",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-v-konce-mini-treninga-podvel-vyvody-uchastnikov-k-logicheskomu-zaversheniyu-dlya",
+            "prompt": "Менеджер в конце мини-тренинга подвел выводы участников к логическому завершению (для того что бы изменилось поведение сотрудников в зале)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "zaklyuchenie",
+        "title": "Заключение",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "menedzher-ulozhilsya-v-15-minutnyy-tayming-provedeniya-sobraniya",
+            "prompt": "Менеджер уложился в 15 минутный тайминг проведения собрания",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-obsudil-obuchenie-s-komandoy-sprosil-ih-mnenie-sobral-predlozheniya-i-videnie-ko",
+            "prompt": "Менеджер обсудил обучение с командой, спросил их мнение, собрал предложения и видение команды на стандарт, механику работы и отработку навыка/ знания",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "menedzher-postavil-zadachu-po-itogam-kross-treninga-i-oboznachil-metod-kontrolya-so-svoey",
+            "prompt": "Менеджер поставил задачу по итогам кросс-тренинга и обозначил метод контроля со своей стороны",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "energichnaya-zaryazhayuschaya-bodrilka-prisutstvuet",
+            "prompt": "Энергичная заряжающая бодрилка присутствует",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "prisutstvuet-konechnyy-komandnyy-ritual",
+            "prompt": "Присутствует конечный командный ритуал",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

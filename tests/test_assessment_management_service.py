@@ -16,9 +16,11 @@ from app.infra.database.models import (
 from app.internal.services.assessment_management_service import (
     AssessmentManagementAlreadyCompleted,
     AssessmentManagementDuplicate,
+    AssessmentManagementNotFound,
     AssessmentManagementPermissionDenied,
     AssessmentManagementService,
     CreateAssignment,
+    StartManagerMeasurement,
 )
 from app.internal.services.assessment_attempt_service import (
     AnswerInput,
@@ -38,9 +40,43 @@ def command(context, *, due_at=None):
         company_id=context.company.id,
         employee_profile_id=context.profile.id,
         template_version_id=context.version.id,
+        venue_id=None,
         due_at=due_at,
         now=NOW,
     )
+
+
+def measurement_command(context):
+    return StartManagerMeasurement(
+        account_id=context.account.id,
+        company_id=context.company.id,
+        subject_employee_profile_id=context.profile.id,
+        template_version_id=context.version.id,
+        venue_id=None,
+        now=NOW,
+    )
+
+
+@pytest.mark.asyncio
+async def test_manager_measurement_uses_subject_and_manager_owned_attempt():
+    engine = create_async_engine(os.environ["DATABASE_URL"])
+    async with AsyncSession(engine, expire_on_commit=False) as session:
+        context = await seed_context(session)
+        context.assignment.status = "completed"
+        context.assignment.completed_at = NOW
+        await session.flush()
+        result = await AssessmentManagementService(session).start_manager_measurement(
+            measurement_command(context)
+        )
+        attempt = await session.get(AssessmentAttempt, result["id"])
+        assignment = await session.get(AssessmentAssignment, result["assignment_id"])
+        assert assignment.purpose == "manager_measurement"
+        assert assignment.employee_profile_id == context.profile.id
+        assert assignment.assigned_by_account_id == context.account.id
+        assert attempt.account_id == context.account.id
+        assert result["read_only"] is False
+        await session.rollback()
+    await engine.dispose()
 
 
 @pytest.mark.asyncio
@@ -92,6 +128,26 @@ async def test_owner_directory_templates_and_safe_assignment_projection():
 
 
 @pytest.mark.asyncio
+async def test_operational_walkthrough_is_not_exposed_as_employee_assignment():
+    engine = create_async_engine(os.environ["DATABASE_URL"])
+    async with AsyncSession(engine, expire_on_commit=False) as session:
+        context = await seed_context(session)
+        context.template.activity_type = "walkthrough"
+        await session.flush()
+        service = AssessmentManagementService(session)
+
+        assert (
+            await service.list_templates(context.account.id, context.company.id, NOW)
+            == []
+        )
+        with pytest.raises(AssessmentManagementNotFound):
+            await service.create_assignment(command(context))
+
+        await session.rollback()
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_create_sets_account_audit_and_allows_repeat_after_terminal_states():
     engine = create_async_engine(os.environ["DATABASE_URL"])
     async with AsyncSession(engine, expire_on_commit=False) as session:
@@ -107,6 +163,7 @@ async def test_create_sets_account_audit_and_allows_repeat_after_terminal_states
         assert row.assigned_by_account_id == context.account.id
         assert row.assigned_by_employee_profile_id == context.profile.id
         assert row.status == "assigned"
+        assert row.purpose == "employee_evaluation"
         row.status = "revoked"
         row.revoked_at = NOW
         await session.flush()
@@ -194,9 +251,9 @@ async def test_ten_worker_concurrent_create_has_one_winner():
                     start.set()
             await start.wait()
             try:
-                result = await AssessmentManagementService(
-                    session
-                ).create_assignment(values)
+                result = await AssessmentManagementService(session).create_assignment(
+                    values
+                )
                 await session.commit()
                 return "success", result["id"]
             except AssessmentManagementDuplicate:
@@ -272,6 +329,9 @@ async def test_ordinary_employee_is_denied(monkeypatch):
         async def can_in_company(self, *_args):
             return False
 
+        async def list_accessible_venue_ids(self, *_args):
+            return set()
+
     monkeypatch.setattr(
         "app.internal.services.assessment_management_service.AccessDecisionService",
         Access,
@@ -296,12 +356,17 @@ async def test_manage_permission_implies_read_but_read_does_not_imply_manage(
         async def can_in_company(self, _account, _company, permission, _now):
             return permission == "assessment.assignment.manage"
 
+        async def list_accessible_venue_ids(self, *_args):
+            return set()
+
     monkeypatch.setattr(
         "app.internal.services.assessment_management_service.AccessDecisionService",
         Access,
     )
     service = AssessmentManagementService(None)
-    await service._require_read(__import__("uuid").uuid4(), __import__("uuid").uuid4(), NOW)
+    await service._require_read(
+        __import__("uuid").uuid4(), __import__("uuid").uuid4(), NOW
+    )
     await service._require_manage(
         __import__("uuid").uuid4(), __import__("uuid").uuid4(), NOW
     )
@@ -314,7 +379,9 @@ async def test_manage_permission_implies_read_but_read_does_not_imply_manage(
         "app.internal.services.assessment_management_service.AccessDecisionService",
         ReadOnlyAccess,
     )
-    await service._require_read(__import__("uuid").uuid4(), __import__("uuid").uuid4(), NOW)
+    await service._require_read(
+        __import__("uuid").uuid4(), __import__("uuid").uuid4(), NOW
+    )
     with pytest.raises(AssessmentManagementPermissionDenied):
         await service._require_manage(
             __import__("uuid").uuid4(), __import__("uuid").uuid4(), NOW

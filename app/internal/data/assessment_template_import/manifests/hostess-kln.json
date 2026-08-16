@@ -1,0 +1,1329 @@
+{
+  "schema_version": 1,
+  "source": {
+    "filename": "НОВЫЙ ИСПРАВЛЕННЫЙ КЛН-корректировка хостес .xlsx",
+    "sha256": "065b9e74097bb7cdda55d3d36df7840b89d5c91bcaef226ab5f6abfabef80938",
+    "provenance": "read_only_methodology_source"
+  },
+  "template": {
+    "code": "hostess-kln",
+    "name": "КЛН хостес",
+    "activity_type": "evaluation",
+    "description": "Company-private draft imported from reviewed methodology source.",
+    "methodology": {
+      "code": "hostess-kln-methodology",
+      "title": "КЛН хостес",
+      "body": "Взвешенная оценка по критериям Да/Нет. Отсутствующие исторические результаты и персональные данные не импортируются.",
+      "version": 1
+    },
+    "scoring": {
+      "algorithm": "weighted_v1",
+      "version": 1,
+      "config": {
+        "rounding": "half_up",
+        "score_scale": 100
+      }
+    },
+    "sections": [
+      {
+        "code": "bronirovanie-stola",
+        "title": "Бронирование стола",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "hostes-otvechaet-gostyam-ne-dolshe-chem-cherez-3-gudka",
+            "prompt": "Хостес отвечает гостям не дольше чем через 3 гудка",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-privetstvuet-gostya-s-ulybkoy-v-sootvetstvii-so-standartom",
+            "prompt": "Хостес приветствует гостя с улыбкой в соответствии со стандартом",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-utochnyaet-informaciyu-po-vizitu-imya-data-vremya-kol-vo-gostey-budut-li-deti-nomer",
+            "prompt": "Хостес уточняет информацию по визиту (имя/ дата/ время/ кол-во гостей/ будут ли дети/ номер телефона/повод визита)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "pri-otsutstvii-svobodnyh-stolov-na-vybrannoe-vremya-hostes-predlagaet-alternativu-drugoe-v",
+            "prompt": "При отсутствии свободных столов на выбранное время, хостес предлагает альтернативу: другое время/ дату/ лист ожидания",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-provodit-research-produblirovala-bron-gostyam-po-standartu",
+            "prompt": "Хостес проводит Research - продублировала бронь гостям по стандарту",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-rasskazala-ob-aktcalnoy-informacii-po-meropriyatiyam-zhivoy-muzyke-akciyah",
+            "prompt": "Хостес рассказала об актцальной информации по мероприятиям/живой музыке/акциях",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-poproschalas-v-sootvetstvii-so-standartom-i-otsylkoy-na-datu-bronirovaniya",
+            "prompt": "Хостес попрощалась в соответствии со стандартом и отсылкой на дату бронирования",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "gost-pervym-polozhil-trubku",
+            "prompt": "Гость первым положил трубку",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-vnesla-dannye-v-sistemu-bronirovaniya",
+            "prompt": "Хостес внесла данные в систему бронирования",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-podtverdila-informaciyu-v-den-bronirovaniya-cherez-obzvon-gostey",
+            "prompt": "Хостес подтвердила информацию в день бронирования (через обзвон гостей)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "vstrecha-gostya",
+        "title": "Встреча гостя",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "hostes-gostepriimnaya-ulybaetsya-gostyam",
+            "prompt": "Хостес гостеприимная, улыбается гостям",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-privetstvuet-gostey",
+            "prompt": "Хостес приветствует гостей",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-delaet-shag-na-vstrechu-gostyu-nahoditsya-v-zritelnom-kontakte",
+            "prompt": "Хостес делает шаг на встречу гостю, находится в зрительном контакте",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-u-tochnila-informaciyu-po-bronirovaniyu-servisnoy-frazoy",
+            "prompt": "Хостес у точнила информацию по бронированию сервисной фразой",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-predlozhila-gostyu-ostavit-verhnyuyu-odezhdu-v-garderobe",
+            "prompt": "Хостес предложила гостю оставить верхнюю одежду в гардеробе",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-priglasila-gostya-proyti-k-stolu-provozhaet-v-pol-oborota",
+            "prompt": "Хостес пригласила гостя пройти к столу, провожает в пол оборота",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-ispolzuet-malyy-razgovor-na-puti-k-stolu",
+            "prompt": "Хостес использует малый разговор на пути к столу",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-soblyudaet-distanciyu-v-poltora-shaga",
+            "prompt": "Хостес соблюдает дистанцию в полтора шага",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-predostavila-vozmozhnost-vybora-stola-esli-byla-vozmozhnost-soblyudaya-pravila-rota",
+            "prompt": "Хостес предоставила возможность выбора стола, если была возможность, соблюдая правила ротации столов",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-pomogla-raspolozhitsya-za-stolom-ispolzuya-pravila-gostepriimstva-prinesla-podstavk",
+            "prompt": "Хостес помогла расположиться за столом, используя правила гостеприимства (принесла подставку под сумку/ вазу/ плед/ павербанк и др.)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-podala-menyu-otkrytoy-rukoy-soblyudaya-standart",
+            "prompt": "Хостес подала меню открытой рукой, соблюдая стандарт",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-pozhelala-priyatnogo-otdyha",
+            "prompt": "Хостес пожелала приятного отдыха",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-peredaet-informaciyu-kakomu-oficiantu-i-kakoy-stol-posadila",
+            "prompt": "Хостес передает информацию какому официанту и какой стол посадила",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-korrektno-zanosit-zakaz-v-iiko",
+            "prompt": "Хостес корректно заносит заказ в IIKO",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "kontrol-vo-vremya-smeny",
+        "title": "Контроль во время смены",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "hostes-provodit-kontrol-kolichestva-svobodnyh-stolov",
+            "prompt": "Хостес проводит контроль количества свободных столов",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-provodit-kontrol-potencialno-osvobozhdayuschihsya-stolov",
+            "prompt": "Хостес проводит контроль потенциально освобождающихся столов",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-sledit-za-chistotoy-i-aktualnostyu-menyu",
+            "prompt": "Хостес следит за чистотой и актуальностью меню",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-ispolzuet-mnogourovnevoe-bronirovanie-pravilno-raschityvaet-potencial-zagruzki-zala",
+            "prompt": "Хостес использует многоуровневое бронирование (правильно расчитывает потенциал загрузки зала)",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-rabotaet-s-virtualnoy-i-zhivoy-ocheredyu",
+            "prompt": "Хостес работает с виртуальной и живой очередью",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-soblyudaet-rotaciyu-posadki-zala",
+            "prompt": "Хостес соблюдает ротацию посадки зала",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-pokidaet-rabochee-mesto-preduprediv-menedzhera",
+            "prompt": "Хостес покидает рабочее место предупредив менеджера",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-svoevremenno-sobiraet-menyu-so-steyshenov-i-stolov",
+            "prompt": "Хостес своевременно собирает меню со стейшенов и столов",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-kommuniciruet-s-drugimi-sotrudnikami-po-racii-govorit-oficiantam-kakie-stoly-posadi",
+            "prompt": "Хостес коммуницирует с другими сотрудниками по рации: говорит официантам какие столы посадила, передает второму хосту информацию по свободным столам в рацию",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-pomogaet-oficiantam-ubrat-stol-esli-trebuetsya-posadit-gostey-a-oficiant-ne-uspevae",
+            "prompt": "Хостес помогает официантам убрать стол, если требуется посадить гостей, а официант не успевает",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "proschanie-s-gostem",
+        "title": "Прощание с гостем",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "hostes-delaet-shag-na-vstrechu-gostyu",
+            "prompt": "Хостес делает шаг на встречу гостю",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-beret-obratnuyu-svyaz-po-vizitu-gostey",
+            "prompt": "Хостес берет обратную связь по визиту гостей",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-peredaet-obratnuyu-svyaz-gostey-menedzheru",
+            "prompt": "Хостес передает обратную связь гостей менеджеру",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-proschaetsya-s-ulybkoy-smotrit-v-glaza-v-golose-radushie",
+            "prompt": "Хостес прощается с улыбкой, смотрит в глаза, в голосе радушие",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "hostes-ispolzuet-pri-proschanii-s-gostem-kommunikativnye-orientiry",
+            "prompt": "Хостес использует при прощании с гостем коммуникативные ориентиры",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "1.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "1.0",
+                "direction": "positive"
+              },
+              {
+                "code": "service",
+                "weight": "1.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

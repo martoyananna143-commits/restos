@@ -1,0 +1,521 @@
+{
+  "schema_version": 1,
+  "source": {
+    "filename": "КЛН повара_Камелот.xlsx",
+    "sha256": "6bdcdcb35a6003769552209e6439bb6c56f9ac968120da6bdeb650db592e064e",
+    "provenance": "read_only_methodology_source"
+  },
+  "template": {
+    "code": "cook-kln",
+    "name": "КЛН повара",
+    "activity_type": "evaluation",
+    "description": "Company-private draft imported from reviewed methodology source.",
+    "methodology": {
+      "code": "cook-kln-methodology",
+      "title": "КЛН повара",
+      "body": "Взвешенная оценка по критериям Да/Нет. Отсутствующие исторические результаты и персональные данные не импортируются.",
+      "version": 1
+    },
+    "scoring": {
+      "algorithm": "weighted_v1",
+      "version": 1,
+      "config": {
+        "rounding": "half_up",
+        "score_scale": 100
+      }
+    },
+    "sections": [
+      {
+        "code": "sanitariya",
+        "title": "Санитария",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "soblyudaet-ustanovlennyy-standart-vneshnego-vida",
+            "prompt": "Соблюдает установленный стандарт внешнего вида",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "food_safety",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "soblyudaet-pravila-lichnoy-gigieny",
+            "prompt": "Соблюдает правила личной гигиены",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "food_safety",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "podderzhivaet-poryadok-na-rabochem-meste-otsutstvuyut-lishnie-veschi",
+            "prompt": "Поддерживает порядок на рабочем месте, отсутствуют лишние вещи",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "food_safety",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "space",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "sroki-godnosti-syrya-i-pf-v-cehe-sootvetstvuyut-standartam",
+            "prompt": "Сроки годности сырья и ПФ в цехе соответствуют стандартам",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "3.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "3.0",
+                "direction": "positive"
+              },
+              {
+                "code": "food_safety",
+                "weight": "3.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "v-cehe-soblyudaetsya-tovarnoe-sosedstvo-pravila-rotacii",
+            "prompt": "В цехе соблюдается товарное соседство, правила ротации",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "5.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "5.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "5.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "5.0",
+                "direction": "positive"
+              },
+              {
+                "code": "food_safety",
+                "weight": "5.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "vkus",
+        "title": "Вкус",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "znaet-standarty-syrya-po-lup-dlya-blyud-napitkov-svoego-ceha",
+            "prompt": "Знает стандарты сырья по ЛУП для блюд/напитков своего цеха",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "5.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "5.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "5.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "znaet-tehnologiyu-prigotovleniya-blyuda-napitka",
+            "prompt": "Знает технологию приготовления блюда / напитка",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "verno-otvechaet-na-utochnyayuschie-voprosy-po-tehnologii",
+            "prompt": "Верно отвечает на уточняющие вопросы по технологии",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "vneshniy-vid-otdannogo-blyuda-napitka-sootvetstvuet-standartam",
+            "prompt": "Внешний вид отданного блюда / напитка соответствует стандартам",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "skorost-otdachi-blyuda-napitka-sootvestvuet-standartam",
+            "prompt": "Скорость отдачи блюда / напитка соотвествует стандартам",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "5.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "5.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "5.0",
+                "direction": "positive"
+              },
+              {
+                "code": "speed",
+                "weight": "5.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "provodit-brakerazh-pf-vhodyaschih-v-sostav-blyuda-napitka",
+            "prompt": "Проводит бракераж ПФ входящих в состав блюда / напитка",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "food_safety",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "oborudovanie-inventar",
+        "title": "Оборудование инвентарь",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "soblyudaet-standarty-raboty-s-inventarem",
+            "prompt": "Соблюдает стандарты работы с инвентарем",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "soblyudaet-standarty-raboty-s-oborudovaniem",
+            "prompt": "Соблюдает стандарты работы с оборудованием",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "taste",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "code": "rabota-v-smenu",
+        "title": "Работа в смену",
+        "description": null,
+        "kind": "section",
+        "weight": null,
+        "items": [
+          {
+            "code": "kolichestvo-zagotovok-v-cehe-soootvetstvuet-layn-cheku",
+            "prompt": "Количество заготовок в цехе сооответствует лайн-чеку",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          },
+          {
+            "code": "otkrytie-i-zakrytie-smeny-proizvoditsya-po-chek-listu",
+            "prompt": "Открытие и закрытие смены производится по чек-листу",
+            "guidance": null,
+            "response_type": "boolean",
+            "required": true,
+            "weight": "2.0",
+            "min_value": null,
+            "max_value": null,
+            "passing_value": null,
+            "evidence_mode": "optional_comment",
+            "criticality": "normal",
+            "config": {},
+            "options": [],
+            "metrics": [
+              {
+                "code": "people",
+                "weight": "2.0",
+                "direction": "positive"
+              },
+              {
+                "code": "order",
+                "weight": "2.0",
+                "direction": "positive"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
