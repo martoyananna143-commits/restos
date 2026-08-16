@@ -28,13 +28,26 @@ from app.infra.database.models.assessment_attempt import (
     AssessmentAttempt,
     AssessmentAttemptAnswer,
 )
+from app.infra.database.models.assessment_metric import (
+    AssessmentAggregationPolicy,
+    AssessmentItemMetricMapping,
+    AssessmentMetricDefinition,
+    AssessmentMetricObservation,
+    AssessmentProductMeasurement,
+    AssessmentProductMeasurementItem,
+    AssessmentScoringPolicy,
+    AssessmentTemplateImportSource,
+)
 from app.infra.database.models.employee import Employee, EmployeeType
 from app.infra.database.models.employee_assignment import (
     AssignmentScopeVenue,
     AssignmentVenue,
     EmployeeAssignment,
 )
-from app.infra.database.models.employee_profile import EmployeeProfile
+from app.infra.database.models.employee_profile import (
+    EmployeeBirthDateAudit,
+    EmployeeProfile,
+)
 from app.infra.database.models.device_registration_challenge import (
     DeviceRegistrationChallenge,
 )
@@ -55,6 +68,14 @@ from app.infra.database.models.organization import Organization
 from app.infra.database.models.position import Position
 from app.infra.database.models.phone_verification_challenge import (
     PhoneVerificationChallenge,
+)
+from app.infra.database.models.organization_workflow import (
+    GroupInvitation,
+    GroupInvitationRegistration,
+    Task,
+    TaskAssignment,
+    TaskEvent,
+    TaskPhoto,
 )
 from app.infra.database.models.user import User
 from app.infra.database.models.venue import Venue
@@ -80,10 +101,19 @@ __all__ = [
     "AssessmentAssignment",
     "AssessmentAttempt",
     "AssessmentAttemptAnswer",
+    "AssessmentMetricDefinition",
+    "AssessmentScoringPolicy",
+    "AssessmentItemMetricMapping",
+    "AssessmentMetricObservation",
+    "AssessmentAggregationPolicy",
+    "AssessmentTemplateImportSource",
+    "AssessmentProductMeasurement",
+    "AssessmentProductMeasurementItem",
     "Company",
     "Venue",
     "Position",
     "EmployeeProfile",
+    "EmployeeBirthDateAudit",
     "DeviceRegistrationChallenge",
     "EmployeeAssignment",
     "AssignmentVenue",
@@ -92,6 +122,12 @@ __all__ = [
     "InvitationVenue",
     "InvitationScopeVenue",
     "PhoneVerificationChallenge",
+    "GroupInvitation",
+    "GroupInvitationRegistration",
+    "Task",
+    "TaskAssignment",
+    "TaskPhoto",
+    "TaskEvent",
     "Organization",
     "EmployeeType",
     "Employee",

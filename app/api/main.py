@@ -13,12 +13,18 @@ from app.api.routers import account_invitation_auth
 from app.api.routers import account_standalone_auth
 from app.api.routers import account_first_company
 from app.api.routers import account_workforce
+from app.api.routers import account_workforce_join
+from app.api.routers import account_organization_access
 from app.api.routers import account_sessions
 from app.api.routers import account_web_sessions
 from app.api.routers import account_passkeys
 from app.api.routers import assessment_templates
 from app.api.routers import account_assessments
 from app.api.routers import account_assessment_management
+from app.api.routers import account_restaurant_metrics
+from app.api.routers import account_product_measurements
+from app.api.routers import account_operational_walkthroughs
+from app.api.routers import account_organization_workflows
 from app.api.setup import ensure_default_admin
 from app.internal import Container
 
@@ -48,31 +54,33 @@ def get_shared_bot():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for FastAPI application.
-    
+
     Handles startup and shutdown events.
     Uses shared container if available (when running with bot).
-    
+
     Args:
         app: FastAPI application instance.
     """
     global _shared_container
-    
+
     # Use shared container or create new one
     if _shared_container is not None:
         container = _shared_container
         owns_container = False
     else:
         container = Container()
-        container.wire(modules=[
-            __name__,
-            "app.api.deps",
-            "app.api.routers.webapp",
-            "app.api.routers.web_auth",
-            "app.api.routers.web_data",
-            "app.api.routers.web",
-        ])
+        container.wire(
+            modules=[
+                __name__,
+                "app.api.deps",
+                "app.api.routers.webapp",
+                "app.api.routers.web_auth",
+                "app.api.routers.web_data",
+                "app.api.routers.web",
+            ]
+        )
         owns_container = True
-    
+
     app.state.container = container
     app.state.sms_http_client = httpx.AsyncClient()
 
@@ -132,7 +140,14 @@ def create_app() -> FastAPI:
         allow_origins=config.CORS_ORIGINS,
         allow_credentials=config.CORS_ALLOW_CREDENTIALS,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "X-RestOS-Web-Session", "X-Telegram-Id", "X-Telegram-Chat-Id", "X-Organization-Id"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "X-RestOS-Web-Session",
+            "X-Telegram-Id",
+            "X-Telegram-Chat-Id",
+            "X-Organization-Id",
+        ],
     )
     account_invitation_auth.configure_account_auth_http_security(app)
 
@@ -143,12 +158,18 @@ def create_app() -> FastAPI:
     app.include_router(account_standalone_auth.router)
     app.include_router(account_first_company.router)
     app.include_router(account_workforce.router)
+    app.include_router(account_workforce_join.router)
+    app.include_router(account_organization_access.router)
     app.include_router(account_sessions.router)
     app.include_router(account_web_sessions.router)
     app.include_router(account_passkeys.router)
     app.include_router(assessment_templates.router)
     app.include_router(account_assessments.router)
     app.include_router(account_assessment_management.router)
+    app.include_router(account_restaurant_metrics.router)
+    app.include_router(account_product_measurements.router)
+    app.include_router(account_operational_walkthroughs.router)
+    app.include_router(account_organization_workflows.router)
 
     @app.get("/health")
     async def health_check():

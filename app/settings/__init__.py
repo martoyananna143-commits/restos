@@ -32,14 +32,21 @@ class Config:
         self.TGBOT_TOKEN = self.env.str("TGBOT_TOKEN")
         self.TGBOT_ADMIN_IDS = self.env.list("TGBOT_ADMIN_IDS", subcast=int)
         self.TGBOT_USE_REDIS = self.env.bool("TGBOT_USE_REDIS", default=True)
-        self.TGBOT_TRIGGER_MESSAGE_BUSINESS_CHAT = self.env.str("TGBOT_TRIGGER_MESSAGE_BUSINESS_CHAT", default="start")
-        self.TGBOT_TRIGGER_AUTO_MESSAGE_BUSINESS_CHAT = self.env.str("TGBOT_TRIGGER_AUTO_MESSAGE_BUSINESS_CHAT", default="help")
+        self.TGBOT_TRIGGER_MESSAGE_BUSINESS_CHAT = self.env.str(
+            "TGBOT_TRIGGER_MESSAGE_BUSINESS_CHAT", default="start"
+        )
+        self.TGBOT_TRIGGER_AUTO_MESSAGE_BUSINESS_CHAT = self.env.str(
+            "TGBOT_TRIGGER_AUTO_MESSAGE_BUSINESS_CHAT", default="help"
+        )
 
         # Redis settings
         self.REDIS_DSN = self.env.str("REDIS_DSN", default="redis://localhost:6379/0")
 
         # Database settings
-        self.DATABASE_URL = self.env.str("DATABASE_URL", default="postgresql+asyncpg://postgres:password@localhost:5432/restos")
+        self.DATABASE_URL = self.env.str(
+            "DATABASE_URL",
+            default="postgresql+asyncpg://postgres:password@localhost:5432/restos",
+        )
         self.DATABASE_POOL_SIZE = self.env.int("DATABASE_POOL_SIZE", default=10)
         self.DATABASE_MAX_OVERFLOW = self.env.int("DATABASE_MAX_OVERFLOW", default=20)
         self.DATABASE_POOL_RECYCLE = self.env.int("DATABASE_POOL_RECYCLE", default=3600)
@@ -57,6 +64,12 @@ class Config:
         )
         self.ACCOUNT_AUTH_SESSION_PEPPER = self.env.str(
             "ACCOUNT_AUTH_SESSION_PEPPER", default=""
+        )
+        self.ACCOUNT_GROUP_INVITATION_PEPPER = self.env.str(
+            "ACCOUNT_GROUP_INVITATION_PEPPER", default=""
+        )
+        self.ACCOUNT_GROUP_ONBOARDING_DOB_LEGAL_PUBLISHED = self.env.bool(
+            "ACCOUNT_GROUP_ONBOARDING_DOB_LEGAL_PUBLISHED", default=False
         )
         self.ACCOUNT_AUTH_ACCESS_TOKEN_KEY = self.env.str(
             "ACCOUNT_AUTH_ACCESS_TOKEN_KEY", default=""
@@ -100,8 +113,32 @@ class Config:
             "SMS_HTTP_TIMEOUT_SECONDS", default=10.0
         )
 
+        # Private application media.  Credentials intentionally have no
+        # fallback and are consumed only by the backend S3 adapter.
+        self.TASK_MEDIA_PROVIDER = self.env.str(
+            "TASK_MEDIA_PROVIDER", default="disabled"
+        )
+        self.TASK_MEDIA_S3_ENDPOINT = self.env.str("TASK_MEDIA_S3_ENDPOINT", default="")
+        self.TASK_MEDIA_S3_BUCKET = self.env.str("TASK_MEDIA_S3_BUCKET", default="")
+        self.TASK_MEDIA_S3_REGION = self.env.str(
+            "TASK_MEDIA_S3_REGION", default="us-east-1"
+        )
+        self.TASK_MEDIA_S3_ACCESS_KEY_ID = self.env.str(
+            "TASK_MEDIA_S3_ACCESS_KEY_ID", default=""
+        )
+        self.TASK_MEDIA_S3_SECRET_ACCESS_KEY = self.env.str(
+            "TASK_MEDIA_S3_SECRET_ACCESS_KEY", default=""
+        )
+        self.TASK_MEDIA_S3_CA_FILE = self.env.str("TASK_MEDIA_S3_CA_FILE", default="")
+        self.TASK_MEDIA_S3_SSE = self.env.str("TASK_MEDIA_S3_SSE", default="AES256")
+        self.TASK_MEDIA_TEMPORARY_TTL_HOURS = self.env.int(
+            "TASK_MEDIA_TEMPORARY_TTL_HOURS", default=48
+        )
+
         # Web App settings
-        self.WEBAPP_BASE_URL = self.env.str("WEBAPP_BASE_URL", default="http://localhost:8080")
+        self.WEBAPP_BASE_URL = self.env.str(
+            "WEBAPP_BASE_URL", default="http://localhost:8080"
+        )
         self.WEBAPP_API_URL = self.env.str("WEBAPP_API_URL", default="")
         # 32-byte key for ChaCha20Poly1305 (generate with: python -c "import secrets; print(secrets.token_hex(32))")
         self.WEBAPP_SECRET_KEY = self.env.str("WEBAPP_SECRET_KEY", default="0" * 64)
@@ -113,38 +150,59 @@ class Config:
         self.INTERNAL_API_KEY = self.env.str("INTERNAL_API_KEY", default="")
 
         # JWT settings for web auth
-        self.JWT_SECRET_KEY = self.env.str("JWT_SECRET_KEY", default="change-me-in-production-" + "0" * 32)
+        self.JWT_SECRET_KEY = self.env.str(
+            "JWT_SECRET_KEY", default="change-me-in-production-" + "0" * 32
+        )
         self.JWT_ALGORITHM = "HS256"
         self.JWT_EXPIRE_DAYS = self.env.int("JWT_EXPIRE_DAYS", default=30)
         # Web app: second-factor PIN must be re-entered if JWT claim ``pva`` is older than this (seconds).
-        self.WEB_PIN_MAX_AGE_SECONDS = self.env.int("WEB_PIN_MAX_AGE_SECONDS", default=86400)
+        self.WEB_PIN_MAX_AGE_SECONDS = self.env.int(
+            "WEB_PIN_MAX_AGE_SECONDS", default=86400
+        )
 
         # Default admin user (created on first startup if not exists)
         self.DEFAULT_ADMIN_LOGIN = self.env.str("DEFAULT_ADMIN_LOGIN", default="admin")
-        self.DEFAULT_ADMIN_PASSWORD = self.env.str("DEFAULT_ADMIN_PASSWORD", default="admin123")
-        self.DEFAULT_ADMIN_NAME = self.env.str("DEFAULT_ADMIN_NAME", default="Главный администратор")
-        self.DEFAULT_ORG_NAME = self.env.str("DEFAULT_ORG_NAME", default="Моя организация")
+        self.DEFAULT_ADMIN_PASSWORD = self.env.str(
+            "DEFAULT_ADMIN_PASSWORD", default="admin123"
+        )
+        self.DEFAULT_ADMIN_NAME = self.env.str(
+            "DEFAULT_ADMIN_NAME", default="Главный администратор"
+        )
+        self.DEFAULT_ORG_NAME = self.env.str(
+            "DEFAULT_ORG_NAME", default="Моя организация"
+        )
         self.DEFAULT_ORG_CODE = self.env.str("DEFAULT_ORG_CODE", default="main")
         self.LEGACY_DEFAULT_ADMIN_BOOTSTRAP_ENABLED = self.env.bool(
             "LEGACY_DEFAULT_ADMIN_BOOTSTRAP_ENABLED",
-            default=self.env.str("APP_ENV", default="development")
-            != "production",
+            default=self.env.str("APP_ENV", default="development") != "production",
         )
 
         # Superuser login — this account has cross-org access without needing
         # an employee record in each org. Defaults to the default admin login.
-        self.SUPERUSER_LOGIN = self.env.str("SUPERUSER_LOGIN", default=self.DEFAULT_ADMIN_LOGIN)
+        self.SUPERUSER_LOGIN = self.env.str(
+            "SUPERUSER_LOGIN", default=self.DEFAULT_ADMIN_LOGIN
+        )
 
         # CORS settings for API
         self.CORS_ORIGINS = self.env.list("CORS_ORIGINS", default=["*"])
-        self.CORS_ALLOW_CREDENTIALS = self.env.bool("CORS_ALLOW_CREDENTIALS", default=True)
+        self.CORS_ALLOW_CREDENTIALS = self.env.bool(
+            "CORS_ALLOW_CREDENTIALS", default=True
+        )
 
         # Google Sheets / Drive (live criterion templates)
-        self.GOOGLE_SHEETS_FETCH_TIMEOUT = self.env.float("GOOGLE_SHEETS_FETCH_TIMEOUT", default=15.0)
-        self.GOOGLE_SHEETS_MAX_ROWS = self.env.int("GOOGLE_SHEETS_MAX_ROWS", default=500)
+        self.GOOGLE_SHEETS_FETCH_TIMEOUT = self.env.float(
+            "GOOGLE_SHEETS_FETCH_TIMEOUT", default=15.0
+        )
+        self.GOOGLE_SHEETS_MAX_ROWS = self.env.int(
+            "GOOGLE_SHEETS_MAX_ROWS", default=500
+        )
         # Path to service account JSON file OR leave empty and use GOOGLE_SERVICE_ACCOUNT_JSON_DATA
-        self.GOOGLE_SERVICE_ACCOUNT_JSON = self.env.str("GOOGLE_SERVICE_ACCOUNT_JSON", default="")
-        self.GOOGLE_SERVICE_ACCOUNT_JSON_DATA = self.env.str("GOOGLE_SERVICE_ACCOUNT_JSON_DATA", default="")
+        self.GOOGLE_SERVICE_ACCOUNT_JSON = self.env.str(
+            "GOOGLE_SERVICE_ACCOUNT_JSON", default=""
+        )
+        self.GOOGLE_SERVICE_ACCOUNT_JSON_DATA = self.env.str(
+            "GOOGLE_SERVICE_ACCOUNT_JSON_DATA", default=""
+        )
 
         # Deployment environment: "development" or "production"
         self.APP_ENV = self.env.str("APP_ENV", default="development")
@@ -159,16 +217,30 @@ class Config:
         if self.APP_ENV != "production":
             return
         errors: list[str] = []
+        if len(self.ACCOUNT_GROUP_INVITATION_PEPPER.encode("utf-8")) < 32:
+            errors.append(
+                "ACCOUNT_GROUP_INVITATION_PEPPER must contain at least 32 bytes"
+            )
         if self.JWT_SECRET_KEY in _INSECURE_JWT_KEYS:
-            errors.append("JWT_SECRET_KEY is using an insecure default — set a strong random value")
+            errors.append(
+                "JWT_SECRET_KEY is using an insecure default — set a strong random value"
+            )
         if self.WEBAPP_SECRET_KEY in _INSECURE_WEBAPP_KEYS:
-            errors.append("WEBAPP_SECRET_KEY is using an insecure default (64 zeros) — generate a real key")
+            errors.append(
+                "WEBAPP_SECRET_KEY is using an insecure default (64 zeros) — generate a real key"
+            )
         if self.DEFAULT_ADMIN_PASSWORD in _INSECURE_ADMIN_PASSWORDS:
-            errors.append(f"DEFAULT_ADMIN_PASSWORD is '{self.DEFAULT_ADMIN_PASSWORD}' — change it before deploying")
+            errors.append(
+                f"DEFAULT_ADMIN_PASSWORD is '{self.DEFAULT_ADMIN_PASSWORD}' — change it before deploying"
+            )
         if not self.INTERNAL_API_KEY:
-            errors.append("INTERNAL_API_KEY is not set — bot token-mint endpoints are unprotected")
+            errors.append(
+                "INTERNAL_API_KEY is not set — bot token-mint endpoints are unprotected"
+            )
         if self.CORS_ORIGINS == ["*"] and self.CORS_ALLOW_CREDENTIALS:
-            errors.append("CORS_ORIGINS='*' with CORS_ALLOW_CREDENTIALS=True is rejected by browsers and insecure")
+            errors.append(
+                "CORS_ORIGINS='*' with CORS_ALLOW_CREDENTIALS=True is rejected by browsers and insecure"
+            )
         rp_id = self.WEBAUTHN_RP_ID
         if (
             not isinstance(rp_id, str)
@@ -218,13 +290,9 @@ class Config:
                     or parsed_origin.fragment
                     or invalid_port
                     or not rp_id
-                    or not (
-                        hostname == rp_id or hostname.endswith("." + rp_id)
-                    )
+                    or not (hostname == rp_id or hostname.endswith("." + rp_id))
                 ):
-                    errors.append(
-                        "WEBAUTHN_ALLOWED_ORIGINS contains an unsafe origin"
-                    )
+                    errors.append("WEBAUTHN_ALLOWED_ORIGINS contains an unsafe origin")
                     break
         if (
             isinstance(self.WEBAUTHN_CHALLENGE_TTL_SECONDS, bool)
@@ -277,19 +345,56 @@ class Config:
                 errors.append("SMS_AERO_BASE_URL must be a safe HTTPS URL")
             if self.SMS_HTTP_TIMEOUT_SECONDS <= 0:
                 errors.append("SMS_HTTP_TIMEOUT_SECONDS must be positive")
+        media_provider = self.TASK_MEDIA_PROVIDER.strip().lower()
+        if media_provider not in {"disabled", "s3"}:
+            errors.append("TASK_MEDIA_PROVIDER must be 'disabled' or 's3'")
+        elif media_provider == "s3":
+            required_media_settings = {
+                "TASK_MEDIA_S3_ENDPOINT": self.TASK_MEDIA_S3_ENDPOINT,
+                "TASK_MEDIA_S3_BUCKET": self.TASK_MEDIA_S3_BUCKET,
+                "TASK_MEDIA_S3_ACCESS_KEY_ID": self.TASK_MEDIA_S3_ACCESS_KEY_ID,
+                "TASK_MEDIA_S3_SECRET_ACCESS_KEY": self.TASK_MEDIA_S3_SECRET_ACCESS_KEY,
+            }
+            missing_media_settings = [
+                name
+                for name, value in required_media_settings.items()
+                if not isinstance(value, str) or not value.strip()
+            ]
+            if missing_media_settings:
+                errors.append(
+                    "TASK_MEDIA_PROVIDER='s3' requires: "
+                    + ", ".join(missing_media_settings)
+                )
+            endpoint = urlsplit(self.TASK_MEDIA_S3_ENDPOINT.strip())
+            if (
+                endpoint.scheme != "https"
+                or not endpoint.hostname
+                or endpoint.username is not None
+                or endpoint.password is not None
+                or endpoint.path not in {"", "/"}
+                or endpoint.query
+                or endpoint.fragment
+            ):
+                errors.append("TASK_MEDIA_S3_ENDPOINT must be a safe HTTPS origin")
+            if self.TASK_MEDIA_S3_SSE != "AES256":
+                errors.append("TASK_MEDIA_S3_SSE must be AES256")
+            if not 1 <= self.TASK_MEDIA_TEMPORARY_TTL_HOURS <= 48:
+                errors.append("TASK_MEDIA_TEMPORARY_TTL_HOURS must be between 1 and 48")
         if errors:
             raise RuntimeError(
                 "Production security checks failed — fix the following before starting:\n"
                 + "\n".join(f"  • {e}" for e in errors)
             )
         if self.CORS_ORIGINS == ["*"]:
-            _log.warning("CORS_ORIGINS is '*' — restrict to specific origins in production")
+            _log.warning(
+                "CORS_ORIGINS is '*' — restrict to specific origins in production"
+            )
 
 
 def find_project_root() -> Path:
     current = Path(__file__).resolve().parent
     while current != current.parent:
-        if (current / '.env').exists():
+        if (current / ".env").exists():
             return current
         current = current.parent
     return Path(os.getcwd())
