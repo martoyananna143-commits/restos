@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infra.database.models.access_profile import AccessProfile
-from app.infra.database.models.account import Account
+from app.infra.database.models.account import Account, AccountIdentity
 from app.infra.database.models.company import Company
 from app.infra.database.models.employee_assignment import (
     AssignmentScopeVenue,
@@ -32,6 +32,7 @@ from app.infra.database.models.invitation_v1 import (
 from app.infra.database.models.position import Position
 from app.infra.database.models.venue import Venue
 from app.internal.services.access_decision_service import AccessDecisionService
+from app.internal.services.phone_verification_service import PhoneVerificationService
 
 
 _SCOPE_RANK = {
@@ -106,6 +107,13 @@ class CreatedWorkforceInvitation:
 
 @dataclass(frozen=True)
 class AcceptWorkforceInvitation:
+    account_id: UUID
+    code: str
+    now: datetime
+
+
+@dataclass(frozen=True)
+class AcceptAuthenticatedWorkforceInvitation:
     account_id: UUID
     code: str
     now: datetime
@@ -241,6 +249,165 @@ class WorkforceInvitationService:
                     "account already belongs to this company"
                 ) from error
             raise
+
+    async def accept_authenticated(
+        self,
+        request: AcceptAuthenticatedWorkforceInvitation,
+        phone_pepper: bytes,
+    ) -> AcceptedWorkforceInvitation:
+        """Accept an invitation only when it matches the Account's verified phone."""
+        self._validate_accept_input(
+            AcceptWorkforceInvitation(request.account_id, request.code, request.now)
+        )
+        if not isinstance(phone_pepper, bytes) or len(phone_pepper) < 32:
+            raise ValueError("phone_pepper must contain at least 32 bytes")
+        digest = hmac.new(
+            self._pepper, request.code.encode("ascii"), hashlib.sha256
+        ).digest()
+        try:
+            async with self._session.begin_nested():
+                invitation = (
+                    await self._session.execute(
+                        select(Invitation)
+                        .where(
+                            Invitation.code_digest == digest,
+                            Invitation.deleted_at.is_(None),
+                        )
+                        .with_for_update()
+                    )
+                ).scalar_one_or_none()
+                if invitation is None or not hmac.compare_digest(
+                    invitation.code_digest, digest
+                ):
+                    raise InvalidOrUnavailableInvitation(
+                        "invitation is unavailable"
+                    )
+                await self._require_authenticated_phone_match(
+                    invitation, request.account_id, phone_pepper
+                )
+                if invitation.status == "accepted":
+                    result = await self._accepted_result_for_replay(
+                        invitation, request.account_id
+                    )
+                elif (
+                    invitation.status == "pending"
+                    and invitation.expires_at > request.now
+                ):
+                    result = await self._accept_locked(
+                        AcceptWorkforceInvitation(
+                            request.account_id, request.code, request.now
+                        ),
+                        digest,
+                    )
+                else:
+                    raise InvalidOrUnavailableInvitation(
+                        "invitation is unavailable"
+                    )
+                await self._session.flush()
+                return result
+        except IntegrityError as error:
+            constraint = _postgres_constraint_name(error)
+            if constraint == "uq_employee_profiles_active_company_account":
+                raise AccountAlreadyMemberOfCompany(
+                    "account already belongs to this company"
+                ) from error
+            raise
+
+    async def _require_authenticated_phone_match(
+        self,
+        invitation: Invitation,
+        account_id: UUID,
+        phone_pepper: bytes,
+    ) -> None:
+        account = (
+            await self._session.execute(
+                select(Account.id)
+                .where(
+                    Account.id == account_id,
+                    Account.status == "active",
+                    Account.deleted_at.is_(None),
+                )
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        profile = (
+            await self._session.execute(
+                select(EmployeeProfile)
+                .where(EmployeeProfile.id == invitation.employee_profile_id)
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        identity_digest = (
+            await self._session.execute(
+                select(AccountIdentity.subject_digest).where(
+                    AccountIdentity.account_id == account_id,
+                    AccountIdentity.identity_type == "phone",
+                    AccountIdentity.provider == "e164",
+                    AccountIdentity.status == "verified",
+                    AccountIdentity.is_primary.is_(True),
+                    AccountIdentity.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        if (
+            account is None
+            or profile is None
+            or profile.company_id != invitation.company_id
+            or profile.deleted_at is not None
+            or profile.phone is None
+            or identity_digest is None
+        ):
+            raise InvalidOrUnavailableInvitation("invitation is unavailable")
+        try:
+            phone = PhoneVerificationService.normalize_e164(profile.phone)
+        except Exception as error:
+            raise InvalidOrUnavailableInvitation(
+                "invitation is unavailable"
+            ) from error
+        expected_digest = hmac.new(
+            phone_pepper, phone.encode("ascii"), hashlib.sha256
+        ).digest()
+        if not hmac.compare_digest(identity_digest, expected_digest):
+            raise InvalidOrUnavailableInvitation("invitation is unavailable")
+
+    async def _accepted_result_for_replay(
+        self, invitation: Invitation, account_id: UUID
+    ) -> AcceptedWorkforceInvitation:
+        profile = await self._session.get(
+            EmployeeProfile, invitation.employee_profile_id
+        )
+        assignment = (
+            await self._session.execute(
+                select(EmployeeAssignment).where(
+                    EmployeeAssignment.id == invitation.accepted_assignment_id,
+                    EmployeeAssignment.company_id == invitation.company_id,
+                    EmployeeAssignment.employee_profile_id
+                    == invitation.employee_profile_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if (
+            invitation.accepted_by_account_id != account_id
+            or invitation.accepted_assignment_id is None
+            or profile is None
+            or profile.account_id != account_id
+            or profile.employment_status != "active"
+            or profile.deleted_at is not None
+            or assignment is None
+        ):
+            raise InvalidOrUnavailableInvitation("invitation is unavailable")
+        working_ids, scope_ids = await self._locked_invitation_venues(invitation)
+        return AcceptedWorkforceInvitation(
+            invitation_id=invitation.id,
+            company_id=invitation.company_id,
+            employee_profile_id=invitation.employee_profile_id,
+            employee_assignment_id=assignment.id,
+            position_id=invitation.position_id,
+            access_profile_id=invitation.access_profile_id,
+            scope_type=invitation.scope_type,
+            working_venue_ids=working_ids,
+            scope_venue_ids=scope_ids,
+        )
 
     def _validate_accept_input(self, request: AcceptWorkforceInvitation) -> None:
         if not isinstance(request.account_id, UUID):

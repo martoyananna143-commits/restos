@@ -18,6 +18,7 @@ def _production_environment(monkeypatch, **changes):
         "CORS_ORIGINS": "https://api.example.test",
         "CORS_ALLOW_CREDENTIALS": "true",
         "SMS_PROVIDER": "disabled",
+        "ACCOUNT_GROUP_INVITATION_PEPPER": "g" * 48,
         "WEBAUTHN_RP_ID": "example.test",
         "WEBAUTHN_RP_NAME": "RestOS",
         "WEBAUTHN_ALLOWED_ORIGINS": "https://example.test",

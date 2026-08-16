@@ -56,6 +56,11 @@ def make_client(monkeypatch):
         "ACCOUNT_AUTH_INVITATION_PEPPER",
         "test-invitation-pepper-at-least-32-bytes",
     )
+    monkeypatch.setattr(
+        account_workforce.config,
+        "ACCOUNT_AUTH_PHONE_PEPPER",
+        "test-phone-pepper-at-least-32-bytes",
+    )
     app = FastAPI()
     configure_account_auth_http_security(app)
     app.include_router(account_workforce.router)

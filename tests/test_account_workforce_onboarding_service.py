@@ -121,11 +121,15 @@ async def test_create_invitation_binds_normalized_phone_without_assignment(db_se
             EmployeeAssignment.employee_profile_id == profile.id
         )
     ) == 0
-    assert await db_session.scalar(
-        select(func.count()).select_from(AccessProfilePermission).where(
+    assert set(
+        (
+            await db_session.execute(
+                select(AccessProfilePermission.permission_code).where(
             AccessProfilePermission.access_profile_id == invitation.access_profile_id
-        )
-    ) == 0
+                )
+            )
+        ).scalars()
+    ) == {"venue.view"}
 
 
 @pytest.mark.asyncio
@@ -279,7 +283,7 @@ async def test_invalid_phone_and_missing_legacy_phone_fail_closed(db_session):
 
 
 @pytest.mark.asyncio
-async def test_phone_bound_to_account_or_active_profile_is_neutral_conflict(db_session):
+async def test_existing_account_phone_is_not_enumerated_or_globally_blocked(db_session):
     owner, company = await owner_company(db_session)
     service = AccountWorkforceOnboardingService(db_session, PEPPER, PHONE_PEPPER)
     phone = "+79991234567"
@@ -315,8 +319,12 @@ async def test_phone_bound_to_account_or_active_profile_is_neutral_conflict(db_s
         )
     )
     await db_session.flush()
-    with pytest.raises(AccountWorkforceOnboardingConflict):
-        await service.create_invitation(command(owner, company, uuid4(), phone=phone))
+    result = await service.create_invitation(
+        command(owner, company, uuid4(), phone=phone)
+    )
+    profile = await db_session.get(EmployeeProfile, result.employee_profile_id)
+    assert result.created is True
+    assert profile.phone == phone and profile.account_id is None
 
 
 @pytest.mark.asyncio

@@ -185,6 +185,7 @@ def test_production_app_starts_without_active_web_session(monkeypatch):
             "CORS_ORIGINS": "https://restos.test",
             "CORS_ALLOW_CREDENTIALS": "true",
             "ACCOUNT_WEB_ALLOWED_ORIGINS": "",
+            "ACCOUNT_GROUP_INVITATION_PEPPER": "g" * 64,
             "WEBAUTHN_RP_ID": "passkeys.example.com",
             "WEBAUTHN_RP_NAME": "RestOS Test",
             "WEBAUTHN_ALLOWED_ORIGINS": "https://passkeys.example.com",

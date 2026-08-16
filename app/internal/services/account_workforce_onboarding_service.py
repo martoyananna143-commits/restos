@@ -9,13 +9,13 @@ import hmac
 from uuid import UUID, uuid5
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infra.database.models.access_profile import (
     AccessProfile,
     AccessProfilePermission,
 )
-from app.infra.database.models.account import AccountIdentity
 from app.infra.database.models.company import Company
 from app.infra.database.models.employee_profile import EmployeeProfile
 from app.infra.database.models.invitation_v1 import Invitation
@@ -92,15 +92,32 @@ class AccountWorkforceOnboardingService:
     async def list_venues(
         self, actor_account_id: UUID, company_id: UUID, now: datetime
     ) -> list[dict[str, object]]:
-        if not await self._access.can_in_company(
-            actor_account_id, company_id, "employee.invite", now
-        ):
+        membership = (
+            await self._session.execute(
+                select(EmployeeProfile.id).where(
+                    EmployeeProfile.account_id == actor_account_id,
+                    EmployeeProfile.company_id == company_id,
+                    EmployeeProfile.employment_status == "active",
+                    EmployeeProfile.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        company_access = await self._access.can_in_company(
+            actor_account_id, company_id, "venue.view", now
+        )
+        venue_ids = await self._access.list_accessible_venue_ids(
+            actor_account_id, company_id, "venue.view", now
+        )
+        if membership is None and not company_access:
             raise AccountWorkforceOnboardingForbidden("invitation is forbidden")
+        if not company_access and not venue_ids:
+            return []
         rows = (
             await self._session.execute(
                 select(Venue)
                 .where(
                     Venue.company_id == company_id,
+                    *([] if company_access else [Venue.id.in_(venue_ids)]),
                     Venue.status == "active",
                     Venue.deleted_at.is_(None),
                 )
@@ -117,9 +134,6 @@ class AccountWorkforceOnboardingService:
             phone = PhoneVerificationService.normalize_e164(command.phone)
         except Exception as error:
             raise AccountWorkforceOnboardingInvalid("phone is invalid") from error
-        phone_digest = hmac.new(
-            self._phone_pepper, phone.encode("ascii"), hashlib.sha256
-        ).digest()
         if command.now.tzinfo is None or command.now.utcoffset() is None:
             raise AccountWorkforceOnboardingInvalid("now must be timezone-aware")
         for value in (
@@ -163,26 +177,18 @@ class AccountWorkforceOnboardingService:
                 command, existing_profile, employee_profile_id, name, phone
             )
 
-        existing_identity = (
-            await self._session.execute(
-                select(AccountIdentity.id).where(
-                    AccountIdentity.identity_type == "phone",
-                    AccountIdentity.provider == "e164",
-                    AccountIdentity.subject_digest == phone_digest,
-                    AccountIdentity.deleted_at.is_(None),
-                )
-            )
-        ).scalar_one_or_none()
         incompatible_profile = (
             await self._session.execute(
                 select(EmployeeProfile.id).where(
                     EmployeeProfile.id != employee_profile_id,
+                    EmployeeProfile.company_id == command.company_id,
                     EmployeeProfile.phone == phone,
                     EmployeeProfile.deleted_at.is_(None),
+                    EmployeeProfile.employment_status != "terminated",
                 )
             )
         ).scalar_one_or_none()
-        if existing_identity is not None or incompatible_profile is not None:
+        if incompatible_profile is not None:
             raise AccountWorkforceOnboardingConflict(
                 "workforce invitation is unavailable"
             )
@@ -200,8 +206,19 @@ class AccountWorkforceOnboardingService:
             terminated_at=None,
             meta={"source": "account_invitation_v1"},
         )
-        self._session.add(profile)
-        await self._session.flush()
+        try:
+            async with self._session.begin_nested():
+                self._session.add(profile)
+                await self._session.flush()
+        except IntegrityError as error:
+            if (
+                _postgres_constraint_name(error)
+                == "uq_employee_profiles_active_company_phone"
+            ):
+                raise AccountWorkforceOnboardingConflict(
+                    "workforce invitation is unavailable"
+                ) from error
+            raise
 
         codes = self._candidate_codes(command)
         index = 0
@@ -334,15 +351,27 @@ class AccountWorkforceOnboardingService:
             raise AccountWorkforceOnboardingConflict(
                 "employee access profile is incompatible"
             )
-        permission_count = await self._session.scalar(
-            select(func.count())
-            .select_from(AccessProfilePermission)
-            .where(AccessProfilePermission.access_profile_id == access_profile.id)
+        permissions = set(
+            (
+                await self._session.execute(
+                    select(AccessProfilePermission.permission_code).where(
+                        AccessProfilePermission.access_profile_id == access_profile.id
+                    )
+                )
+            ).scalars()
         )
-        if permission_count:
+        if permissions - {"venue.view"}:
             raise AccountWorkforceOnboardingConflict(
                 "employee access profile is incompatible"
             )
+        if "venue.view" not in permissions:
+            self._session.add(
+                AccessProfilePermission(
+                    access_profile_id=access_profile.id,
+                    permission_code="venue.view",
+                )
+            )
+            await self._session.flush()
 
         expected_position_id = uuid5(
             _ID_NAMESPACE, f"employee-position-v1:{company_id}"
@@ -410,3 +439,20 @@ class AccountWorkforceOnboardingService:
         if not normalized or len(normalized) > 255:
             raise AccountWorkforceOnboardingInvalid("invalid employee_name")
         return normalized
+
+
+def _postgres_constraint_name(error: IntegrityError) -> str | None:
+    current = error.orig
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        diag = getattr(current, "diag", None)
+        name = getattr(diag, "constraint_name", None) or getattr(
+            current, "constraint_name", None
+        )
+        if name:
+            return name
+        current = getattr(current, "__cause__", None) or getattr(
+            current, "__context__", None
+        )
+    return None

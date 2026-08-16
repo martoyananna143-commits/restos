@@ -168,6 +168,7 @@ def test_adapter_requires_safe_https_base_url(base_url):
 
 def _safe_production_config(monkeypatch):
     monkeypatch.setattr(config, "APP_ENV", "production")
+    monkeypatch.setattr(config, "ACCOUNT_GROUP_INVITATION_PEPPER", "g" * 64)
     monkeypatch.setattr(config, "JWT_SECRET_KEY", "j" * 64)
     monkeypatch.setattr(config, "WEBAPP_SECRET_KEY", "w" * 64)
     monkeypatch.setattr(config, "DEFAULT_ADMIN_PASSWORD", "Strong-Test-Password-20")

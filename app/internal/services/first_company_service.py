@@ -161,6 +161,7 @@ class FirstCompanyService:
             code="owner",
             description=None,
             default_access_profile_id=access_profile.id,
+            default_scope_type="company",
             is_active=True,
             sort_order=0,
         )

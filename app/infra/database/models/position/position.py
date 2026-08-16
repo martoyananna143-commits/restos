@@ -38,6 +38,11 @@ class Position(Base, TimestampMixin, SoftDeleteMixin):
             name="ck_positions_code_slug",
         ),
         CheckConstraint("sort_order >= 0", name="ck_positions_sort_order"),
+        CheckConstraint(
+            "default_scope_type IS NULL OR default_scope_type IN "
+            "('self', 'working_venues', 'explicit_venues', 'company')",
+            name="ck_positions_default_scope_type",
+        ),
         Index(
             "uq_positions_active_company_code",
             "company_id",
@@ -60,6 +65,9 @@ class Position(Base, TimestampMixin, SoftDeleteMixin):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     default_access_profile_id: Mapped[Optional[UUID]] = mapped_column(
         PGUUID(as_uuid=True), nullable=True
+    )
+    default_scope_type: Mapped[Optional[str]] = mapped_column(
+        String(30), nullable=True
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
