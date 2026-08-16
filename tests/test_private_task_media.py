@@ -208,9 +208,26 @@ def test_production_disabled_media_is_valid_without_provider_credentials(monkeyp
     Config().validate_production_security()
 
 
+def test_path_a_production_example_declares_required_fail_closed_settings():
+    values = {}
+    with open(".env.production.example", encoding="utf-8") as source:
+        for line in source:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#") and "=" in stripped:
+                name, value = stripped.split("=", 1)
+                values[name] = value
+
+    assert "ACCOUNT_GROUP_INVITATION_PEPPER" in values
+    assert values["ACCOUNT_GROUP_INVITATION_PEPPER"].startswith("GENERATE_WITH:")
+    assert values["ACCOUNT_GROUP_ONBOARDING_DOB_LEGAL_PUBLISHED"] == "false"
+    assert values["TASK_MEDIA_PROVIDER"] == "disabled"
+    assert not any(name.startswith("TASK_MEDIA_S3_") for name in values)
+
+
 @pytest.mark.parametrize(
     ("name", "value"),
     [
+        ("ACCOUNT_GROUP_INVITATION_PEPPER", ""),
         ("TASK_MEDIA_PROVIDER", "filesystem"),
         ("TASK_MEDIA_S3_ENDPOINT", "http://media.example.test"),
         ("TASK_MEDIA_S3_ENDPOINT", "https://user:key@media.example.test"),
