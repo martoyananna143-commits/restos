@@ -140,6 +140,12 @@ class AssessmentAttempt(Base, TimestampMixin):
         Index(
             "ix_assessment_attempts_employee_status", "employee_profile_id", "status"
         ),
+        Index(
+            "ix_assessment_attempts_submitted_cursor",
+            "submitted_at",
+            "id",
+            postgresql_where=text("status = 'submitted'"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(

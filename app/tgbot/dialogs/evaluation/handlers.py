@@ -25,6 +25,7 @@ from app.internal.services.evaluation_service import EvaluationService
 from app.internal.services.organization_service import OrganizationService
 from app.internal.services.excel_report_service import ExcelReportService
 from app.internal.services.pdf_report_service import PDFReportService
+from app.internal.services.presentation_percent import format_percent
 from app.tgbot.dialogs.common.evaluation_type import (
     confirm_evaluation_type,
     process_evaluation_type_code_input as common_process_code,
@@ -40,7 +41,7 @@ from app.tgbot.services import broadcaster
 
 @inject
 async def _on_evaluation_type_selected(
-    evaluation_type, 
+    evaluation_type,
     dialog_manager: DialogManager,
     employee_service: EmployeeService = Provide[Container.employee_service],
     organization_service: OrganizationService = Provide[Container.organization_service],
@@ -54,21 +55,27 @@ async def _on_evaluation_type_selected(
         organization_service: Organization service instance (injected).
     """
     dialog_manager.dialog_data["evaluation_type_name"] = evaluation_type.name
-    
+
     # Check if user is administrator
     telegram_id = None
-    if dialog_manager.event and hasattr(dialog_manager.event, "from_user") and dialog_manager.event.from_user:
+    if (
+        dialog_manager.event
+        and hasattr(dialog_manager.event, "from_user")
+        and dialog_manager.event.from_user
+    ):
         telegram_id = dialog_manager.event.from_user.id
-    
+
     if telegram_id:
         organization_id = dialog_manager.dialog_data.get("organization_id")
         if not organization_id:
-            organization = await organization_service.get_by_user_telegram_id(telegram_id)
+            organization = await organization_service.get_by_user_telegram_id(
+                telegram_id
+            )
             if organization:
                 organization_id = organization.id
                 dialog_manager.dialog_data["organization_id"] = organization_id
                 dialog_manager.middleware_data["organization"] = organization
-        
+
         if organization_id:
             employee = await employee_service.get_by_telegram_id_and_organization_id(
                 telegram_id, organization_id
@@ -76,12 +83,16 @@ async def _on_evaluation_type_selected(
             if employee:
                 employee_type_code = employee.meta.get("employee_type_code")
                 is_administrator = employee_type_code == "administrator"
-                
+
                 # For non-administrators: automatically set filled_by_employee and skip organization/filled_by selection
                 if not is_administrator:
                     dialog_manager.dialog_data["filled_by_employee_id"] = employee.id
-                    dialog_manager.dialog_data["filled_by_employee_name"] = employee.full_name
-                    await dialog_manager.switch_to(EvaluationDialog.select_evaluated_employee)
+                    dialog_manager.dialog_data["filled_by_employee_name"] = (
+                        employee.full_name
+                    )
+                    await dialog_manager.switch_to(
+                        EvaluationDialog.select_evaluated_employee
+                    )
                     return True  # signal: we already switched, don't call switch_to(next_state)
 
     # For administrators: also try to skip org selection if org is already known
@@ -133,7 +144,7 @@ async def on_select_filled_by_employee_window_start(
     organization_service: OrganizationService = Provide[Container.organization_service],
 ):
     """Auto-skip filled by employee selection window if employee is already selected.
-    
+
     Args:
         dialog_manager: Dialog manager.
         employee_service: Employee service instance (injected).
@@ -145,7 +156,7 @@ async def on_select_filled_by_employee_window_start(
         # Already set, skip this window
         await dialog_manager.switch_to(EvaluationDialog.select_evaluated_employee)
         return
-    
+
     # If not set, try to auto-select for non-administrators
     organization_id = dialog_manager.dialog_data.get("organization_id")
     if not organization_id:
@@ -158,17 +169,19 @@ async def on_select_filled_by_employee_window_start(
             if dialog_manager.event and dialog_manager.event.from_user:
                 telegram_id = dialog_manager.event.from_user.id
             if telegram_id:
-                organization = await organization_service.get_by_user_telegram_id(telegram_id)
+                organization = await organization_service.get_by_user_telegram_id(
+                    telegram_id
+                )
                 if organization:
                     organization_id = organization.id
                     dialog_manager.dialog_data["organization_id"] = organization_id
                     dialog_manager.middleware_data["organization"] = organization
-    
+
     if organization_id:
         telegram_id = None
         if dialog_manager.event and dialog_manager.event.from_user:
             telegram_id = dialog_manager.event.from_user.id
-        
+
         if telegram_id:
             employee = await employee_service.get_by_telegram_id_and_organization_id(
                 telegram_id, organization_id
@@ -176,13 +189,17 @@ async def on_select_filled_by_employee_window_start(
             if employee:
                 employee_type_code = employee.meta.get("employee_type_code")
                 is_administrator = employee_type_code == "administrator"
-                
+
                 # Auto-select for non-administrators
                 if not is_administrator:
                     dialog_manager.dialog_data["filled_by_employee_id"] = employee.id
-                    dialog_manager.dialog_data["filled_by_employee_name"] = employee.full_name
+                    dialog_manager.dialog_data["filled_by_employee_name"] = (
+                        employee.full_name
+                    )
                     # Skip this window
-                    await dialog_manager.switch_to(EvaluationDialog.select_evaluated_employee)
+                    await dialog_manager.switch_to(
+                        EvaluationDialog.select_evaluated_employee
+                    )
 
 
 @inject
@@ -342,19 +359,24 @@ async def on_use_default_criterion_set(
     telegram_id = None
     if callback.from_user:
         telegram_id = callback.from_user.id
-    
+
     user_organization_ids = []
     if telegram_id:
-        user_organizations = await organization_service.get_all_by_user_telegram_id(telegram_id)
+        user_organizations = await organization_service.get_all_by_user_telegram_id(
+            telegram_id
+        )
         user_organization_ids = [org.id for org in user_organizations]
         # Update dialog_data and middleware_data with first organization (for compatibility)
         if user_organizations:
             dialog_manager.dialog_data["organization_id"] = user_organizations[0].id
             dialog_manager.middleware_data["organization"] = user_organizations[0]
             dialog_manager.dialog_data["user_organization_ids"] = user_organization_ids
-    
+
     # Проверяем, что набор критериев принадлежит одной из организаций пользователя
-    if user_organization_ids and criterion_set.organization_id not in user_organization_ids:
+    if (
+        user_organization_ids
+        and criterion_set.organization_id not in user_organization_ids
+    ):
         from aiogram.types import Message as MessageType
 
         if callback.message and isinstance(callback.message, MessageType):
@@ -370,7 +392,9 @@ async def on_use_default_criterion_set(
             "id": c.id,
             "name": c.name,
             "code": c.code,
-            "value_type": c.value_type if hasattr(c, "value_type") and c.value_type else "boolean",  # По умолчанию boolean для обратной совместимости
+            "value_type": (
+                c.value_type if hasattr(c, "value_type") and c.value_type else "boolean"
+            ),  # По умолчанию boolean для обратной совместимости
         }
         for c in criteria
     ]
@@ -470,17 +494,19 @@ async def on_finish_combining_sets(
     telegram_id = None
     if callback.from_user:
         telegram_id = callback.from_user.id
-    
+
     user_organization_ids = []
     if telegram_id:
-        user_organizations = await organization_service.get_all_by_user_telegram_id(telegram_id)
+        user_organizations = await organization_service.get_all_by_user_telegram_id(
+            telegram_id
+        )
         user_organization_ids = [org.id for org in user_organizations]
         # Update dialog_data and middleware_data with first organization (for compatibility)
         if user_organizations:
             dialog_manager.dialog_data["organization_id"] = user_organizations[0].id
             dialog_manager.middleware_data["organization"] = user_organizations[0]
             dialog_manager.dialog_data["user_organization_ids"] = user_organization_ids
-    
+
     if not user_organization_ids:
         from aiogram.types import Message as MessageType
 
@@ -518,13 +544,17 @@ async def on_finish_combining_sets(
     criteria = await criterion_service.get_by_ids(all_criterion_ids)
     # Сохраняем порядок в котором наборы были выбраны
     criteria_by_id = {c.id: c for c in criteria}
-    criteria_ordered = [criteria_by_id[cid] for cid in all_criterion_ids if cid in criteria_by_id]
+    criteria_ordered = [
+        criteria_by_id[cid] for cid in all_criterion_ids if cid in criteria_by_id
+    ]
     criteria_list = [
         {
             "id": c.id,
             "name": c.name,
             "code": c.code,
-            "value_type": c.value_type if hasattr(c, "value_type") and c.value_type else "boolean",
+            "value_type": (
+                c.value_type if hasattr(c, "value_type") and c.value_type else "boolean"
+            ),
         }
         for c in criteria_ordered
     ]
@@ -533,20 +563,30 @@ async def on_finish_combining_sets(
     combined_set_name = f"Комбинированный: {', '.join(set_names)}"
 
     # Используем первую организацию пользователя для создания комбинированного набора
-    primary_organization_id = user_organization_ids[0] if user_organization_ids else None
-    
+    primary_organization_id = (
+        user_organization_ids[0] if user_organization_ids else None
+    )
+
     if not primary_organization_id:
         from aiogram.types import Message as MessageType
+
         if callback.message and isinstance(callback.message, MessageType):
-            await callback.message.answer("Ошибка: не найдена организация для создания набора")
+            await callback.message.answer(
+                "Ошибка: не найдена организация для создания набора"
+            )
         return
 
     # Проверяем, существует ли уже набор с таким же названием и организацией
-    existing_sets = await criterion_set_service.get_by_organization_id(primary_organization_id)
+    existing_sets = await criterion_set_service.get_by_organization_id(
+        primary_organization_id
+    )
     existing_combined_set = None
-    
+
     for existing_set in existing_sets:
-        if existing_set.name == combined_set_name and existing_set.organization_id == primary_organization_id:
+        if (
+            existing_set.name == combined_set_name
+            and existing_set.organization_id == primary_organization_id
+        ):
             existing_combined_set = existing_set
             break
 
@@ -555,8 +595,10 @@ async def on_finish_combining_sets(
         criterion_set_id = existing_combined_set.id
     else:
         # Создаем новый комбинированный набор
-        from app.infra.database.repository.criterion_set.dto import CreateCriterionSetDTO
-        
+        from app.infra.database.repository.criterion_set.dto import (
+            CreateCriterionSetDTO,
+        )
+
         create_dto = CreateCriterionSetDTO(
             organization_id=primary_organization_id,
             name=combined_set_name,
@@ -572,16 +614,21 @@ async def on_finish_combining_sets(
             # Если произошла ошибка (например, набор уже существует из-за уникального ограничения),
             # перезапрашиваем список наборов и ищем существующий
             from aiogram.types import Message as MessageType
-            
+
             # Перезапрашиваем список наборов на случай, если набор был создан параллельно
-            updated_sets = await criterion_set_service.get_by_organization_id(primary_organization_id)
+            updated_sets = await criterion_set_service.get_by_organization_id(
+                primary_organization_id
+            )
             found_set = None
-            
+
             for existing_set in updated_sets:
-                if existing_set.name == combined_set_name and existing_set.organization_id == primary_organization_id:
+                if (
+                    existing_set.name == combined_set_name
+                    and existing_set.organization_id == primary_organization_id
+                ):
                     found_set = existing_set
                     break
-            
+
             if found_set:
                 criterion_set_id = found_set.id
             else:
@@ -643,19 +690,24 @@ async def on_select_criterion_set(
     telegram_id = None
     if callback.from_user:
         telegram_id = callback.from_user.id
-    
+
     user_organization_ids = []
     if telegram_id:
-        user_organizations = await organization_service.get_all_by_user_telegram_id(telegram_id)
+        user_organizations = await organization_service.get_all_by_user_telegram_id(
+            telegram_id
+        )
         user_organization_ids = [org.id for org in user_organizations]
         # Update dialog_data and middleware_data with first organization (for compatibility)
         if user_organizations:
             dialog_manager.dialog_data["organization_id"] = user_organizations[0].id
             dialog_manager.middleware_data["organization"] = user_organizations[0]
             dialog_manager.dialog_data["user_organization_ids"] = user_organization_ids
-    
+
     # Проверяем, что набор критериев принадлежит одной из организаций пользователя
-    if user_organization_ids and criterion_set.organization_id not in user_organization_ids:
+    if (
+        user_organization_ids
+        and criterion_set.organization_id not in user_organization_ids
+    ):
         from aiogram.types import Message as MessageType
 
         if callback.message and isinstance(callback.message, MessageType):
@@ -667,26 +719,35 @@ async def on_select_criterion_set(
 
     # Получаем критерии из набора
     import logging
+
     logger = logging.getLogger(__name__)
-    
+
     data = dialog_manager.dialog_data
     criterion_ids = criterion_set.criterion_ids or []
-    logger.info(f"on_select_criterion_set: criterion_set_id={criterion_set_id}, criterion_ids={criterion_ids}, len={len(criterion_ids)}")
-    
+    logger.info(
+        f"on_select_criterion_set: criterion_set_id={criterion_set_id}, criterion_ids={criterion_ids}, len={len(criterion_ids)}"
+    )
+
     criteria = await criterion_service.get_by_ids(criterion_ids)
-    logger.info(f"on_select_criterion_set: loaded {len(criteria)} criteria from database")
-    
+    logger.info(
+        f"on_select_criterion_set: loaded {len(criteria)} criteria from database"
+    )
+
     criteria_list = [
         {
             "id": c.id,
             "name": c.name,
             "code": c.code,
-            "value_type": c.value_type if hasattr(c, "value_type") and c.value_type else "boolean",  # По умолчанию boolean для обратной совместимости
+            "value_type": (
+                c.value_type if hasattr(c, "value_type") and c.value_type else "boolean"
+            ),  # По умолчанию boolean для обратной совместимости
         }
         for c in criteria
     ]
-    
-    logger.info(f"on_select_criterion_set: criteria_list={[c.get('id') for c in criteria_list]}, value_types={[c.get('value_type') for c in criteria_list]}")
+
+    logger.info(
+        f"on_select_criterion_set: criteria_list={[c.get('id') for c in criteria_list]}, value_types={[c.get('value_type') for c in criteria_list]}"
+    )
 
     data["criterion_set_id"] = criterion_set_id
     data["criteria"] = criteria_list
@@ -725,7 +786,9 @@ async def on_create_new_criterion_set_from_evaluation(
     if telegram_id:
         organization_id = dialog_manager.dialog_data.get("organization_id")
         if not organization_id:
-            organization = await organization_service.get_by_user_telegram_id(telegram_id)
+            organization = await organization_service.get_by_user_telegram_id(
+                telegram_id
+            )
             if organization:
                 organization_id = organization.id
                 dialog_manager.dialog_data["organization_id"] = organization_id
@@ -750,22 +813,33 @@ async def on_create_new_criterion_set_from_evaluation(
         # Сохраняем состояние оценки для возможного возврата
         evaluation_state = {
             "organization_id": organization_id,
-            "evaluation_type_name": dialog_manager.dialog_data.get("evaluation_type_name"),
-            "filled_by_employee_id": dialog_manager.dialog_data.get("filled_by_employee_id"),
-            "evaluated_employee_id": dialog_manager.dialog_data.get("evaluated_employee_id"),
+            "evaluation_type_name": dialog_manager.dialog_data.get(
+                "evaluation_type_name"
+            ),
+            "filled_by_employee_id": dialog_manager.dialog_data.get(
+                "filled_by_employee_id"
+            ),
+            "evaluated_employee_id": dialog_manager.dialog_data.get(
+                "evaluated_employee_id"
+            ),
         }
         dialog_manager.middleware_data["evaluation_state"] = evaluation_state
-        dialog_manager.middleware_data["from_evaluation"] = True  # Флаг для возврата в evaluation
+        dialog_manager.middleware_data["from_evaluation"] = (
+            True  # Флаг для возврата в evaluation
+        )
 
         # Пытаемся получить organization из БД, если organization_id не известен
         if not organization_id and telegram_id:
             user_svc = dialog_manager.middleware_data.get("user_service")
             if not user_svc:
                 from app.internal import Container as C
+
                 user_svc = C.user_service()
             user = await user_svc.repository.get_by_telegram_id_any_chat(telegram_id)
             if user and getattr(user, "current_organization_id", None):
-                org = await organization_service.get_by_id(int(user.current_organization_id))
+                org = await organization_service.get_by_id(
+                    int(user.current_organization_id)
+                )
                 if org:
                     organization_id = org.id
             if not organization_id:
@@ -777,7 +851,9 @@ async def on_create_new_criterion_set_from_evaluation(
             organization = await organization_service.get_by_id(organization_id)
             if organization:
                 dialog_manager.middleware_data["organization"] = organization
-                dialog_manager.middleware_data["preset_organization_id"] = organization_id
+                dialog_manager.middleware_data["preset_organization_id"] = (
+                    organization_id
+                )
                 await dialog_manager.start(
                     CriterionSetDialog.name_input,
                     mode=StartMode.NORMAL,
@@ -807,12 +883,14 @@ async def on_create_new_criterion_set_from_evaluation(
 @inject
 async def on_select_criterion_set_window_start(
     dialog_manager: DialogManager,
-    criterion_set_service: CriterionSetService = Provide[Container.criterion_set_service],
+    criterion_set_service: CriterionSetService = Provide[
+        Container.criterion_set_service
+    ],
     employee_service: EmployeeService = Provide[Container.employee_service],
     organization_service: OrganizationService = Provide[Container.organization_service],
 ):
     """Auto-check if criterion sets exist and navigate to create if empty.
-    
+
     Args:
         dialog_manager: Dialog manager.
         criterion_set_service: CriterionSet service instance (injected).
@@ -821,13 +899,19 @@ async def on_select_criterion_set_window_start(
     """
     # Get all organizations where user is a member
     telegram_id = None
-    if dialog_manager.event and hasattr(dialog_manager.event, "from_user") and dialog_manager.event.from_user:
+    if (
+        dialog_manager.event
+        and hasattr(dialog_manager.event, "from_user")
+        and dialog_manager.event.from_user
+    ):
         telegram_id = dialog_manager.event.from_user.id
-    
+
     user_organization_ids = []
     if telegram_id:
         # Get all organizations where user is a member
-        user_organizations = await organization_service.get_all_by_user_telegram_id(telegram_id)
+        user_organizations = await organization_service.get_all_by_user_telegram_id(
+            telegram_id
+        )
         user_organization_ids = [org.id for org in user_organizations]
         # Update dialog_data and middleware_data with first organization (for compatibility)
         if user_organizations:
@@ -844,25 +928,29 @@ async def on_select_criterion_set_window_start(
         # Получаем наборы критериев из всех организаций пользователя
         all_criterion_sets = []
         for org_id in user_organization_ids:
-            org_criterion_sets = await criterion_set_service.get_by_organization_id(org_id)
+            org_criterion_sets = await criterion_set_service.get_by_organization_id(
+                org_id
+            )
             all_criterion_sets.extend(org_criterion_sets)
         criterion_sets = all_criterion_sets
-        
+
         # Если наборов нет, переходим к созданию нового набора
         if len(criterion_sets) == 0:
             # Проверяем права администратора
             telegram_id = None
             if dialog_manager.event and dialog_manager.event.from_user:
                 telegram_id = dialog_manager.event.from_user.id
-            
+
             if telegram_id:
-                employee = await employee_service.get_by_telegram_id_and_organization_id(
-                    telegram_id, organization_id
+                employee = (
+                    await employee_service.get_by_telegram_id_and_organization_id(
+                        telegram_id, organization_id
+                    )
                 )
                 if employee:
                     employee_type_code = employee.meta.get("employee_type_code")
                     is_administrator = employee_type_code == "administrator"
-                    
+
                     if is_administrator:
                         # Сохраняем флаг для возврата в evaluation
                         dialog_manager.middleware_data["from_evaluation"] = True
@@ -1006,7 +1094,7 @@ async def process_number_input(
             if isinstance(criterion_id, str) and criterion_id.isdigit()
             else criterion_id
         )
-        
+
         # Пытаемся преобразовать в число
         try:
             number_text = message.text.strip() if message.text else ""
@@ -1023,7 +1111,9 @@ async def process_number_input(
             from aiogram.types import Message as MessageType
 
             if message and isinstance(message, MessageType):
-                await message.answer("Ошибка: введите корректное число (например: 10 или 10.5)")
+                await message.answer(
+                    "Ошибка: введите корректное число (например: 10 или 10.5)"
+                )
 
 
 async def on_skip_comment(
@@ -1062,22 +1152,22 @@ async def on_back_to_last_question(
     data = dialog_manager.dialog_data
     current_question_index = data.get("current_question_index", 0)
     criteria = data.get("criteria", [])
-    
+
     # Уменьшаем индекс, чтобы вернуться к последнему вопросу
     if current_question_index >= len(criteria):
         current_question_index = len(criteria) - 1
     else:
         current_question_index = max(0, current_question_index - 1)
-    
+
     data["current_question_index"] = current_question_index
-    
+
     if current_question_index < len(criteria):
         current_criterion = criteria[current_question_index]
         value_type = current_criterion.get("value_type", "boolean")
-        
+
         # Сохраняем тип вопроса для правильного возврата из add_comment
         data["last_question_type"] = value_type
-        
+
         # Переходим к правильному окну в зависимости от типа данных
         if value_type == "boolean":
             await dialog_manager.switch_to(EvaluationDialog.answer_question)
@@ -1142,11 +1232,11 @@ async def on_next_question(
     data = dialog_manager.dialog_data
     current_question_index = data.get("current_question_index", 0)
     criteria = data.get("criteria", [])
-    
+
     if current_question_index < len(criteria):
         current_criterion = criteria[current_question_index]
         value_type = current_criterion.get("value_type", "boolean")
-        
+
         # Переходим к правильному окну в зависимости от типа данных
         if value_type == "boolean":
             await dialog_manager.switch_to(EvaluationDialog.answer_question)
@@ -1221,7 +1311,9 @@ async def on_send_to_employee(
                 from aiogram.types import Message as MessageType
 
                 if callback.message and isinstance(callback.message, MessageType):
-                    await callback.message.answer("Ошибка: оцениваемый сотрудник не найден")
+                    await callback.message.answer(
+                        "Ошибка: оцениваемый сотрудник не найден"
+                    )
                 return
 
             if evaluated_employee.organization_id != organization_id:
@@ -1277,7 +1369,9 @@ async def on_send_to_employee(
                 # Если это комбинированный набор, показываем имена исходных наборов
                 combined_set_names = data.get("combined_set_names")
                 if combined_set_names:
-                    criterion_set_name = f"Комбинированный: {', '.join(combined_set_names)}"
+                    criterion_set_name = (
+                        f"Комбинированный: {', '.join(combined_set_names)}"
+                    )
                 else:
                     criterion_set_name = criterion_set.name
 
@@ -1318,21 +1412,23 @@ async def on_send_to_employee(
         # Подсчитываем статистику только для boolean критериев
         passed_criteria = 0
         boolean_criteria_count = 0
-        
+
         for criterion in criteria:
             criterion_id = criterion["id"]
             value_type = criterion.get("value_type", "boolean")
             answer = get_answer_by_id(criterion_id, criterion_answers)
-            
+
             # Подсчитываем статистику только для boolean критериев
             if value_type == "boolean" and answer is not None:
                 boolean_criteria_count += 1
                 if answer is True:
                     passed_criteria += 1
-        
+
         failed_criteria = boolean_criteria_count - passed_criteria
         score_percentage = (
-            (passed_criteria / boolean_criteria_count * 100) if boolean_criteria_count > 0 else 0.0
+            (passed_criteria / boolean_criteria_count * 100)
+            if boolean_criteria_count > 0
+            else 0.0
         )
 
         # Сохраняем все данные в dialog_data для генерации PDF
@@ -1387,7 +1483,7 @@ async def on_send_to_employee(
             f"Всего критериев: {total_criteria}\n"
             f"Пройдено: {passed_criteria}\n"
             f"Не пройдено: {failed_criteria}\n"
-            f"Процент успешных: {score_percentage:.1f}%\n\n"
+            f"Процент успешных: {format_percent(score_percentage)}\n\n"
         )
 
         # Добавляем детали по каждому критерию
@@ -1407,7 +1503,7 @@ async def on_send_to_employee(
                     answer_text = f"🔢 {answer}"
                 else:
                     answer_text = str(answer)
-                
+
                 message_text += f"{criterion['name']}: {answer_text}\n"
                 if comment:
                     message_text += f"  Комментарий: {comment}\n"
@@ -1451,7 +1547,9 @@ async def on_generate_pdf(
     dialog_manager: DialogManager,
     pdf_report_service: PDFReportService = Provide[Container.pdf_report_service],
     employee_service: EmployeeService = Provide[Container.employee_service],
-    criterion_value_repo: CriterionValueRepositoryAsyncpg = Provide[Container.criterion_value_repository],
+    criterion_value_repo: CriterionValueRepositoryAsyncpg = Provide[
+        Container.criterion_value_repository
+    ],
     criterion_service: CriterionService = Provide[Container.criterion_service],
 ):
     """Handle generate PDF button click.
@@ -1488,27 +1586,31 @@ async def on_generate_pdf(
 
         # Check if from web form - load criteria from DB
         from_web_form = data.get("from_web_form", False)
-        
+
         if from_web_form:
             # Load criteria values from database
-            criterion_values = await criterion_value_repo.get_by_evaluation_id(evaluation_id)
-            
+            criterion_values = await criterion_value_repo.get_by_evaluation_id(
+                evaluation_id
+            )
+
             # Get criteria names
             criterion_ids = [cv.criterion_id for cv in criterion_values]
             criteria_objs = await criterion_service.get_by_ids(criterion_ids)
             criteria_map = {c.id: c for c in criteria_objs}
-            
+
             criteria = []
             criterion_answers = {}
             criterion_comments = {}
-            
+
             for cv in criterion_values:
                 crit = criteria_map.get(cv.criterion_id)
-                criteria.append({
-                    "id": cv.criterion_id,
-                    "name": crit.name if crit else f"Критерий {cv.criterion_id}",
-                    "value_type": crit.value_type if crit else "boolean",
-                })
+                criteria.append(
+                    {
+                        "id": cv.criterion_id,
+                        "name": crit.name if crit else f"Критерий {cv.criterion_id}",
+                        "value_type": crit.value_type if crit else "boolean",
+                    }
+                )
                 criterion_answers[cv.criterion_id] = cv.value
                 criterion_comments[cv.criterion_id] = cv.notes
         else:
@@ -1551,7 +1653,7 @@ async def on_generate_pdf(
         criteria_list = []
         boolean_criteria_count = 0
         passed_criteria = 0
-        
+
         for criterion in criteria:
             criterion_id = criterion["id"]
             value_type = criterion.get("value_type", "boolean")
@@ -1567,7 +1669,7 @@ async def on_generate_pdf(
                     "comment": comment or "",
                 }
             )
-            
+
             # Подсчитываем статистику только для boolean критериев
             if value_type == "boolean" and answer is not None:
                 boolean_criteria_count += 1
@@ -1578,7 +1680,9 @@ async def on_generate_pdf(
         total_criteria = len(criteria_list)
         failed_criteria = boolean_criteria_count - passed_criteria
         score_percentage = (
-            (passed_criteria / boolean_criteria_count * 100) if boolean_criteria_count > 0 else 0.0
+            (passed_criteria / boolean_criteria_count * 100)
+            if boolean_criteria_count > 0
+            else 0.0
         )
 
         pdf_path = pdf_report_service.generate_evaluation_report(
@@ -1647,7 +1751,9 @@ async def on_generate_excel(
     dialog_manager: DialogManager,
     excel_report_service: ExcelReportService = Provide[Container.excel_report_service],
     employee_service: EmployeeService = Provide[Container.employee_service],
-    criterion_value_repo: CriterionValueRepositoryAsyncpg = Provide[Container.criterion_value_repository],
+    criterion_value_repo: CriterionValueRepositoryAsyncpg = Provide[
+        Container.criterion_value_repository
+    ],
     criterion_service: CriterionService = Provide[Container.criterion_service],
 ):
     """Handle generate Excel button click.
@@ -1684,27 +1790,31 @@ async def on_generate_excel(
 
         # Check if from web form - load criteria from DB
         from_web_form = data.get("from_web_form", False)
-        
+
         if from_web_form:
             # Load criteria values from database
-            criterion_values = await criterion_value_repo.get_by_evaluation_id(evaluation_id)
-            
+            criterion_values = await criterion_value_repo.get_by_evaluation_id(
+                evaluation_id
+            )
+
             # Get criteria names
             criterion_ids = [cv.criterion_id for cv in criterion_values]
             criteria_objs = await criterion_service.get_by_ids(criterion_ids)
             criteria_map = {c.id: c for c in criteria_objs}
-            
+
             criteria = []
             criterion_answers = {}
             criterion_comments = {}
-            
+
             for cv in criterion_values:
                 crit = criteria_map.get(cv.criterion_id)
-                criteria.append({
-                    "id": cv.criterion_id,
-                    "name": crit.name if crit else f"Критерий {cv.criterion_id}",
-                    "value_type": crit.value_type if crit else "boolean",
-                })
+                criteria.append(
+                    {
+                        "id": cv.criterion_id,
+                        "name": crit.name if crit else f"Критерий {cv.criterion_id}",
+                        "value_type": crit.value_type if crit else "boolean",
+                    }
+                )
                 criterion_answers[cv.criterion_id] = cv.value
                 criterion_comments[cv.criterion_id] = cv.notes
         else:
@@ -1715,7 +1825,9 @@ async def on_generate_excel(
         # Функция для получения ответа по ID критерия
         def get_answer_by_id(criterion_id, answers_dict):
             if isinstance(answers_dict, dict):
-                return answers_dict.get(str(criterion_id)) or answers_dict.get(criterion_id)
+                return answers_dict.get(str(criterion_id)) or answers_dict.get(
+                    criterion_id
+                )
             return None
 
         criteria_list = []
@@ -1808,11 +1920,14 @@ async def on_generate_excel(
         from aiogram.types import Message as MessageType
 
         if callback.message and isinstance(callback.message, MessageType):
-            await callback.message.answer(f"Ошибка при генерации Excel отчета: {str(e)}")
+            await callback.message.answer(
+                f"Ошибка при генерации Excel отчета: {str(e)}"
+            )
         return
 
 
 # ==================== Evaluation Method Selection ====================
+
 
 async def on_select_bot_method(
     callback: CallbackQuery, button: Button, dialog_manager: DialogManager
@@ -1837,24 +1952,31 @@ async def on_select_webform_method(
         button: Button widget.
         dialog_manager: Dialog manager.
     """
-    from aiogram.types import Message as MessageType, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+    from aiogram.types import (
+        Message as MessageType,
+        InlineKeyboardMarkup,
+        InlineKeyboardButton,
+        WebAppInfo,
+    )
     from app.api.routers.webapp import create_encrypted_token
     from app.settings import config
-    
+
     data = dialog_manager.dialog_data
-    
+
     # Get required data
     organization_id = data.get("organization_id")
     criterion_set_id = data.get("criterion_set_id")
     filled_by_employee_id = data.get("filled_by_employee_id")
     evaluated_employee_id = data.get("evaluated_employee_id")
     evaluation_type_id = data.get("evaluation_type_id", 1)
-    
+
     if not organization_id or not criterion_set_id or not filled_by_employee_id:
         if callback.message and isinstance(callback.message, MessageType):
-            await callback.message.answer("❌ Ошибка: не все данные заполнены для создания формы")
+            await callback.message.answer(
+                "❌ Ошибка: не все данные заполнены для создания формы"
+            )
         return
-    
+
     try:
         # Create encrypted token
         token = create_encrypted_token(
@@ -1864,29 +1986,33 @@ async def on_select_webform_method(
             evaluated_employee_id=evaluated_employee_id,
             evaluation_type_id=evaluation_type_id,
         )
-        
+
         # Build form URL with token
         # If WEBAPP_API_URL is set (two tunnels setup), include it as api_base param
         from urllib.parse import urlencode
+
         if config.WEBAPP_API_URL:
             params = urlencode({"token": token, "api_base": config.WEBAPP_API_URL})
             form_url = f"{config.WEBAPP_BASE_URL}?{params}"
         else:
             form_url = f"{config.WEBAPP_BASE_URL}?token={token}"
-        
+
         # Get names for display
         evaluated_name = data.get("evaluated_employee_name", "сотрудника")
         criteria_count = len(data.get("criteria", []))
-        
+
         # Check if URL is localhost (Telegram doesn't allow localhost in button URLs)
-        is_localhost = "localhost" in config.WEBAPP_BASE_URL or "127.0.0.1" in config.WEBAPP_BASE_URL
-        
+        is_localhost = (
+            "localhost" in config.WEBAPP_BASE_URL
+            or "127.0.0.1" in config.WEBAPP_BASE_URL
+        )
+
         # Get bot
         bot = dialog_manager.middleware_data.get("bot")
         if not bot:
             if dialog_manager.event:
                 bot = getattr(dialog_manager.event, "bot", None)
-        
+
         if bot and callback.from_user:
             if is_localhost:
                 # For localhost: send URL as text (for local development)
@@ -1913,7 +2039,12 @@ async def on_select_webform_method(
                 )
                 keyboard = InlineKeyboardMarkup(
                     inline_keyboard=[
-                        [InlineKeyboardButton(text="🌐 Открыть форму оценки", web_app=WebAppInfo(url=form_url))]
+                        [
+                            InlineKeyboardButton(
+                                text="🌐 Открыть форму оценки",
+                                web_app=WebAppInfo(url=form_url),
+                            )
+                        ]
                     ]
                 )
                 await bot.send_message(
@@ -1922,12 +2053,12 @@ async def on_select_webform_method(
                     parse_mode="HTML",
                     reply_markup=keyboard,
                 )
-        
+
         await callback.answer("Форма создана!")
-        
+
         # End dialog - user will fill form via link
         await dialog_manager.done()
-        
+
     except Exception as e:
         if callback.message and isinstance(callback.message, MessageType):
             await callback.message.answer(f"❌ Ошибка при создании формы: {str(e)}")
@@ -2023,18 +2154,20 @@ async def on_select_evaluation_to_delete(
     """
     from app.tgbot.dialogs.organization.handlers import _check_administrator_access
     from aiogram.types import Message as MessageType
-    
+
     # Check administrator access
-    if not await _check_administrator_access(callback, dialog_manager, employee_service):
+    if not await _check_administrator_access(
+        callback, dialog_manager, employee_service
+    ):
         if callback.message and isinstance(callback.message, MessageType):
             await callback.message.answer(
                 "❌ У вас нет прав доступа для удаления замеров. "
                 "Только администраторы могут удалять замеры."
             )
         return
-    
+
     evaluation_id = int(item_id)
-    
+
     # Delete evaluation
     success = await evaluation_service.delete(evaluation_id)
     if success:

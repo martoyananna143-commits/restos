@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     libcairo2-dev \
     pkg-config \
     postgresql-client \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Install poetry

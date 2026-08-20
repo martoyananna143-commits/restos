@@ -77,6 +77,75 @@ def completion_result():
     }
 
 
+def history_page(attempt_id):
+    return {
+        "items": [
+            {
+                "attempt_id": attempt_id,
+                "template_name": "Employee-safe assessment",
+                "template_version": 1,
+                "status": "completed",
+                "event_at": NOW,
+                "local_event_at": NOW,
+                "local_date": NOW.date(),
+                "day_label": "7 августа 2026",
+                "timezone": "Europe/Moscow",
+                "venue_name": None,
+                "subject_name": "Synthetic Employee",
+                "score_percent": "87.5000",
+                "score_display": "88%",
+                "has_result": True,
+                "pdf_available": True,
+            }
+        ],
+        "next_cursor": None,
+        "company_timezone": "Europe/Moscow",
+    }
+
+
+def result_detail(attempt_id, company_id):
+    return {
+        "attempt_id": attempt_id,
+        "company_id": company_id,
+        "venue_id": None,
+        "template_name": "Employee-safe assessment",
+        "template_version": 1,
+        "status": "completed",
+        "venue_name": None,
+        "subject_name": "Synthetic Employee",
+        "submitted_at": NOW,
+        "local_submitted_at": NOW,
+        "timezone": "Europe/Moscow",
+        "scoring_algorithm": "weighted_v1",
+        "score_percent": "87.5000",
+        "score_display": "88%",
+        "answered_count": 1,
+        "required_count": 1,
+        "total_count": 1,
+        "critical_failure_count": 0,
+        "stop_factor_count": 0,
+        "sections": [
+            {
+                "title": "Service",
+                "score_percent": "87.5000",
+                "score_display": "88%",
+                "coverage": "1.000000",
+                "critical_failure_count": 0,
+                "stop_factor_count": 0,
+                "items": [
+                    {
+                        "prompt": "Safe prompt",
+                        "answer_type": "boolean",
+                        "value": "Да",
+                        "comment": None,
+                    }
+                ],
+            }
+        ],
+        "related_tasks": [],
+    }
+
+
 def make_client(monkeypatch):
     session = FakeSession()
 
@@ -96,7 +165,7 @@ def make_client(monkeypatch):
     return TestClient(app, raise_server_exceptions=False), session, app
 
 
-def test_openapi_exposes_exact_seven_bearer_operations(monkeypatch):
+def test_openapi_exposes_exact_nine_bearer_operations(monkeypatch):
     _, _, app = make_client(monkeypatch)
     operations = {
         (method, path)
@@ -112,6 +181,8 @@ def test_openapi_exposes_exact_seven_bearer_operations(monkeypatch):
         ("put", "/api/v1/account/assessment-attempts/{attempt_id}/draft"),
         ("post", "/api/v1/account/assessment-attempts/{attempt_id}/submit"),
         ("get", "/api/v1/account/assessment-attempts/{attempt_id}/result"),
+        ("get", "/api/v1/account/assessment-attempts/{attempt_id}/result.pdf"),
+        ("get", "/api/v1/account/assessment-history"),
     }
     serialized = str(app.openapi()).lower()
     for forbidden in ("refresh_token", "private_key", "credential_id", "numeric_value"):
@@ -120,15 +191,29 @@ def test_openapi_exposes_exact_seven_bearer_operations(monkeypatch):
     assert {"weight", "passing_value"}.issubset(item_schema["properties"])
     list_parameters = {
         value["name"]
-        for value in app.openapi()["paths"][
-            "/api/v1/account/assessment-assignments"
-        ]["get"]["parameters"]
+        for value in app.openapi()["paths"]["/api/v1/account/assessment-assignments"][
+            "get"
+        ]["parameters"]
     }
     assert list_parameters == {
         "company_id",
         "history_period",
         "date_from",
         "date_to",
+    }
+    history_parameters = {
+        value["name"]
+        for value in app.openapi()["paths"]["/api/v1/account/assessment-history"][
+            "get"
+        ]["parameters"]
+    }
+    assert history_parameters == {
+        "company_id",
+        "history_period",
+        "date_from",
+        "date_to",
+        "cursor",
+        "limit",
     }
 
 
@@ -166,7 +251,11 @@ def test_draft_request_accepts_only_typed_section_order(monkeypatch):
     http, _, _ = make_client(monkeypatch)
     response = http.put(
         f"/api/v1/account/assessment-attempts/{attempt_id}/draft",
-        json={"expected_revision": 0, "answers": [], "section_order": [str(section_id)]},
+        json={
+            "expected_revision": 0,
+            "answers": [],
+            "section_order": [str(section_id)],
+        },
     )
     assert response.status_code == 200
     assert captured.section_order == [section_id]
@@ -205,10 +294,11 @@ def test_all_success_schemas_are_strict_and_typed(monkeypatch):
             "AssessmentCompletionV1Response",
             "AssessmentWeightedV1Response",
         },
-        ("get", "/api/v1/account/assessment-attempts/{attempt_id}/result"): {
-            "AssessmentCompletionV1Response",
-            "AssessmentWeightedV1Response",
-        },
+        (
+            "get",
+            "/api/v1/account/assessment-attempts/{attempt_id}/result",
+        ): "AssessmentResultResponse",
+        ("get", "/api/v1/account/assessment-history"): "AssessmentHistoryPageResponse",
     }
     operation_ids = []
     for (method, path), model in expected.items():
@@ -225,7 +315,12 @@ def test_all_success_schemas_are_strict_and_typed(monkeypatch):
                 else schema["$ref"]
             )
             assert reference.endswith(f"/{model}")
-    assert len(operation_ids) == len(set(operation_ids)) == 7
+    pdf_operation = spec["paths"][
+        "/api/v1/account/assessment-attempts/{attempt_id}/result.pdf"
+    ]["get"]
+    assert "application/pdf" in pdf_operation["responses"]["200"]["content"]
+    operation_ids.append(pdf_operation["operationId"])
+    assert len(operation_ids) == len(set(operation_ids)) == 9
     public_models = {
         name: schema
         for name, schema in spec["components"]["schemas"].items()
@@ -294,8 +389,9 @@ def test_mutation_is_no_store_and_never_sets_cookie(monkeypatch):
     assert session.commits == 1 and session.rollbacks == 0
 
 
-def test_six_success_boundaries_validate_runtime_payloads(monkeypatch):
+def test_history_and_result_success_boundaries_validate_runtime_payloads(monkeypatch):
     assignment_id, attempt_id = uuid4(), uuid4()
+    company_id = uuid4()
 
     class Service:
         def __init__(self, _session):
@@ -316,10 +412,18 @@ def test_six_success_boundaries_validate_runtime_payloads(monkeypatch):
         async def submit(self, *_args):
             return completion_result()
 
-        async def result(self, *_args):
-            return completion_result()
+    class HistoryService:
+        def __init__(self, _session):
+            pass
+
+        async def history(self, *_args):
+            return history_page(attempt_id)
+
+        async def result_projection(self, *_args):
+            return result_detail(attempt_id, company_id)
 
     monkeypatch.setattr(account_assessments, "AssessmentAttemptService", Service)
+    monkeypatch.setattr(account_assessments, "AssessmentHistoryService", HistoryService)
     http, _, _ = make_client(monkeypatch)
     requests = [
         ("get", "/api/v1/account/assessment-assignments"),
@@ -327,22 +431,62 @@ def test_six_success_boundaries_validate_runtime_payloads(monkeypatch):
         ("post", f"/api/v1/account/assessment-assignments/{assignment_id}/attempt"),
         ("get", f"/api/v1/account/assessment-attempts/{attempt_id}"),
         ("post", f"/api/v1/account/assessment-attempts/{attempt_id}/submit"),
-        ("get", f"/api/v1/account/assessment-attempts/{attempt_id}/result"),
+        ("get", f"/api/v1/account/assessment-history?company_id={company_id}"),
+        (
+            "get",
+            f"/api/v1/account/assessment-attempts/{attempt_id}/result?company_id={company_id}",
+        ),
     ]
     for method, path in requests:
         response = getattr(http, method)(path)
         assert response.status_code == 200, response.text
         assert response.headers["cache-control"] == "private, no-store"
         assert "set-cookie" not in response.headers
-    assert set(
-        http.get(f"/api/v1/account/assessment-attempts/{attempt_id}/result").json()
-    ) == {
-        "scoring_algorithm",
-        "submitted_at",
-        "answered_count",
-        "required_count",
-        "total_count",
-    }
+    result = http.get(
+        f"/api/v1/account/assessment-attempts/{attempt_id}/result?company_id={company_id}"
+    ).json()
+    assert result["score_percent"] == "87.5000"
+    assert result["score_display"] == "88%"
+    assert result["sections"][0]["items"][0]["value"] == "Да"
+
+
+def test_pdf_download_uses_authorized_projection_and_safe_headers(monkeypatch):
+    attempt_id, company_id = uuid4(), uuid4()
+
+    class HistoryService:
+        def __init__(self, _session):
+            pass
+
+        async def result_projection(
+            self, account_id, selected_company_id, selected_attempt_id, _now
+        ):
+            assert account_id == ACCOUNT_ID
+            assert selected_company_id == company_id
+            assert selected_attempt_id == attempt_id
+            return result_detail(attempt_id, company_id)
+
+    class PdfService:
+        def generate(self, projection, generated_at):
+            assert projection["attempt_id"] == attempt_id
+            assert generated_at.tzinfo is not None
+            return b"%PDF-1.4\nsynthetic-safe-pdf\n%%EOF"
+
+    monkeypatch.setattr(account_assessments, "AssessmentHistoryService", HistoryService)
+    monkeypatch.setattr(account_assessments, "AssessmentResultPdfService", PdfService)
+    http, session, _ = make_client(monkeypatch)
+    response = http.get(
+        f"/api/v1/account/assessment-attempts/{attempt_id}/result.pdf?company_id={company_id}"
+    )
+    assert response.status_code == 200
+    assert response.content.startswith(b"%PDF-")
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.headers["cache-control"] == "private, no-store"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["content-disposition"] == (
+        'attachment; filename="restos-assessment-2026-08-07.pdf"'
+    )
+    assert "set-cookie" not in response.headers
+    assert session.commits == session.rollbacks == 0
 
 
 def test_strict_response_models_reject_internal_fields():

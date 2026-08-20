@@ -113,6 +113,9 @@ async def _create_committed_weighted_attempt(engine):
         await session.commit()
         return SimpleNamespace(
             account_id=owner.id,
+            company_id=company.company_id,
+            employee_profile_id=company.employee_profile_id,
+            template_version_id=imported.template_version_id,
             assignment_id=assignment["id"],
             attempt_id=document["id"],
         )
@@ -132,8 +135,7 @@ async def test_weighted_submit_persists_strict_json_and_is_idempotent():
     assert result["scoring_algorithm"] == "weighted_v1"
     assert len(result["sections"]) == 4
     assert all(
-        isinstance(section["section_id"], str)
-        and UUID(section["section_id"])
+        isinstance(section["section_id"], str) and UUID(section["section_id"])
         for section in result["sections"]
     )
     assert json.loads(json.dumps(result)) == result
@@ -157,11 +159,14 @@ async def test_weighted_submit_persists_strict_json_and_is_idempotent():
         assert repeated == result
 
     async with AsyncSession(engine) as session:
-        assert await session.scalar(
-            select(func.count())
-            .select_from(AssessmentMetricObservation)
-            .where(AssessmentMetricObservation.attempt_id == context.attempt_id)
-        ) == observation_count
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(AssessmentMetricObservation)
+                .where(AssessmentMetricObservation.attempt_id == context.attempt_id)
+            )
+            == observation_count
+        )
     await engine.dispose()
 
 
@@ -196,10 +201,13 @@ async def test_unsupported_weighted_result_rolls_back_attempt_and_observations()
         assert attempt is not None and attempt.status == "draft"
         assert attempt.result_json is None and attempt.submitted_at is None
         assert assignment is not None and assignment.status == "in_progress"
-        assert await session.scalar(
-            select(func.count())
-            .select_from(AssessmentMetricObservation)
-            .where(AssessmentMetricObservation.attempt_id == context.attempt_id)
-        ) == observations_before
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(AssessmentMetricObservation)
+                .where(AssessmentMetricObservation.attempt_id == context.attempt_id)
+            )
+            == observations_before
+        )
         assert await session.scalar(select(1)) == 1
     await engine.dispose()

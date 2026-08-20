@@ -15,6 +15,8 @@ from openpyxl.styles import (
     Side,
 )
 
+from app.internal.services.presentation_percent import format_percent
+
 logger = logging.getLogger(__name__)
 
 
@@ -137,7 +139,9 @@ class ExcelReportService:
 
             ws.merge_cells(f"A{row}:D{row}")
             cell = ws[f"A{row}"]
-            cell.value = f"Дата формирования: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+            cell.value = (
+                f"Дата формирования: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+            )
             cell.font = Font(name="Arial", size=10, color="7f8c8d")
             cell.alignment = Alignment(horizontal="center", vertical="center")
             row += 2
@@ -159,13 +163,17 @@ class ExcelReportService:
                 ws[f"A{row}"].font = bold_font
                 ws[f"A{row}"].fill = light_gray_fill
                 ws[f"A{row}"].border = thin_border
-                ws[f"A{row}"].alignment = Alignment(horizontal="left", vertical="center")
+                ws[f"A{row}"].alignment = Alignment(
+                    horizontal="left", vertical="center"
+                )
 
                 ws[f"B{row}"] = value
                 ws[f"B{row}"].font = normal_font
                 ws[f"B{row}"].fill = light_gray_fill
                 ws[f"B{row}"].border = thin_border
-                ws[f"B{row}"].alignment = Alignment(horizontal="left", vertical="center")
+                ws[f"B{row}"].alignment = Alignment(
+                    horizontal="left", vertical="center"
+                )
 
                 ws.merge_cells(f"B{row}:D{row}")
                 row += 1
@@ -192,9 +200,10 @@ class ExcelReportService:
                 # Парсим JSON строки, если значение - строка с JSON
                 if isinstance(value, str):
                     value_stripped = value.strip()
-                    if value_stripped.startswith('{') and value_stripped.endswith('}'):
+                    if value_stripped.startswith("{") and value_stripped.endswith("}"):
                         try:
                             import json
+
                             parsed = json.loads(value)
                             if isinstance(parsed, dict) and "value" in parsed:
                                 # Извлекаем значение из JSON объекта {"type": "...", "value": ...}
@@ -203,11 +212,19 @@ class ExcelReportService:
                                     # Преобразуем тип в зависимости от type в JSON
                                     value_type_from_json = parsed.get("type")
                                     if value_type_from_json == "boolean":
-                                        value = bool(extracted_value) if not isinstance(extracted_value, bool) else extracted_value
+                                        value = (
+                                            bool(extracted_value)
+                                            if not isinstance(extracted_value, bool)
+                                            else extracted_value
+                                        )
                                     elif value_type_from_json == "number":
                                         if isinstance(extracted_value, str):
                                             try:
-                                                value = float(extracted_value) if "." in extracted_value else int(extracted_value)
+                                                value = (
+                                                    float(extracted_value)
+                                                    if "." in extracted_value
+                                                    else int(extracted_value)
+                                                )
                                             except (ValueError, TypeError):
                                                 value = extracted_value
                                         else:
@@ -231,7 +248,9 @@ class ExcelReportService:
                 cell = ws.cell(row=row, column=2)
                 cell.value = criterion.get("name", "Не указано")
                 cell.font = bold_font
-                cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+                cell.alignment = Alignment(
+                    horizontal="left", vertical="center", wrap_text=True
+                )
                 cell.border = thin_border
 
                 # Результат
@@ -249,7 +268,10 @@ class ExcelReportService:
                     result_cell.value = "Да" if is_passed else "Нет"
                     result_cell.fill = green_fill if is_passed else red_fill
                     result_cell.font = Font(
-                        name="Arial", size=11, bold=True, color="155724" if is_passed else "721c24"
+                        name="Arial",
+                        size=11,
+                        bold=True,
+                        color="155724" if is_passed else "721c24",
                     )
                 elif value_type == "string":
                     result_cell.value = str(value) if value is not None else "—"
@@ -262,13 +284,19 @@ class ExcelReportService:
                             result_cell.value = float(value)
                             result_cell.number_format = "0.00"
                         else:
-                            result_cell.value = int(value) if isinstance(value, float) and value.is_integer() else value
+                            result_cell.value = (
+                                int(value)
+                                if isinstance(value, float) and value.is_integer()
+                                else value
+                            )
                     result_cell.font = normal_font
                 else:
                     result_cell.value = str(value) if value is not None else "—"
                     result_cell.font = normal_font
 
-                result_cell.alignment = Alignment(horizontal="center", vertical="center")
+                result_cell.alignment = Alignment(
+                    horizontal="center", vertical="center"
+                )
                 result_cell.border = thin_border
 
                 # Комментарий
@@ -278,7 +306,9 @@ class ExcelReportService:
                     comment = "—"
                 cell.value = comment
                 cell.font = Font(name="Arial", size=11, italic=True)
-                cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+                cell.alignment = Alignment(
+                    horizontal="left", vertical="center", wrap_text=True
+                )
                 cell.border = thin_border
 
                 # Чередующийся цвет фона
@@ -308,10 +338,12 @@ class ExcelReportService:
                     total_criteria,
                     passed_criteria,
                     failed_criteria,
-                    f"{score_percentage:.1f}%",
+                    format_percent(score_percentage),
                 ]
 
-                for col_idx, (header, value) in enumerate(zip(stats_headers, stats_values), 1):
+                for col_idx, (header, value) in enumerate(
+                    zip(stats_headers, stats_values), 1
+                ):
                     cell = ws.cell(row=row, column=col_idx)
                     cell.value = str(header)
                     cell.font = Font(name="Arial", size=9)
@@ -326,13 +358,21 @@ class ExcelReportService:
                         value_cell.value = str(value)
                     value_cell.font = Font(name="Arial", size=16, bold=True)
                     if col_idx == 2:  # Пройдено
-                        value_cell.font = Font(name="Arial", size=16, bold=True, color="28a745")
+                        value_cell.font = Font(
+                            name="Arial", size=16, bold=True, color="28a745"
+                        )
                     elif col_idx == 3:  # Не пройдено
-                        value_cell.font = Font(name="Arial", size=16, bold=True, color="dc3545")
+                        value_cell.font = Font(
+                            name="Arial", size=16, bold=True, color="dc3545"
+                        )
                     elif col_idx == 4:  # Успешность
-                        value_cell.font = Font(name="Arial", size=16, bold=True, color="4CAF50")
+                        value_cell.font = Font(
+                            name="Arial", size=16, bold=True, color="4CAF50"
+                        )
                     value_cell.fill = summary_fill
-                    value_cell.alignment = Alignment(horizontal="center", vertical="center")
+                    value_cell.alignment = Alignment(
+                        horizontal="center", vertical="center"
+                    )
                     value_cell.border = thin_border
 
                 row += 2
@@ -347,8 +387,12 @@ class ExcelReportService:
                         "не учитываются в статистике, так как их невозможно оценить "
                         "по принципу верно/неверно."
                     )
-                    note_cell.font = Font(name="Arial", size=10, italic=True, color="7f8c8d")
-                    note_cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+                    note_cell.font = Font(
+                        name="Arial", size=10, italic=True, color="7f8c8d"
+                    )
+                    note_cell.alignment = Alignment(
+                        horizontal="left", vertical="center", wrap_text=True
+                    )
                     row += 1
             else:
                 # Только общее количество
@@ -376,8 +420,12 @@ class ExcelReportService:
                     "Примечание: в данной оценке используются только текстовые и числовые критерии, "
                     "которые невозможно оценить по принципу верно/неверно."
                 )
-                note_cell.font = Font(name="Arial", size=10, italic=True, color="7f8c8d")
-                note_cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+                note_cell.font = Font(
+                    name="Arial", size=10, italic=True, color="7f8c8d"
+                )
+                note_cell.alignment = Alignment(
+                    horizontal="left", vertical="center", wrap_text=True
+                )
                 row += 1
 
             row += 1
@@ -430,7 +478,7 @@ class ExcelReportService:
         last_evaluation_date: Optional[str] = None,
     ) -> Path:
         """Generate Excel report for employee.
-        
+
         Args:
             employee_id: Employee ID.
             employee_name: Employee full name.
@@ -446,7 +494,7 @@ class ExcelReportService:
             best_score: Best score.
             worst_score: Worst score.
             last_evaluation_date: Last evaluation date.
-            
+
         Returns:
             Path to generated Excel file.
         """
@@ -460,21 +508,30 @@ class ExcelReportService:
             ws.title = "Отчет по сотруднику"
 
             title_font = Font(name="Arial", size=16, bold=True, color="FFFFFF")
-            header_font = Font(name="Arial", size=12, bold=True, color="FFFFFF")
             normal_font = Font(name="Arial", size=11)
             bold_font = Font(name="Arial", size=11, bold=True)
 
-            title_fill = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
-            light_gray_fill = PatternFill(start_color="f9f9f9", end_color="f9f9f9", fill_type="solid")
-            summary_fill = PatternFill(start_color="e8f5e9", end_color="e8f5e9", fill_type="solid")
+            title_fill = PatternFill(
+                start_color="2c3e50", end_color="2c3e50", fill_type="solid"
+            )
+            light_gray_fill = PatternFill(
+                start_color="f9f9f9", end_color="f9f9f9", fill_type="solid"
+            )
+            summary_fill = PatternFill(
+                start_color="e8f5e9", end_color="e8f5e9", fill_type="solid"
+            )
 
             thin_border = Border(
-                left=Side(style="thin"), right=Side(style="thin"),
-                top=Side(style="thin"), bottom=Side(style="thin")
+                left=Side(style="thin"),
+                right=Side(style="thin"),
+                top=Side(style="thin"),
+                bottom=Side(style="thin"),
             )
             thick_border = Border(
-                left=Side(style="thick"), right=Side(style="thick"),
-                top=Side(style="thick"), bottom=Side(style="thick")
+                left=Side(style="thick"),
+                right=Side(style="thick"),
+                top=Side(style="thick"),
+                bottom=Side(style="thick"),
             )
 
             row = 1
@@ -492,7 +549,9 @@ class ExcelReportService:
 
             ws.merge_cells(f"A{row}:B{row}")
             cell = ws[f"A{row}"]
-            cell.value = f"Дата формирования: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+            cell.value = (
+                f"Дата формирования: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+            )
             cell.font = Font(name="Arial", size=10, color="7f8c8d")
             cell.alignment = Alignment(horizontal="center", vertical="center")
             row += 2
@@ -519,13 +578,17 @@ class ExcelReportService:
                 ws[f"A{row}"].font = bold_font
                 ws[f"A{row}"].fill = light_gray_fill
                 ws[f"A{row}"].border = thin_border
-                ws[f"A{row}"].alignment = Alignment(horizontal="left", vertical="center")
+                ws[f"A{row}"].alignment = Alignment(
+                    horizontal="left", vertical="center"
+                )
 
                 ws[f"B{row}"] = value
                 ws[f"B{row}"].font = normal_font
                 ws[f"B{row}"].fill = light_gray_fill
                 ws[f"B{row}"].border = thin_border
-                ws[f"B{row}"].alignment = Alignment(horizontal="left", vertical="center")
+                ws[f"B{row}"].alignment = Alignment(
+                    horizontal="left", vertical="center"
+                )
                 row += 1
 
             row += 1
@@ -541,15 +604,17 @@ class ExcelReportService:
 
             if avg_score is not None:
                 stats_headers.append("Средний балл")
-                stats_values.append(f"{avg_score:.1f}%")
+                stats_values.append(format_percent(avg_score))
             if best_score is not None:
                 stats_headers.append("Лучший результат")
-                stats_values.append(f"{best_score:.1f}%")
+                stats_values.append(format_percent(best_score))
             if worst_score is not None:
                 stats_headers.append("Худший результат")
-                stats_values.append(f"{worst_score:.1f}%")
+                stats_values.append(format_percent(worst_score))
 
-            for col_idx, (header, value) in enumerate(zip(stats_headers, stats_values), 1):
+            for col_idx, (header, value) in enumerate(
+                zip(stats_headers, stats_values), 1
+            ):
                 cell = ws.cell(row=row, column=col_idx)
                 cell.value = str(header)
                 cell.font = Font(name="Arial", size=9)
@@ -565,16 +630,22 @@ class ExcelReportService:
                         value_cell.value = str(value)
                 else:
                     value_cell.value = str(value)
-                
+
                 if col_idx == 2 and avg_score is not None:  # Средний балл
-                    value_cell.font = Font(name="Arial", size=16, bold=True, color="4CAF50")
+                    value_cell.font = Font(
+                        name="Arial", size=16, bold=True, color="4CAF50"
+                    )
                 elif col_idx == 3 and best_score is not None:  # Лучший результат
-                    value_cell.font = Font(name="Arial", size=16, bold=True, color="28a745")
+                    value_cell.font = Font(
+                        name="Arial", size=16, bold=True, color="28a745"
+                    )
                 elif col_idx == 4 and worst_score is not None:  # Худший результат
-                    value_cell.font = Font(name="Arial", size=16, bold=True, color="dc3545")
+                    value_cell.font = Font(
+                        name="Arial", size=16, bold=True, color="dc3545"
+                    )
                 else:
                     value_cell.font = Font(name="Arial", size=16, bold=True)
-                
+
                 value_cell.fill = summary_fill
                 value_cell.alignment = Alignment(horizontal="center", vertical="center")
                 value_cell.border = thin_border
@@ -585,7 +656,9 @@ class ExcelReportService:
                 note_cell = ws.merge_cells(f"A{row}:B{row}")
                 note_cell = ws[f"A{row}"]
                 note_cell.value = f"Последний замер: {last_evaluation_date}"
-                note_cell.font = Font(name="Arial", size=10, italic=True, color="7f8c8d")
+                note_cell.font = Font(
+                    name="Arial", size=10, italic=True, color="7f8c8d"
+                )
                 note_cell.alignment = Alignment(horizontal="left", vertical="center")
                 row += 1
 
@@ -613,7 +686,9 @@ class ExcelReportService:
             return excel_path
 
         except Exception as e:
-            logger.error(f"Error generating employee Excel report: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error generating employee Excel report: {str(e)}", exc_info=True
+            )
             raise
 
     def generate_criterion_report(
@@ -646,17 +721,27 @@ class ExcelReportService:
             normal_font = Font(name="Arial", size=11)
             bold_font = Font(name="Arial", size=11, bold=True)
 
-            title_fill = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
-            light_gray_fill = PatternFill(start_color="f9f9f9", end_color="f9f9f9", fill_type="solid")
-            summary_fill = PatternFill(start_color="e8f5e9", end_color="e8f5e9", fill_type="solid")
+            title_fill = PatternFill(
+                start_color="2c3e50", end_color="2c3e50", fill_type="solid"
+            )
+            light_gray_fill = PatternFill(
+                start_color="f9f9f9", end_color="f9f9f9", fill_type="solid"
+            )
+            summary_fill = PatternFill(
+                start_color="e8f5e9", end_color="e8f5e9", fill_type="solid"
+            )
 
             thin_border = Border(
-                left=Side(style="thin"), right=Side(style="thin"),
-                top=Side(style="thin"), bottom=Side(style="thin")
+                left=Side(style="thin"),
+                right=Side(style="thin"),
+                top=Side(style="thin"),
+                bottom=Side(style="thin"),
             )
             thick_border = Border(
-                left=Side(style="thick"), right=Side(style="thick"),
-                top=Side(style="thick"), bottom=Side(style="thick")
+                left=Side(style="thick"),
+                right=Side(style="thick"),
+                top=Side(style="thick"),
+                bottom=Side(style="thick"),
             )
 
             row = 1
@@ -674,7 +759,9 @@ class ExcelReportService:
 
             ws.merge_cells(f"A{row}:B{row}")
             cell = ws[f"A{row}"]
-            cell.value = f"Дата формирования: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+            cell.value = (
+                f"Дата формирования: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+            )
             cell.font = Font(name="Arial", size=10, color="7f8c8d")
             cell.alignment = Alignment(horizontal="center", vertical="center")
             row += 2
@@ -699,13 +786,17 @@ class ExcelReportService:
                 ws[f"A{row}"].font = bold_font
                 ws[f"A{row}"].fill = light_gray_fill
                 ws[f"A{row}"].border = thin_border
-                ws[f"A{row}"].alignment = Alignment(horizontal="left", vertical="center")
+                ws[f"A{row}"].alignment = Alignment(
+                    horizontal="left", vertical="center"
+                )
 
                 ws[f"B{row}"] = value
                 ws[f"B{row}"].font = normal_font
                 ws[f"B{row}"].fill = light_gray_fill
                 ws[f"B{row}"].border = thin_border
-                ws[f"B{row}"].alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+                ws[f"B{row}"].alignment = Alignment(
+                    horizontal="left", vertical="center", wrap_text=True
+                )
                 row += 1
 
             row += 1
@@ -745,7 +836,9 @@ class ExcelReportService:
                     note_cell = ws[f"A{row}"]
                     note_cell.value = f"  • {set_name}"
                     note_cell.font = Font(name="Arial", size=10)
-                    note_cell.alignment = Alignment(horizontal="left", vertical="center")
+                    note_cell.alignment = Alignment(
+                        horizontal="left", vertical="center"
+                    )
                     row += 1
 
                 if len(criterion_sets) > 20:
@@ -753,7 +846,9 @@ class ExcelReportService:
                     note_cell = ws[f"A{row}"]
                     note_cell.value = f"  ... и еще {len(criterion_sets) - 20}"
                     note_cell.font = Font(name="Arial", size=10, italic=True)
-                    note_cell.alignment = Alignment(horizontal="left", vertical="center")
+                    note_cell.alignment = Alignment(
+                        horizontal="left", vertical="center"
+                    )
                     row += 1
             else:
                 ws.merge_cells(f"A{row}:B{row}")
@@ -787,7 +882,9 @@ class ExcelReportService:
             return excel_path
 
         except Exception as e:
-            logger.error(f"Error generating criterion Excel report: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error generating criterion Excel report: {str(e)}", exc_info=True
+            )
             raise
 
     def generate_criterion_set_report(
@@ -816,18 +913,30 @@ class ExcelReportService:
             normal_font = Font(name="Arial", size=11)
             bold_font = Font(name="Arial", size=11, bold=True)
 
-            title_fill = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
-            header_fill = PatternFill(start_color="4CAF50", end_color="4CAF50", fill_type="solid")
-            light_gray_fill = PatternFill(start_color="f9f9f9", end_color="f9f9f9", fill_type="solid")
-            summary_fill = PatternFill(start_color="e8f5e9", end_color="e8f5e9", fill_type="solid")
+            title_fill = PatternFill(
+                start_color="2c3e50", end_color="2c3e50", fill_type="solid"
+            )
+            header_fill = PatternFill(
+                start_color="4CAF50", end_color="4CAF50", fill_type="solid"
+            )
+            light_gray_fill = PatternFill(
+                start_color="f9f9f9", end_color="f9f9f9", fill_type="solid"
+            )
+            summary_fill = PatternFill(
+                start_color="e8f5e9", end_color="e8f5e9", fill_type="solid"
+            )
 
             thin_border = Border(
-                left=Side(style="thin"), right=Side(style="thin"),
-                top=Side(style="thin"), bottom=Side(style="thin")
+                left=Side(style="thin"),
+                right=Side(style="thin"),
+                top=Side(style="thin"),
+                bottom=Side(style="thin"),
             )
             thick_border = Border(
-                left=Side(style="thick"), right=Side(style="thick"),
-                top=Side(style="thick"), bottom=Side(style="thick")
+                left=Side(style="thick"),
+                right=Side(style="thick"),
+                top=Side(style="thick"),
+                bottom=Side(style="thick"),
             )
 
             row = 1
@@ -845,7 +954,9 @@ class ExcelReportService:
 
             ws.merge_cells(f"A{row}:D{row}")
             cell = ws[f"A{row}"]
-            cell.value = f"Дата формирования: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+            cell.value = (
+                f"Дата формирования: {datetime.now().strftime('%d.%m.%Y %H:%M')}"
+            )
             cell.font = Font(name="Arial", size=10, color="7f8c8d")
             cell.alignment = Alignment(horizontal="center", vertical="center")
             row += 2
@@ -865,13 +976,17 @@ class ExcelReportService:
                 ws[f"A{row}"].font = bold_font
                 ws[f"A{row}"].fill = light_gray_fill
                 ws[f"A{row}"].border = thin_border
-                ws[f"A{row}"].alignment = Alignment(horizontal="left", vertical="center")
+                ws[f"A{row}"].alignment = Alignment(
+                    horizontal="left", vertical="center"
+                )
 
                 ws[f"B{row}"] = value
                 ws[f"B{row}"].font = normal_font
                 ws[f"B{row}"].fill = light_gray_fill
                 ws[f"B{row}"].border = thin_border
-                ws[f"B{row}"].alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+                ws[f"B{row}"].alignment = Alignment(
+                    horizontal="left", vertical="center", wrap_text=True
+                )
                 ws.merge_cells(f"B{row}:D{row}")
                 row += 1
 
@@ -881,7 +996,9 @@ class ExcelReportService:
             if criteria:
                 criteria_title = ws.cell(row=row, column=1)
                 criteria_title.value = f"Критерии в наборе ({len(criteria)})"
-                criteria_title.font = Font(name="Arial", size=14, bold=True, color="2c3e50")
+                criteria_title.font = Font(
+                    name="Arial", size=14, bold=True, color="2c3e50"
+                )
                 row += 1
 
                 headers = ["№", "Название", "Код", "Тип"]
@@ -898,22 +1015,32 @@ class ExcelReportService:
                 for idx, criterion in enumerate(criteria[:100], 1):
                     ws.cell(row=row, column=1).value = idx
                     ws.cell(row=row, column=1).font = normal_font
-                    ws.cell(row=row, column=1).alignment = Alignment(horizontal="center", vertical="center")
+                    ws.cell(row=row, column=1).alignment = Alignment(
+                        horizontal="center", vertical="center"
+                    )
                     ws.cell(row=row, column=1).border = thin_border
 
-                    ws.cell(row=row, column=2).value = criterion.get('name', 'N/A')
+                    ws.cell(row=row, column=2).value = criterion.get("name", "N/A")
                     ws.cell(row=row, column=2).font = normal_font
-                    ws.cell(row=row, column=2).alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+                    ws.cell(row=row, column=2).alignment = Alignment(
+                        horizontal="left", vertical="center", wrap_text=True
+                    )
                     ws.cell(row=row, column=2).border = thin_border
 
-                    ws.cell(row=row, column=3).value = criterion.get('code', 'N/A')
+                    ws.cell(row=row, column=3).value = criterion.get("code", "N/A")
                     ws.cell(row=row, column=3).font = normal_font
-                    ws.cell(row=row, column=3).alignment = Alignment(horizontal="left", vertical="center")
+                    ws.cell(row=row, column=3).alignment = Alignment(
+                        horizontal="left", vertical="center"
+                    )
                     ws.cell(row=row, column=3).border = thin_border
 
-                    ws.cell(row=row, column=4).value = criterion.get('value_type', 'N/A')
+                    ws.cell(row=row, column=4).value = criterion.get(
+                        "value_type", "N/A"
+                    )
                     ws.cell(row=row, column=4).font = normal_font
-                    ws.cell(row=row, column=4).alignment = Alignment(horizontal="left", vertical="center")
+                    ws.cell(row=row, column=4).alignment = Alignment(
+                        horizontal="left", vertical="center"
+                    )
                     ws.cell(row=row, column=4).border = thin_border
 
                     if idx % 2 == 0:
@@ -926,8 +1053,12 @@ class ExcelReportService:
                     ws.merge_cells(f"A{row}:D{row}")
                     note_cell = ws[f"A{row}"]
                     note_cell.value = f"... и еще {len(criteria) - 100} критериев"
-                    note_cell.font = Font(name="Arial", size=10, italic=True, color="7f8c8d")
-                    note_cell.alignment = Alignment(horizontal="left", vertical="center")
+                    note_cell.font = Font(
+                        name="Arial", size=10, italic=True, color="7f8c8d"
+                    )
+                    note_cell.alignment = Alignment(
+                        horizontal="left", vertical="center"
+                    )
                     row += 1
 
                 row += 1
@@ -985,6 +1116,7 @@ class ExcelReportService:
             return excel_path
 
         except Exception as e:
-            logger.error(f"Error generating criterion set Excel report: {str(e)}", exc_info=True)
+            logger.error(
+                f"Error generating criterion set Excel report: {str(e)}", exc_info=True
+            )
             raise
-

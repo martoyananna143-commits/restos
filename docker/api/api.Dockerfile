@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgdk-pixbuf2.0-dev \
     libfreetype6-dev \
     libffi-dev \
+    fonts-dejavu-core \
     meson \
     ninja-build \
     && rm -rf /var/lib/apt/lists/*

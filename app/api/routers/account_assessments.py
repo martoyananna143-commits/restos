@@ -1,11 +1,13 @@
-"""Authenticated employee assessment assignment and attempt HTTP boundary."""
+"""Authenticated assessment assignment, history, result and PDF boundary."""
 
+import asyncio
 from datetime import date, datetime, timezone
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse
+from anyio import to_thread
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +27,16 @@ from app.internal.services.assessment_attempt_service import (
     AssessmentAttemptRevisionConflict,
     AssessmentAttemptService,
     ReplaceDraft,
+)
+from app.internal.services.assessment_history_service import (
+    AssessmentHistoryInvalid,
+    AssessmentHistoryNotFound,
+    AssessmentHistoryService,
+    HistoryPageQuery,
+)
+from app.internal.services.assessment_result_pdf_service import (
+    AssessmentResultPdfInvalid,
+    AssessmentResultPdfService,
 )
 
 
@@ -203,7 +215,86 @@ class AssessmentWeightedV1Response(StrictModel):
 AssessmentSubmissionResponse = (
     AssessmentCompletionV1Response | AssessmentWeightedV1Response
 )
-AssessmentResultResponse = AssessmentSubmissionResponse
+
+
+class AssessmentHistoryItemResponse(StrictModel):
+    attempt_id: UUID
+    template_name: str
+    template_version: int = Field(ge=1)
+    status: Literal["completed", "revoked", "expired", "unavailable"]
+    event_at: datetime
+    local_event_at: datetime
+    local_date: date
+    day_label: str
+    timezone: str
+    venue_name: str | None
+    subject_name: str
+    score_percent: str | None
+    score_display: str | None
+    has_result: bool
+    pdf_available: bool
+
+
+class AssessmentHistoryPageResponse(StrictModel):
+    items: list[AssessmentHistoryItemResponse]
+    next_cursor: str | None
+    company_timezone: str
+
+
+class AssessmentResultAnswerResponse(StrictModel):
+    prompt: str
+    answer_type: Literal[
+        "boolean",
+        "score",
+        "integer",
+        "decimal",
+        "text",
+        "single_choice",
+        "multi_choice",
+        "date",
+        "time",
+    ]
+    value: bool | int | str | list[str]
+    comment: str | None
+
+
+class AssessmentResultSectionResponse(StrictModel):
+    title: str
+    score_percent: str | None
+    score_display: str | None
+    coverage: str | None
+    critical_failure_count: int = Field(ge=0)
+    stop_factor_count: int = Field(ge=0)
+    items: list[AssessmentResultAnswerResponse]
+
+
+class AssessmentResultTaskResponse(StrictModel):
+    title: str
+    status: Literal["draft", "assigned", "completed", "cancelled"]
+
+
+class AssessmentResultResponse(StrictModel):
+    attempt_id: UUID
+    company_id: UUID
+    venue_id: UUID | None
+    template_name: str
+    template_version: int = Field(ge=1)
+    status: Literal["completed"]
+    venue_name: str | None
+    subject_name: str
+    submitted_at: datetime
+    local_submitted_at: datetime
+    timezone: str
+    scoring_algorithm: Literal["completion_v1", "weighted_v1"]
+    score_percent: str | None
+    score_display: str | None
+    answered_count: int = Field(ge=0)
+    required_count: int = Field(ge=0)
+    total_count: int = Field(ge=0)
+    critical_failure_count: int = Field(ge=0)
+    stop_factor_count: int = Field(ge=0)
+    sections: list[AssessmentResultSectionResponse]
+    related_tasks: list[AssessmentResultTaskResponse]
 
 
 class RevisionConflictDetail(StrictModel):
@@ -242,6 +333,53 @@ def _no_store(response: Response) -> None:
 
 
 @router.get(
+    "/assessment-history",
+    response_model=AssessmentHistoryPageResponse,
+    responses={
+        401: {"model": PublicError},
+        404: {"model": PublicError},
+        422: {"model": PublicError},
+    },
+)
+async def list_assessment_history(
+    response: Response,
+    principal: Annotated[
+        CurrentAccountPrincipal, Depends(get_current_account_principal)
+    ],
+    session: Annotated[AsyncSession, Depends(get_account_auth_session)],
+    company_id: UUID,
+    history_period: Literal[
+        "all", "yesterday", "previous_week", "previous_month", "custom"
+    ] = "all",
+    date_from: date | None = None,
+    date_to: date | None = None,
+    cursor: Annotated[str | None, Query(max_length=256)] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 30,
+) -> dict[str, Any]:
+    _no_store(response)
+    try:
+        return await AssessmentHistoryService(session).history(
+            HistoryPageQuery(
+                account_id=principal.account_id,
+                company_id=company_id,
+                now=datetime.now(timezone.utc),
+                period=history_period,
+                date_from=date_from,
+                date_to=date_to,
+                cursor=cursor,
+                limit=limit,
+            )
+        )
+    except AssessmentHistoryInvalid as error:
+        raise _error(
+            "invalid_assessment_history_query",
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ) from error
+    except AssessmentHistoryNotFound as error:
+        raise _error("assessment_not_found", status.HTTP_404_NOT_FOUND) from error
+
+
+@router.get(
     "/assessment-assignments",
     response_model=list[AssessmentAssignmentSummaryResponse],
     responses={401: {"model": PublicError}},
@@ -253,10 +391,10 @@ async def list_assignments(
     ],
     session: Annotated[AsyncSession, Depends(get_account_auth_session)],
     company_id: UUID | None = None,
-    history_period: Literal[
-        "today", "yesterday", "previous_week", "previous_month", "custom"
-    ]
-    | None = None,
+    history_period: (
+        Literal["today", "yesterday", "previous_week", "previous_month", "custom"]
+        | None
+    ) = None,
     date_from: date | None = None,
     date_to: date | None = None,
 ) -> list[dict[str, Any]]:
@@ -271,7 +409,9 @@ async def list_assignments(
             date_to=date_to,
         )
     except AssessmentAssignmentPeriodInvalid as error:
-        raise _error("invalid_assessment_period", status.HTTP_422_UNPROCESSABLE_ENTITY) from error
+        raise _error(
+            "invalid_assessment_period", status.HTTP_422_UNPROCESSABLE_ENTITY
+        ) from error
 
 
 @router.get(
@@ -447,11 +587,69 @@ async def get_attempt_result(
         CurrentAccountPrincipal, Depends(get_current_account_principal)
     ],
     session: Annotated[AsyncSession, Depends(get_account_auth_session)],
+    company_id: UUID,
 ) -> dict[str, Any]:
     _no_store(response)
     try:
-        return await AssessmentAttemptService(session).result(
-            principal.account_id, attempt_id, datetime.now(timezone.utc)
+        return await AssessmentHistoryService(session).result_projection(
+            principal.account_id,
+            company_id,
+            attempt_id,
+            datetime.now(timezone.utc),
         )
-    except Exception as error:
-        raise _controlled(error) from error
+    except AssessmentHistoryNotFound as error:
+        raise _error("assessment_not_found", status.HTTP_404_NOT_FOUND) from error
+
+
+@router.get(
+    "/assessment-attempts/{attempt_id}/result.pdf",
+    response_class=Response,
+    responses={
+        200: {
+            "content": {"application/pdf": {}},
+            "description": "Immutable assessment result PDF",
+        },
+        401: {"model": PublicError},
+        404: {"model": PublicError},
+        503: {"model": PublicError},
+    },
+)
+async def download_attempt_result_pdf(
+    attempt_id: UUID,
+    principal: Annotated[
+        CurrentAccountPrincipal, Depends(get_current_account_principal)
+    ],
+    session: Annotated[AsyncSession, Depends(get_account_auth_session)],
+    company_id: UUID,
+) -> Response:
+    generated_at = datetime.now(timezone.utc)
+    try:
+        projection = await AssessmentHistoryService(session).result_projection(
+            principal.account_id,
+            company_id,
+            attempt_id,
+            generated_at,
+        )
+        service = AssessmentResultPdfService()
+        content = await asyncio.wait_for(
+            to_thread.run_sync(service.generate, projection, generated_at),
+            timeout=10,
+        )
+    except AssessmentHistoryNotFound as error:
+        raise _error("assessment_not_found", status.HTTP_404_NOT_FOUND) from error
+    except (AssessmentResultPdfInvalid, TimeoutError) as error:
+        raise _error(
+            "assessment_pdf_unavailable", status.HTTP_503_SERVICE_UNAVAILABLE
+        ) from error
+    local_date = str(projection["local_submitted_at"])[0:10]
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={
+            "Cache-Control": NO_STORE,
+            "Content-Disposition": (
+                f'attachment; filename="restos-assessment-{local_date}.pdf"'
+            ),
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

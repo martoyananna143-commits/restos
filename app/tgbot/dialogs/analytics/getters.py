@@ -13,6 +13,7 @@ from app.internal.services.analytics_service import AnalyticsService
 from app.internal.services.criterion_service import CriterionService
 from app.internal.services.employee_service import EmployeeService
 from app.internal.services.organization_service import OrganizationService
+from app.internal.services.presentation_percent import format_percent
 from app.tgbot.dialogs.common.organization import (
     get_organizations_list_data as common_get_organizations_list_data,
 )
@@ -305,7 +306,7 @@ async def get_results_data(
                         results_lines.append(
                             f"\n📋 {criterion_name}:\n"
                             f"  📊 Всего: {total}\n"
-                            f"  ✅ Пройдено: {passed} ({passed_pct:.1f}%)\n"
+                            f"  ✅ Пройдено: {passed} ({format_percent(passed_pct)})\n"
                             f"  ❌ Не пройдено: {failed}"
                         )
 
@@ -373,7 +374,7 @@ async def get_results_data(
                             # Для boolean показываем процент прохождения
                             results_lines.append(
                                 f"\n📋 {criterion_name}:\n"
-                                f"  ✅ Процент прохождения: {avg['average']:.2f}%\n"
+                                f"  ✅ Процент прохождения: {format_percent(avg['average'])}\n"
                                 f"  📊 Количество: {avg['count']}"
                             )
                         elif value_type == "number":
@@ -406,14 +407,14 @@ async def get_results_data(
                         )
                         results_lines.append(
                             f"\n👤 {employee_name}:\n"
-                            f"  📈 Средний балл: {avg['average']:.2f}%\n"
+                            f"  📈 Средний балл: {format_percent(avg['average'])}\n"
                             f"  📊 Количество замеров: {avg['count']}"
                         )
                 else:  # date
                     for avg in averages[:30]:
                         results_lines.append(
                             f"\n📅 {avg['date']}:\n"
-                            f"  📈 Средний балл: {avg['average']:.2f}%\n"
+                            f"  📈 Средний балл: {format_percent(avg['average'])}\n"
                             f"  📊 Количество замеров: {avg['count']}"
                         )
 
@@ -449,7 +450,7 @@ async def get_results_data(
                     score = eval_data.get("score_percentage", 0.0)
                     results_lines.append(
                         f"📊 Замер #{eval_id} ({eval_date.strftime('%d.%m.%Y') if eval_date else 'N/A'}): "
-                        f"{score:.1f}%"
+                        f"{format_percent(score)}"
                     )
 
             results_text = "\n".join(results_lines)
@@ -603,7 +604,7 @@ def _format_evaluation(
     eval_info += f"   Тип замера ID: {eval_type_id}\n"
     eval_info += f"   Заполнил: {filled_by_name}\n"
     eval_info += f"   Оцениваемый: {evaluated_name}\n"
-    eval_info += f"   Балл: {score:.1f}%\n"
+    eval_info += f"   Балл: {format_percent(score)}\n"
     eval_info += f"   Критерии: {passed_criteria}/{total_criteria} прошло, {failed_criteria} не прошло\n"
     eval_info += f"   Статус: {status}"
     if comment:
@@ -897,9 +898,7 @@ async def _load_data_context(
                     f"Активен: {'Да' if employee.is_active else 'Нет'})"
                 )
             if len(employees) > 100:
-                context_parts.append(
-                    f"  ... и еще {len(employees) - 100} сотрудников"
-                )
+                context_parts.append(f"  ... и еще {len(employees) - 100} сотрудников")
             context_parts.append("")
 
         if data_type in ["evaluations", "all"]:
@@ -984,9 +983,7 @@ async def _load_data_context(
                     employee_names_map.get(evaluated_id, f"ID {evaluated_id}")
                     if evaluated_id and isinstance(evaluated_id, int)
                     else (
-                        "Самозаполнение"
-                        if not evaluated_id
-                        else f"ID {evaluated_id}"
+                        "Самозаполнение" if not evaluated_id else f"ID {evaluated_id}"
                     )
                 )
 
@@ -996,7 +993,7 @@ async def _load_data_context(
                     f"Тип замера ID: {eval_type_id}, "
                     f"Заполнил: {filled_by_name}, "
                     f"Оцениваемый: {evaluated_name}, "
-                    f"Балл: {score:.1f}%, "
+                    f"Балл: {format_percent(score)}, "
                     f"Всего критериев: {total_criteria}, "
                     f"Прошло: {passed_criteria}, "
                     f"Не прошло: {failed_criteria}, "
@@ -1076,7 +1073,9 @@ async def _load_data_context(
 
         data_context = "\n".join(context_parts)
         if not data_context.strip():
-            data_context = f"Нет данных для типа '{data_type}' в организации '{org_name}'."
+            data_context = (
+                f"Нет данных для типа '{data_type}' в организации '{org_name}'."
+            )
         return data_context
 
     except Exception as e:
@@ -1284,7 +1283,8 @@ async def get_ai_assistant_data(
         data_context = cached_context
         logger.debug(
             "Using cached data_context (%d chars) for data_type=%s",
-            len(data_context), data_type,
+            len(data_context),
+            data_type,
         )
     else:
         # Загружаем данные в зависимости от выбранного типа
@@ -1302,7 +1302,8 @@ async def get_ai_assistant_data(
         dialog_manager.dialog_data["ai_data_context"] = data_context
         logger.info(
             "Loaded and cached data_context (%d chars) for data_type=%s",
-            len(data_context), data_type,
+            len(data_context),
+            data_type,
         )
 
     # Проверяем последний ответ
@@ -1317,7 +1318,7 @@ async def get_ai_assistant_data(
     processing_message = dialog_manager.dialog_data.get("ai_processing_message") or ""
     show_response = dialog_manager.dialog_data.get("show_last_response", False)
     is_error_message = last_response and last_response.startswith("❌")
-    
+
     # Debug logging
     if last_response:
         logger.debug(
@@ -1328,7 +1329,7 @@ async def get_ai_assistant_data(
     # Telegram message limit is 4096 chars, keep some buffer
     MAX_MESSAGE_LEN = 3800
     MAX_RESPONSE_LEN = 3000
-    
+
     if processing_message:
         # Показываем сообщение о том, что запрос обрабатывается (приоритет)
         assistant_message = processing_message
@@ -1338,15 +1339,18 @@ async def get_ai_assistant_data(
         # Обрезаем ответ если слишком длинный
         truncated_response = last_response
         if len(last_response) > MAX_RESPONSE_LEN:
-            truncated_response = last_response[:MAX_RESPONSE_LEN] + "\n\n... (ответ обрезан из-за ограничений Telegram)"
-        
+            truncated_response = (
+                last_response[:MAX_RESPONSE_LEN]
+                + "\n\n... (ответ обрезан из-за ограничений Telegram)"
+            )
+
         # Показываем ответ БЕЗ полного data_context (он уже в system message)
         assistant_message = (
             "🤖 Последний ответ ассистента:\n\n"
             f"{truncated_response}\n\n"
             "💬 Задайте следующий вопрос:"
         )
-        
+
         # Проверяем общую длину и обрезаем если нужно
         if len(assistant_message) > MAX_MESSAGE_LEN:
             assistant_message = assistant_message[:MAX_MESSAGE_LEN] + "..."

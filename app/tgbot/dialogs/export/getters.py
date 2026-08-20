@@ -2,6 +2,8 @@
 
 from aiogram_dialog import DialogManager
 
+from app.internal.services.presentation_percent import format_percent
+
 
 async def get_export_data(
     dialog_manager: DialogManager,
@@ -19,7 +21,7 @@ async def get_export_data(
     # Copy start_data to dialog_data if not done yet
     start_data = dialog_manager.start_data or {}
     data = dialog_manager.dialog_data
-    
+
     if start_data and not data.get("evaluation_id"):
         for key, value in start_data.items():
             data[key] = value
@@ -35,7 +37,7 @@ async def get_export_data(
     if both_generated:
         message_text = (
             f"✅ <b>Оценка #{evaluation_id}</b>\n\n"
-            f"📊 Результат: <b>{score_percentage:.1f}%</b>\n\n"
+            f"📊 Результат: <b>{format_percent(score_percentage)}</b>\n\n"
             f"Отчёты сгенерированы:\n"
             f"✅ PDF отчёт\n"
             f"✅ Excel отчёт"
@@ -43,21 +45,21 @@ async def get_export_data(
     elif pdf_generated:
         message_text = (
             f"✅ <b>Оценка #{evaluation_id}</b>\n\n"
-            f"📊 Результат: <b>{score_percentage:.1f}%</b>\n\n"
+            f"📊 Результат: <b>{format_percent(score_percentage)}</b>\n\n"
             f"✅ PDF отчёт отправлен\n\n"
             f"Хотите также сгенерировать Excel?"
         )
     elif excel_generated:
         message_text = (
             f"✅ <b>Оценка #{evaluation_id}</b>\n\n"
-            f"📊 Результат: <b>{score_percentage:.1f}%</b>\n\n"
+            f"📊 Результат: <b>{format_percent(score_percentage)}</b>\n\n"
             f"✅ Excel отчёт отправлен\n\n"
             f"Хотите также сгенерировать PDF?"
         )
     else:
         message_text = (
             f"✅ <b>Оценка успешно сохранена!</b>\n\n"
-            f"📊 Результат: <b>{score_percentage:.1f}%</b>\n"
+            f"📊 Результат: <b>{format_percent(score_percentage)}</b>\n"
             f"🆔 ID оценки: {evaluation_id}\n\n"
             f"Выберите формат для экспорта:"
         )
