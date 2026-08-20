@@ -298,32 +298,120 @@ def test_duplicate_adopt_rolls_back_and_is_409(monkeypatch):
 
 def test_save_240_items_commits_and_returns_document(monkeypatch):
     class Drafts:
-        def __init__(self, _session):
-            pass
+        def __init__(self, session):
+            self.session = session
 
         async def save_draft_document(self, request):
             assert len(request.sections[0].items) == 240
             return SimpleNamespace(edit_revision=2)
 
-    class Catalog:
-        def __init__(self, _session):
-            pass
-
-        async def get_company_template_version(self, *_args):
-            result = document()
-            result["version"]["edit_revision"] = 2
-            return result
+        async def get_draft_document(self, request):
+            assert request.template_id == TEMPLATE_ID
+            assert request.template_version_id == VERSION_ID
+            assert self.session.commits == 1
+            return SimpleNamespace(
+                template={
+                    "id": TEMPLATE_ID,
+                    "scope": "company",
+                    "company_id": COMPANY_ID,
+                    "source_library_version_id": None,
+                    "name": "Local template",
+                    "code": "service",
+                    "activity_type": "measurement",
+                },
+                version={
+                    "id": VERSION_ID,
+                    "version": 2,
+                    "status": "draft",
+                    "edit_revision": 2,
+                    "local_description": None,
+                },
+                methodology={
+                    "id": uuid4(),
+                    "title": "Method",
+                    "body": "Read only",
+                    "version": 1,
+                    "owner_type": "system",
+                },
+                sections=[{
+                    "code": "section",
+                    "title": "Section",
+                    "description": None,
+                    "section_kind": "section",
+                    "sort_order": 0,
+                    "weight": "2.000000",
+                    "parent_code": None,
+                    "items": [{
+                        "code": f"item-{index}",
+                        "prompt": "Question",
+                        "guidance": None,
+                        "response_type": (
+                            "single_choice" if index == 0 else "boolean"
+                        ),
+                        "is_required": True,
+                        "sort_order": index,
+                        "weight": "1.500000" if index == 0 else None,
+                        "min_value": None,
+                        "max_value": None,
+                        "passing_value": None,
+                        "evidence_mode": "none",
+                        "criticality": "normal",
+                        "config": {"depth": {"safe": True}},
+                        "options": [{
+                            "code": "yes",
+                            "label": "Yes",
+                            "sort_order": 0,
+                            "numeric_value": "1.000000",
+                            "is_disqualifying": False,
+                        }] if index == 0 else [],
+                        "metric_mappings": [{
+                            "metric_code": "service",
+                            "contribution_weight": "1.000000",
+                            "direction": "positive",
+                        }] if index == 0 else [],
+                    } for index in range(240)],
+                }],
+            )
 
     monkeypatch.setattr(assessment_templates, "AssessmentDraftService", Drafts)
-    monkeypatch.setattr(assessment_templates, "AssessmentCatalogService", Catalog)
     http, session = client(monkeypatch)
+    payload = draft_payload(240)
+    payload["sections"][0]["weight"] = "2"
+    payload["sections"][0]["items"][0].update({
+        "response_type": "single_choice",
+        "weight": "1.5",
+        "options": [{
+            "code": "yes",
+            "label": "Yes",
+            "sort_order": 0,
+            "numeric_value": "1",
+            "is_disqualifying": False,
+        }],
+        "metric_mappings": [{
+            "metric_code": "service",
+            "contribution_weight": "1",
+            "direction": "positive",
+        }],
+    })
     response = http.put(
         f"/api/v1/companies/{COMPANY_ID}/assessment-templates/"
         f"{TEMPLATE_ID}/versions/{VERSION_ID}/draft",
-        json=draft_payload(240),
+        json=payload,
     )
     assert response.status_code == 200
-    assert response.json()["version"]["edit_revision"] == 2
+    body = response.json()
+    assert assessment_templates.DraftDocumentResponse.model_validate(body)
+    assert body["version"]["edit_revision"] == 2
+    assert body["sections"][0]["weight"] == "2.000000"
+    assert len(body["sections"][0]["items"]) == 240
+    item = body["sections"][0]["items"][0]
+    assert item["weight"] == "1.500000"
+    assert item["options"][0]["numeric_value"] == "1.000000"
+    assert item["metric_mappings"][0] == {
+        "metric_code": "service",
+        "contribution_weight": "1.000000",
+        "direction": "positive",
+    }
     assert session.commits == 1 and session.rollbacks == 0
 
 
@@ -518,6 +606,23 @@ def test_openapi_has_routes_security_and_no_protected_draft_fields(monkeypatch):
         "/api/v1/companies/{company_id}/assessment-templates/{template_id}/versions/{version_id}/next-draft",
     }
     assert expected <= set(paths)
+    draft_path = (
+        "/api/v1/companies/{company_id}/assessment-templates/{template_id}/"
+        "versions/{version_id}/draft"
+    )
+    draft_success_schemas = [
+        paths[draft_path][method]["responses"]["200"]["content"]
+        ["application/json"]["schema"]
+        for method in ("get", "put")
+    ]
+    assert draft_success_schemas == [
+        {"$ref": "#/components/schemas/DraftDocumentResponse"},
+        {"$ref": "#/components/schemas/DraftDocumentResponse"},
+    ]
+    assert not any(
+        schema.get("additionalProperties") is True
+        for schema in draft_success_schemas
+    )
     request_schema = schema["components"]["schemas"]["SaveAssessmentDraftRequest"]
     properties = request_schema["properties"]
     assert "expected_edit_revision" in properties

@@ -514,7 +514,8 @@ async def get_company_version(
 
 
 @router.put(
-    "/companies/{company_id}/assessment-templates/{template_id}/versions/{version_id}/draft"
+    "/companies/{company_id}/assessment-templates/{template_id}/versions/{version_id}/draft",
+    response_model=DraftDocumentResponse,
 )
 async def save_draft(
     company_id: UUID,
@@ -523,7 +524,7 @@ async def save_draft(
     body: SaveAssessmentDraftRequest,
     principal: Annotated[CurrentAccountPrincipal, Depends(get_current_account_principal)],
     session: Annotated[AsyncSession, Depends(get_account_auth_session)],
-) -> dict:
+) -> DraftDocumentResponse:
     await _authorize(session, principal, company_id, MANAGE_PERMISSION)
     try:
         await AssessmentDraftService(session).save_draft_document(
@@ -539,9 +540,10 @@ async def save_draft(
             )
         )
         await session.commit()
-        return await AssessmentCatalogService(session).get_company_template_version(
-            company_id, template_id, version_id
+        result = await AssessmentDraftService(session).get_draft_document(
+            GetDraftDocument(template_id, version_id)
         )
+        return _draft_response(result)
     except HTTPException:
         raise
     except Exception as error:
