@@ -1,7 +1,7 @@
 """PostgreSQL integration tests for atomic draft document editing."""
 
 from datetime import datetime, timezone
-from dataclasses import fields
+from dataclasses import fields, replace
 from decimal import Decimal
 import asyncio
 import os
@@ -21,6 +21,10 @@ from app.infra.database.models.assessment_template import (
     AssessmentTemplateSection,
     AssessmentTemplateVersion,
 )
+from app.infra.database.models.assessment_metric import (
+    AssessmentItemMetricMapping,
+    AssessmentMetricDefinition,
+)
 from app.infra.database.models.company import Company
 from app.internal.services.assessment_draft_service import (
     AssessmentDraftNotEditable,
@@ -28,6 +32,7 @@ from app.internal.services.assessment_draft_service import (
     AssessmentDraftService,
     AssessmentDraftStructureInvalid,
     DraftItemInput,
+    DraftMetricMappingInput,
     DraftOptionInput,
     DraftSectionInput,
     GetDraftDocument,
@@ -161,6 +166,59 @@ async def test_save_and_read_document(context):
     assert loaded.methodology["body"] == method.body
     assert loaded.sections[0]["code"] == "guest-zone"
     assert loaded.sections[0]["items"][0]["options"][0]["label"] == "Bad"
+
+
+@pytest.mark.asyncio
+async def test_metric_mappings_round_trip_atomically_with_item_weight(context):
+    session, template, version, _ = context
+    definition = (
+        await session.execute(
+            select(AssessmentMetricDefinition).where(
+                AssessmentMetricDefinition.code == "service",
+                AssessmentMetricDefinition.status == "active",
+            )
+        )
+    ).scalar_one_or_none()
+    if definition is None:
+        definition = AssessmentMetricDefinition(
+            id=uuid4(), code="service", version=1, title="Service",
+            description=None, status="active", created_at=NOW, updated_at=NOW,
+        )
+        session.add(definition)
+        await session.flush()
+
+    source = document(template, version)
+    item = source.sections[0].items[0]
+    mapped_item = replace(
+        item,
+        metric_mappings=[
+            DraftMetricMappingInput("service", Decimal("2"), "positive")
+        ],
+    )
+    mapped_section = replace(source.sections[0], items=[mapped_item])
+    await AssessmentDraftService(session).save_draft_document(
+        replace(source, sections=[mapped_section])
+    )
+
+    loaded = await AssessmentDraftService(session).get_draft_document(
+        GetDraftDocument(template.id, version.id)
+    )
+    assert loaded.sections[0]["items"][0]["metric_mappings"] == [
+        {
+            "metric_code": "service",
+            "contribution_weight": Decimal("2.000000"),
+            "direction": "positive",
+        }
+    ]
+    stored = (
+        await session.execute(
+            select(AssessmentItemMetricMapping).where(
+                AssessmentItemMetricMapping.template_version_id == version.id
+            )
+        )
+    ).scalars().all()
+    assert len(stored) == 1
+    assert stored[0].metric_definition_id == definition.id
 
 
 @pytest.mark.asyncio

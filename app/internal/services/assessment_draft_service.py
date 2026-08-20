@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 import json
@@ -22,6 +22,10 @@ from app.infra.database.models.assessment_template import (
     AssessmentTemplateSection,
     AssessmentTemplateVersion,
 )
+from app.infra.database.models.assessment_metric import (
+    AssessmentItemMetricMapping,
+    AssessmentMetricDefinition,
+)
 
 
 _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -36,6 +40,10 @@ _EVIDENCE_MODES = {
 }
 _CRITICALITIES = {"normal", "critical", "stop_factor"}
 _CHOICES = {"single_choice", "multi_choice"}
+_METRIC_DIRECTIONS = {"positive", "inverse"}
+_CANONICAL_METRIC_CODES = {
+    "people", "service", "taste", "speed", "order", "space", "economics",
+}
 
 
 class AssessmentDraftError(Exception):
@@ -72,6 +80,13 @@ class DraftOptionInput:
 
 
 @dataclass(frozen=True)
+class DraftMetricMappingInput:
+    metric_code: str
+    contribution_weight: Decimal
+    direction: str
+
+
+@dataclass(frozen=True)
 class DraftItemInput:
     code: str
     prompt: str
@@ -87,6 +102,7 @@ class DraftItemInput:
     criticality: str
     config: dict
     options: list[DraftOptionInput]
+    metric_mappings: list[DraftMetricMappingInput] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -193,17 +209,42 @@ class AssessmentDraftService:
                 )
             )
         ).scalars().all() if items else []
+        mappings = (
+            await self._session.execute(
+                select(AssessmentItemMetricMapping, AssessmentMetricDefinition.code)
+                .join(
+                    AssessmentMetricDefinition,
+                    AssessmentMetricDefinition.id
+                    == AssessmentItemMetricMapping.metric_definition_id,
+                )
+                .where(
+                    AssessmentItemMetricMapping.template_version_id == version.id
+                )
+                .order_by(
+                    AssessmentItemMetricMapping.item_id,
+                    AssessmentMetricDefinition.code,
+                )
+            )
+        ).all() if items else []
         section_codes = {section.id: section.code for section in sections}
         item_options: dict[UUID, list[dict]] = {}
         for option in options:
             item_options.setdefault(option.item_id, []).append(
                 self._row(option, exclude={"item_id"})
             )
+        item_mappings: dict[UUID, list[dict]] = {}
+        for mapping, metric_code in mappings:
+            item_mappings.setdefault(mapping.item_id, []).append({
+                "metric_code": metric_code,
+                "contribution_weight": mapping.contribution_weight,
+                "direction": mapping.direction,
+            })
         section_items: dict[UUID, list[dict]] = {}
         for item in items:
             value = self._row(item, exclude={"template_version_id", "section_id"})
             value["config"] = deepcopy(item.config)
             value["options"] = item_options.get(item.id, [])
+            value["metric_mappings"] = item_mappings.get(item.id, [])
             section_items.setdefault(item.section_id, []).append(value)
         result_sections = []
         for section in sections:
@@ -251,8 +292,14 @@ class AssessmentDraftService:
             if version.edit_revision != request.expected_edit_revision:
                 raise AssessmentDraftRevisionConflict("draft revision is stale")
             previous = version.edit_revision
+            metric_definitions = await self._active_metric_definitions(normalized)
             item_ids = select(AssessmentTemplateItem.id).where(
                 AssessmentTemplateItem.template_version_id == version.id
+            )
+            await self._session.execute(
+                delete(AssessmentItemMetricMapping).where(
+                    AssessmentItemMetricMapping.template_version_id == version.id
+                )
             )
             await self._session.execute(
                 delete(AssessmentTemplateItemOption).where(
@@ -314,7 +361,10 @@ class AssessmentDraftService:
                             section_id=section_ids[section["code"]],
                             created_at=request.now,
                             updated_at=request.now,
-                            **{key: value for key, value in item.items() if key != "options"},
+                            **{
+                                key: value for key, value in item.items()
+                                if key not in {"options", "metric_mappings"}
+                            },
                         )
                     )
                     await self._session.flush()
@@ -328,6 +378,23 @@ class AssessmentDraftService:
                                 **option,
                             )
                             for option in item["options"]
+                        ]
+                    )
+                    self._session.add_all(
+                        [
+                            AssessmentItemMetricMapping(
+                                id=uuid4(),
+                                template_version_id=version.id,
+                                item_id=item_id,
+                                metric_definition_id=metric_definitions[
+                                    mapping["metric_code"]
+                                ].id,
+                                contribution_weight=mapping["contribution_weight"],
+                                direction=mapping["direction"],
+                                created_at=request.now,
+                                updated_at=request.now,
+                            )
+                            for mapping in item["metric_mappings"]
                         ]
                     )
                     item_count += 1
@@ -344,6 +411,30 @@ class AssessmentDraftService:
                 template.id, version.id, previous, version.edit_revision,
                 len(normalized), item_count, option_count, request.now,
             )
+
+    async def _active_metric_definitions(self, sections: list[dict]):
+        requested = {
+            mapping["metric_code"]
+            for section in sections
+            for item in section["items"]
+            for mapping in item["metric_mappings"]
+        }
+        if not requested:
+            return {}
+        definitions = (
+            await self._session.execute(
+                select(AssessmentMetricDefinition).where(
+                    AssessmentMetricDefinition.code.in_(requested),
+                    AssessmentMetricDefinition.status == "active",
+                )
+            )
+        ).scalars().all()
+        result = {definition.code: definition for definition in definitions}
+        if set(result) != requested:
+            raise AssessmentDraftStructureInvalid(
+                "metric mapping references an unavailable metric"
+            )
+        return result
 
     async def _load_editable(self, template_id, version_id, *, lock):
         template_query = select(AssessmentTemplate).where(
@@ -451,6 +542,39 @@ class AssessmentDraftService:
                         "numeric_value": option.numeric_value,
                         "is_disqualifying": option.is_disqualifying,
                     })
+                if not isinstance(item.metric_mappings, list):
+                    raise InvalidAssessmentDraftRequest(
+                        "metric mappings must be a list"
+                    )
+                metric_codes, metric_mappings = set(), []
+                for mapping in item.metric_mappings:
+                    if not isinstance(mapping, DraftMetricMappingInput):
+                        raise InvalidAssessmentDraftRequest(
+                            "metric mapping has invalid type"
+                        )
+                    if mapping.metric_code not in _CANONICAL_METRIC_CODES:
+                        raise AssessmentDraftStructureInvalid(
+                            "metric mapping is not canonical"
+                        )
+                    if mapping.metric_code in metric_codes:
+                        raise AssessmentDraftStructureInvalid(
+                            "duplicate metric mapping"
+                        )
+                    metric_codes.add(mapping.metric_code)
+                    if mapping.direction not in _METRIC_DIRECTIONS:
+                        raise InvalidAssessmentDraftRequest(
+                            "metric mapping direction is invalid"
+                        )
+                    self._positive_numeric(mapping.contribution_weight)
+                    metric_mappings.append({
+                        "metric_code": mapping.metric_code,
+                        "contribution_weight": (
+                            item.weight
+                            if item.weight is not None
+                            else mapping.contribution_weight
+                        ),
+                        "direction": mapping.direction,
+                    })
                 items.append({
                     "code": item_code, "prompt": item.prompt.strip(),
                     "guidance": self._nullable(item.guidance),
@@ -462,6 +586,7 @@ class AssessmentDraftService:
                     "evidence_mode": item.evidence_mode,
                     "criticality": item.criticality,
                     "config": deepcopy(item.config), "options": options,
+                    "metric_mappings": metric_mappings,
                 })
             parent = self._slug(source.parent_code) if source.parent_code else None
             if parent == code:
@@ -505,6 +630,17 @@ class AssessmentDraftService:
             or value < 0
         ):
             raise InvalidAssessmentDraftRequest("numeric value is invalid")
+
+    @staticmethod
+    def _positive_numeric(value):
+        if (
+            not isinstance(value, (int, Decimal))
+            or isinstance(value, bool)
+            or value <= 0
+        ):
+            raise InvalidAssessmentDraftRequest(
+                "metric contribution weight must be positive"
+            )
 
     @staticmethod
     def _nullable(value):

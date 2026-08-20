@@ -327,6 +327,80 @@ def test_save_240_items_commits_and_returns_document(monkeypatch):
     assert session.commits == 1 and session.rollbacks == 0
 
 
+def test_get_draft_returns_metric_mappings_through_manage_boundary(monkeypatch):
+    class Drafts:
+        def __init__(self, _session):
+            pass
+
+        async def get_draft_document(self, request):
+            assert request.template_id == TEMPLATE_ID
+            assert request.template_version_id == VERSION_ID
+            value = document()
+            value["template"].update({
+                "scope": "company",
+                "company_id": COMPANY_ID,
+                "source_library_version_id": None,
+                "activity_type": "measurement",
+            })
+            value["methodology"].update({
+                "body": "Read only",
+                "owner_type": "system",
+            })
+            value["version"] = {
+                "id": VERSION_ID,
+                "version": 2,
+                "status": "draft",
+                "edit_revision": 3,
+                "local_description": None,
+            }
+            value["sections"] = [{
+                "code": "service",
+                "title": "Service",
+                "section_kind": "section",
+                "sort_order": 0,
+                "weight": None,
+                "parent_code": None,
+                "description": None,
+                "items": [{
+                    "code": "welcome",
+                    "prompt": "Welcome",
+                    "guidance": None,
+                    "response_type": "boolean",
+                    "is_required": True,
+                    "sort_order": 0,
+                    "weight": "1.000000",
+                    "min_value": None,
+                    "max_value": None,
+                    "passing_value": None,
+                    "evidence_mode": "optional_comment",
+                    "criticality": "normal",
+                    "config": {},
+                    "options": [],
+                    "metric_mappings": [{
+                        "metric_code": "service",
+                        "contribution_weight": "1.000000",
+                        "direction": "positive",
+                    }],
+                }],
+            }]
+            return SimpleNamespace(**value)
+
+    monkeypatch.setattr(assessment_templates, "AssessmentDraftService", Drafts)
+    http, session = client(monkeypatch)
+    response = http.get(
+        f"/api/v1/companies/{COMPANY_ID}/assessment-templates/"
+        f"{TEMPLATE_ID}/versions/{VERSION_ID}/draft"
+    )
+    assert response.status_code == 200
+    mapping = response.json()["sections"][0]["items"][0]["metric_mappings"][0]
+    assert mapping == {
+        "metric_code": "service",
+        "contribution_weight": "1.000000",
+        "direction": "positive",
+    }
+    assert session.commits == 0 and session.rollbacks == 0
+
+
 def test_revision_conflict_rolls_back(monkeypatch):
     class Drafts:
         def __init__(self, _session):

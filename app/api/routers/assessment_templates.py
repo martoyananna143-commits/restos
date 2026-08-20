@@ -31,8 +31,10 @@ from app.internal.services.assessment_draft_service import (
     AssessmentDraftStructureInvalid,
     AssessmentDraftService,
     DraftItemInput,
+    DraftMetricMappingInput,
     DraftOptionInput,
     DraftSectionInput,
+    GetDraftDocument,
     InvalidAssessmentDraftRequest,
     SaveDraftDocument,
 )
@@ -81,6 +83,12 @@ class DraftOptionRequest(StrictModel):
     is_disqualifying: bool = False
 
 
+class DraftMetricMappingRequest(StrictModel):
+    metric_code: str = Field(min_length=2, max_length=50)
+    contribution_weight: Decimal = Field(gt=0)
+    direction: str = Field(min_length=1, max_length=20)
+
+
 class DraftItemRequest(StrictModel):
     code: str = Field(min_length=1, max_length=100)
     prompt: str = Field(min_length=1, max_length=10_000)
@@ -96,6 +104,9 @@ class DraftItemRequest(StrictModel):
     criticality: str = Field(min_length=1, max_length=20)
     config: dict[str, Any] = Field(default_factory=dict)
     options: list[DraftOptionRequest] = Field(default_factory=list, max_length=20_000)
+    metric_mappings: list[DraftMetricMappingRequest] = Field(
+        default_factory=list, max_length=7
+    )
 
 
 class DraftSectionRequest(StrictModel):
@@ -141,6 +152,82 @@ class SaveAssessmentDraftRequest(StrictModel):
 
 class NextDraftRequest(StrictModel):
     change_note: str | None = Field(default=None, max_length=10_000)
+
+
+class DraftMetricMappingResponse(StrictModel):
+    metric_code: str
+    contribution_weight: Decimal
+    direction: str
+
+
+class DraftOptionResponse(StrictModel):
+    code: str
+    label: str
+    sort_order: int
+    numeric_value: Decimal | None
+    is_disqualifying: bool
+
+
+class DraftItemResponse(StrictModel):
+    code: str
+    prompt: str
+    guidance: str | None
+    response_type: str
+    is_required: bool
+    sort_order: int
+    weight: Decimal | None
+    min_value: Decimal | None
+    max_value: Decimal | None
+    passing_value: Decimal | None
+    evidence_mode: str
+    criticality: str
+    config: dict[str, Any]
+    options: list[DraftOptionResponse]
+    metric_mappings: list[DraftMetricMappingResponse]
+
+
+class DraftSectionResponse(StrictModel):
+    code: str
+    title: str
+    description: str | None
+    section_kind: str
+    sort_order: int
+    weight: Decimal | None
+    parent_code: str | None
+    items: list[DraftItemResponse]
+
+
+class DraftTemplateResponse(StrictModel):
+    id: UUID
+    scope: str
+    company_id: UUID | None
+    source_library_version_id: UUID | None
+    name: str
+    code: str
+    activity_type: str
+
+
+class DraftVersionResponse(StrictModel):
+    id: UUID
+    version: int
+    status: str
+    edit_revision: int
+    local_description: str | None
+
+
+class DraftMethodologyResponse(StrictModel):
+    id: UUID
+    title: str
+    body: str
+    version: int
+    owner_type: str
+
+
+class DraftDocumentResponse(StrictModel):
+    template: DraftTemplateResponse
+    version: DraftVersionResponse
+    methodology: DraftMethodologyResponse
+    sections: list[DraftSectionResponse]
 
 
 def _validate_json(value: Any, *, depth: int = 0) -> None:
@@ -207,6 +294,14 @@ def _item(value: DraftItemRequest) -> DraftItemInput:
         criticality=value.criticality,
         config=value.config,
         options=[_option(option) for option in value.options],
+        metric_mappings=[
+            DraftMetricMappingInput(
+                mapping.metric_code,
+                mapping.contribution_weight,
+                mapping.direction,
+            )
+            for mapping in value.metric_mappings
+        ],
     )
 
 
@@ -220,6 +315,58 @@ def _section(value: DraftSectionRequest) -> DraftSectionInput:
         weight=value.weight,
         parent_code=value.parent_code,
         items=[_item(item) for item in value.items],
+    )
+
+
+def _draft_response(value) -> DraftDocumentResponse:
+    return DraftDocumentResponse(
+        template=DraftTemplateResponse(**value.template),
+        version=DraftVersionResponse(**value.version),
+        methodology=DraftMethodologyResponse(**value.methodology),
+        sections=[
+            DraftSectionResponse(
+                code=section["code"],
+                title=section["title"],
+                description=section["description"],
+                section_kind=section["section_kind"],
+                sort_order=section["sort_order"],
+                weight=section["weight"],
+                parent_code=section["parent_code"],
+                items=[
+                    DraftItemResponse(
+                        code=item["code"],
+                        prompt=item["prompt"],
+                        guidance=item["guidance"],
+                        response_type=item["response_type"],
+                        is_required=item["is_required"],
+                        sort_order=item["sort_order"],
+                        weight=item["weight"],
+                        min_value=item["min_value"],
+                        max_value=item["max_value"],
+                        passing_value=item["passing_value"],
+                        evidence_mode=item["evidence_mode"],
+                        criticality=item["criticality"],
+                        config=item["config"],
+                        options=[
+                            DraftOptionResponse(
+                                code=option["code"],
+                                label=option["label"],
+                                sort_order=option["sort_order"],
+                                numeric_value=option["numeric_value"],
+                                is_disqualifying=option["is_disqualifying"],
+                            )
+                            for option in item["options"]
+                        ],
+                        metric_mappings=[
+                            DraftMetricMappingResponse(**mapping)
+                            for mapping in item["metric_mappings"]
+                        ],
+                    )
+                    for item in section["items"]
+                ],
+            )
+            for section in value.sections
+        ],
     )
 
 
@@ -302,7 +449,11 @@ async def list_company(
     session: Annotated[AsyncSession, Depends(get_account_auth_session)],
 ) -> list[dict]:
     await _authorize(session, principal, company_id, READ_PERMISSION)
-    return await AssessmentCatalogService(session).list_company_templates(company_id)
+    can_manage = await AccessDecisionService(session).can_in_company(
+        principal.account_id, company_id, MANAGE_PERMISSION
+    )
+    templates = await AssessmentCatalogService(session).list_company_templates(company_id)
+    return [{**template, "can_manage": can_manage} for template in templates]
 
 
 @router.post(
@@ -395,6 +546,27 @@ async def save_draft(
         raise
     except Exception as error:
         await session.rollback()
+        _raise_controlled(error)
+
+
+@router.get(
+    "/companies/{company_id}/assessment-templates/{template_id}/versions/{version_id}/draft",
+    response_model=DraftDocumentResponse,
+)
+async def get_draft(
+    company_id: UUID,
+    template_id: UUID,
+    version_id: UUID,
+    principal: Annotated[CurrentAccountPrincipal, Depends(get_current_account_principal)],
+    session: Annotated[AsyncSession, Depends(get_account_auth_session)],
+) -> DraftDocumentResponse:
+    await _authorize(session, principal, company_id, MANAGE_PERMISSION)
+    try:
+        result = await AssessmentDraftService(session).get_draft_document(
+            GetDraftDocument(template_id, version_id)
+        )
+        return _draft_response(result)
+    except Exception as error:
         _raise_controlled(error)
 
 
