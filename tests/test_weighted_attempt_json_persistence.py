@@ -1,6 +1,7 @@
 """PostgreSQL persistence regressions for weighted assessment results."""
 
 from datetime import timedelta
+from decimal import Decimal
 import json
 import os
 from pathlib import Path
@@ -47,17 +48,21 @@ MANIFEST = (
     Path(__file__).parents[1]
     / "app/internal/data/assessment_template_import/manifests/cook-kln.json"
 )
+WAITER_MANIFEST = (
+    Path(__file__).parents[1]
+    / "app/internal/data/assessment_template_import/manifests/waiter-kln.json"
+)
 SUBMIT_AT = ORGANIZATION_NOW + timedelta(hours=1)
 
 
-async def _create_committed_weighted_attempt(engine):
+async def _create_committed_weighted_attempt(engine, manifest_path=MANIFEST):
     """Create the complete aggregate through production application services."""
 
     async with AsyncSession(engine, expire_on_commit=False) as session:
         owner, company = await create_organization(session, "Weighted JSON")
         imported = await AssessmentTemplateImportService(session).apply(
             company.company_id,
-            ReviewedManifest.parse(MANIFEST.read_bytes()),
+            ReviewedManifest.parse(manifest_path.read_bytes()),
             ORGANIZATION_NOW + timedelta(minutes=10),
         )
         version = await session.get(
@@ -159,6 +164,48 @@ async def test_weighted_submit_persists_strict_json_and_is_idempotent():
         assert repeated == result
 
     async with AsyncSession(engine) as session:
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(AssessmentMetricObservation)
+                .where(AssessmentMetricObservation.attempt_id == context.attempt_id)
+            )
+            == observation_count
+        )
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_waiter_equal_weight_submit_is_immutable_and_materializes_once():
+    engine = create_async_engine(os.environ["DATABASE_URL"])
+    context = await _create_committed_weighted_attempt(engine, WAITER_MANIFEST)
+
+    async with AsyncSession(engine, expire_on_commit=False) as session:
+        result = await AssessmentAttemptService(session).submit(
+            context.account_id, context.attempt_id, SUBMIT_AT
+        )
+        await session.commit()
+
+    assert result["scoring_algorithm"] == "weighted_v1"
+    assert Decimal(result["score_percent"]) == Decimal("100")
+    assert len(result["sections"]) == 4
+    assert json.loads(json.dumps(result)) == result
+    AssessmentWeightedV1Response.model_validate(result)
+
+    async with AsyncSession(engine, expire_on_commit=False) as session:
+        observation_count = await session.scalar(
+            select(func.count())
+            .select_from(AssessmentMetricObservation)
+            .where(AssessmentMetricObservation.attempt_id == context.attempt_id)
+        )
+        repeated = await AssessmentAttemptService(session).submit(
+            context.account_id,
+            context.attempt_id,
+            SUBMIT_AT + timedelta(seconds=1),
+        )
+        await session.commit()
+        assert repeated == result
+        assert observation_count is not None and observation_count > 0
         assert (
             await session.scalar(
                 select(func.count())

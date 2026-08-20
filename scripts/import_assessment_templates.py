@@ -53,7 +53,7 @@ def arguments() -> argparse.Namespace:
     parser.add_argument(
         "--publish-valid",
         action="store_true",
-        help="publish verified imports except waiter-kln; requires --apply",
+        help="publish publication-ready verified imports; requires --apply",
     )
     return parser.parse_args()
 

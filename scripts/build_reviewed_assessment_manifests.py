@@ -74,6 +74,8 @@ PRODUCTION_METRICS = {
     "Пространство": "space",
     "Экономика": "economics",
 }
+WAITER_EQUAL_WEIGHT = "1.0"
+WAITER_WEIGHT_POLICY = "owner_equal_criterion_weights_v1"
 
 
 def digest(path: Path) -> str:
@@ -244,7 +246,10 @@ def extract(
                 item_code = f"{base[:85].rstrip('-')}-{suffix}"
                 suffix += 1
             used_item_codes.add(item_code)
-            weight = str(raw_weight) if isinstance(raw_weight, (int, float)) else None
+            source_weight = (
+                str(raw_weight) if isinstance(raw_weight, (int, float)) else None
+            )
+            weight = WAITER_EQUAL_WEIGHT if code == "waiter-kln" else source_weight
             by_code[section_code]["items"].append(
                 {
                     "code": item_code,
@@ -276,17 +281,41 @@ def extract(
             "code": code,
             "name": name,
             "activity_type": "evaluation",
-            "description": "Company-private draft imported from reviewed methodology source.",
+            "description": (
+                "КЛН официанта: 43 критерия с одинаковым весом 1."
+                if code == "waiter-kln"
+                else "Company-private draft imported from reviewed methodology source."
+            ),
             "methodology": {
                 "code": f"{code}-methodology",
                 "title": name,
-                "body": "Взвешенная оценка по критериям Да/Нет. Отсутствующие исторические результаты и персональные данные не импортируются.",
+                "body": (
+                    "Оценка по 43 критериям Да/Нет. Все критерии имеют "
+                    "одинаковый вес 1 согласно утверждённому продуктовому решению. "
+                    "Отсутствующие исторические результаты и персональные данные "
+                    "не импортируются."
+                    if code == "waiter-kln"
+                    else "Взвешенная оценка по критериям Да/Нет. Отсутствующие "
+                    "исторические результаты и персональные данные не импортируются."
+                ),
                 "version": 1,
             },
             "scoring": {
                 "algorithm": "weighted_v1",
                 "version": 1,
-                "config": {"rounding": "half_up", "score_scale": 100},
+                "config": {
+                    "rounding": "half_up",
+                    "score_scale": 100,
+                    **(
+                        {
+                            "weight_policy": WAITER_WEIGHT_POLICY,
+                            "criterion_weight": WAITER_EQUAL_WEIGHT,
+                            "source_weights_used": False,
+                        }
+                        if code == "waiter-kln"
+                        else {}
+                    ),
+                },
             },
             "sections": sections,
         },

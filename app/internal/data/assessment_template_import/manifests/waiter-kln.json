@@ -9,11 +9,11 @@
     "code": "waiter-kln",
     "name": "КЛН официанта",
     "activity_type": "evaluation",
-    "description": "Company-private draft imported from reviewed methodology source.",
+    "description": "КЛН официанта: 43 критерия с одинаковым весом 1.",
     "methodology": {
       "code": "waiter-kln-methodology",
       "title": "КЛН официанта",
-      "body": "Взвешенная оценка по критериям Да/Нет. Отсутствующие исторические результаты и персональные данные не импортируются.",
+      "body": "Оценка по 43 критериям Да/Нет. Все критерии имеют одинаковый вес 1 согласно утверждённому продуктовому решению. Отсутствующие исторические результаты и персональные данные не импортируются.",
       "version": 1
     },
     "scoring": {
@@ -21,7 +21,10 @@
       "version": 1,
       "config": {
         "rounding": "half_up",
-        "score_scale": 100
+        "score_scale": 100,
+        "weight_policy": "owner_equal_criterion_weights_v1",
+        "criterion_weight": "1.0",
+        "source_weights_used": false
       }
     },
     "sections": [
@@ -65,7 +68,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "2.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -76,12 +79,12 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "2.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "2.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -237,7 +240,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "3.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -248,12 +251,12 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -310,7 +313,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "5.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -321,12 +324,12 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "5.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "5.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -337,7 +340,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "2.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -348,17 +351,17 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "2.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "2.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "economics",
-                "weight": "2.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -369,7 +372,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "3.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -380,17 +383,17 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "economics",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -401,7 +404,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "5.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -412,12 +415,12 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "5.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "5.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -428,7 +431,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "3.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -439,12 +442,12 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -455,7 +458,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "2.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -466,12 +469,12 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "2.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "2.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -482,7 +485,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "3.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -493,12 +496,12 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -509,7 +512,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "3.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -520,22 +523,22 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "taste",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "speed",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -686,7 +689,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "2.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -697,12 +700,12 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "2.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "2.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -749,7 +752,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "3.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -760,27 +763,27 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "speed",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "order",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "space",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -791,7 +794,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "3.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -802,17 +805,17 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "taste",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -855,7 +858,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": null,
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -866,17 +869,17 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": null,
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": null,
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "taste",
-                "weight": null,
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -919,7 +922,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "3.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -930,22 +933,22 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "taste",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "speed",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -956,7 +959,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "3.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -967,12 +970,12 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -1020,7 +1023,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": null,
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -1031,12 +1034,12 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": null,
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": null,
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -1074,7 +1077,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "3.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -1085,12 +1088,12 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -1128,7 +1131,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "2.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -1139,12 +1142,12 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "2.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "2.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]
@@ -1223,7 +1226,7 @@
             "guidance": null,
             "response_type": "boolean",
             "required": true,
-            "weight": "3.0",
+            "weight": "1.0",
             "min_value": null,
             "max_value": null,
             "passing_value": null,
@@ -1234,17 +1237,17 @@
             "metrics": [
               {
                 "code": "people",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "service",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               },
               {
                 "code": "space",
-                "weight": "3.0",
+                "weight": "1.0",
                 "direction": "positive"
               }
             ]

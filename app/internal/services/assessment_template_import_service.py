@@ -11,7 +11,7 @@ import re
 from typing import Any, Mapping
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infra.database.models import (
@@ -635,6 +635,21 @@ class AssessmentLibraryImportService:
     def __init__(self, session: AsyncSession):
         self._session = session
 
+    async def _lock_template_code(self, template_code: str) -> None:
+        """Serialize first publication without inventing a mutable library parent."""
+        bind = self._session.get_bind()
+        if bind.dialect.name != "postgresql":
+            return
+        lock_key = int.from_bytes(
+            sha256(f"assessment-library:{template_code}".encode()).digest()[:8],
+            byteorder="big",
+            signed=True,
+        )
+        await self._session.execute(
+            text("SELECT pg_advisory_xact_lock(:lock_key)"),
+            {"lock_key": lock_key},
+        )
+
     async def plan(self, manifest: ReviewedManifest) -> ImportPlan:
         template = manifest.document["template"]
         source = manifest.document["source"]
@@ -665,6 +680,7 @@ class AssessmentLibraryImportService:
     async def apply(
         self, manifest: ReviewedManifest, now: datetime
     ) -> ImportResult:
+        await self._lock_template_code(manifest.document["template"]["code"])
         plan = await self.plan(manifest)
         if plan.action == "blocked_missing_weights":
             raise AssessmentTemplateImportConflict(

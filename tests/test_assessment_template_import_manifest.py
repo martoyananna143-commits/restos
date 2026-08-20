@@ -75,7 +75,7 @@ def test_reviewed_manifests_have_exact_shape_and_counts() -> None:
         )
 
 
-def test_only_waiter_draft_has_two_unresolved_weights() -> None:
+def test_waiter_release_has_exact_equal_weight_contract() -> None:
     missing = {}
     for path, manifest in manifests():
         items = [
@@ -92,27 +92,40 @@ def test_only_waiter_draft_has_two_unresolved_weights() -> None:
         "kitchen-practicum.json": 0,
         "production-walkthrough.json": 0,
         "restaurant-service-walkthrough.json": 0,
-        "waiter-kln.json": 2,
+        "waiter-kln.json": 0,
     }
     waiter = next(
         manifest for path, manifest in manifests() if path.name == "waiter-kln.json"
     )
-    unresolved = [
+    items = [
         item
         for section in waiter.document["template"]["sections"]
         for item in section["items"]
-        if item["weight"] is None
     ]
-    assert len(unresolved) == 2
-    assert all(
-        mapping["weight"] is None for item in unresolved for mapping in item["metrics"]
-    )
+    assert len(items) == 43
+    assert {item["weight"] for item in items} == {"1.0"}
+    assert {
+        mapping["weight"] for item in items for mapping in item["metrics"]
+    } == {"1.0"}
+    assert {section["weight"] for section in waiter.document["template"]["sections"]} == {
+        None
+    }
+    assert waiter.document["template"]["scoring"]["config"] == {
+        "rounding": "half_up",
+        "score_scale": 100,
+        "weight_policy": "owner_equal_criterion_weights_v1",
+        "criterion_weight": "1.0",
+        "source_weights_used": False,
+    }
+    assert waiter.document["source"] == {
+        "filename": "НОВЫЙ ИСПРАВЛЕННЫЙ КЛН-корректировка официант - Камелот, новый .xlsx",
+        "sha256": "e0e34ffcb0304fc3db9f0c9b790acc8613d54cc76488ef1b2bba6d08b584048a",
+        "provenance": "read_only_methodology_source",
+    }
     decisions = {
         path.name: manifest.publication_ready() for path, manifest in manifests()
     }
-    assert [name for name, ready in decisions.items() if not ready] == [
-        "waiter-kln.json"
-    ]
+    assert all(decisions.values())
 
 
 def test_manifests_do_not_contain_historical_measurement_fields() -> None:
