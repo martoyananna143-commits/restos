@@ -344,8 +344,7 @@ class AccountWorkforceOnboardingService:
             self._session.add(access_profile)
             await self._session.flush()
         elif (
-            access_profile.id != expected_access_id
-            or not access_profile.is_system
+            not access_profile.is_system
             or access_profile.maximum_scope != "working_venues"
         ):
             raise AccountWorkforceOnboardingConflict(
@@ -399,10 +398,7 @@ class AccountWorkforceOnboardingService:
             )
             self._session.add(position)
             await self._session.flush()
-        elif (
-            position.id != expected_position_id
-            or position.default_access_profile_id != access_profile.id
-        ):
+        elif position.default_access_profile_id != access_profile.id:
             raise AccountWorkforceOnboardingConflict(
                 "employee position is incompatible"
             )

@@ -195,6 +195,55 @@ async def test_custom_employee_profile_code_is_not_silently_elevated(db_session)
 
 
 @pytest.mark.asyncio
+async def test_valid_existing_employee_access_profile_with_historical_id_is_reused(
+    db_session,
+):
+    owner, company = await owner_company(db_session)
+    historical_access = AccessProfile(
+        id=uuid4(),
+        company_id=company.company_id,
+        name="Сотрудник",
+        code="employee",
+        description="Базовый доступ сотрудника",
+        maximum_scope="working_venues",
+        is_system=True,
+        is_active=True,
+        version=1,
+    )
+    db_session.add(historical_access)
+    await db_session.flush()
+    db_session.add(
+        AccessProfilePermission(
+            access_profile_id=historical_access.id,
+            permission_code="venue.view",
+        )
+    )
+    await db_session.flush()
+
+    request_id = uuid4()
+    service = AccountWorkforceOnboardingService(db_session, PEPPER, PHONE_PEPPER)
+    first = await service.create_invitation(command(owner, company, request_id))
+    second = await service.create_invitation(command(owner, company, request_id))
+    invitation = await db_session.get(Invitation, first.invitation_id)
+
+    assert first.created is True and second.created is False
+    assert first.invitation_id == second.invitation_id
+    assert invitation.access_profile_id == historical_access.id
+    assert await db_session.scalar(
+        select(func.count()).select_from(EmployeeProfile).where(
+            EmployeeProfile.company_id == company.company_id,
+            EmployeeProfile.full_name == "Synthetic Employee",
+        )
+    ) == 1
+    assert await db_session.scalar(
+        select(func.count()).select_from(Invitation).where(
+            Invitation.company_id == company.company_id,
+            Invitation.employee_profile_id == first.employee_profile_id,
+        )
+    ) == 1
+
+
+@pytest.mark.asyncio
 async def test_rollback_removes_profile_defaults_and_invitation(db_session):
     owner, company = await owner_company(db_session)
     savepoint = await db_session.begin_nested()
