@@ -3,6 +3,7 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 import os
+from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy import func, select
@@ -12,6 +13,9 @@ from app.infra.database.models import (
     AssessmentAssignment,
     AssessmentAttempt,
     AssessmentAttemptAnswer,
+    AssignmentVenue,
+    EmployeeAssignment,
+    Venue,
 )
 from app.internal.services.assessment_management_service import (
     AssessmentManagementAlreadyCompleted,
@@ -75,6 +79,152 @@ async def test_manager_measurement_uses_subject_and_manager_owned_attempt():
         assert assignment.assigned_by_account_id == context.account.id
         assert attempt.account_id == context.account.id
         assert result["read_only"] is False
+        await session.rollback()
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_manager_measurement_requires_employee_venue_link_and_retry_is_duplicate_safe():
+    engine = create_async_engine(os.environ["DATABASE_URL"])
+    async with AsyncSession(engine, expire_on_commit=False) as session:
+        context = await seed_context(session)
+        context.assignment.status = "completed"
+        context.assignment.completed_at = NOW
+        venue = Venue(
+            company_id=context.company.id,
+            name="Synthetic venue",
+            code=f"venue-{__import__('uuid').uuid4().hex[:12]}",
+            status="active",
+            meta={},
+        )
+        session.add(venue)
+        await session.flush()
+        assignment_count_before = await session.scalar(
+            select(func.count()).select_from(AssessmentAssignment)
+        )
+        attempt_count_before = await session.scalar(
+            select(func.count()).select_from(AssessmentAttempt)
+        )
+
+        with pytest.raises(AssessmentManagementNotFound):
+            await AssessmentManagementService(session).start_manager_measurement(
+                StartManagerMeasurement(
+                    account_id=context.account.id,
+                    company_id=context.company.id,
+                    subject_employee_profile_id=context.profile.id,
+                    template_version_id=context.version.id,
+                    venue_id=venue.id,
+                    now=NOW,
+                )
+            )
+        assert await session.scalar(
+            select(func.count()).select_from(AssessmentAssignment)
+        ) == assignment_count_before
+        assert await session.scalar(
+            select(func.count()).select_from(AssessmentAttempt)
+        ) == attempt_count_before
+
+        first = await AssessmentManagementService(session).start_manager_measurement(
+            measurement_command(context)
+        )
+        resumed = await AssessmentManagementService(session).start_manager_measurement(
+            measurement_command(context)
+        )
+        assert resumed["id"] == first["id"]
+        assert await session.scalar(
+            select(func.count()).select_from(AssessmentAssignment)
+        ) == assignment_count_before + 1
+        assert await session.scalar(
+            select(func.count()).select_from(AssessmentAttempt)
+        ) == attempt_count_before + 1
+        await session.rollback()
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_manager_measurement_employee_venue_pair_opens_exactly_one_attempt():
+    engine = create_async_engine(os.environ["DATABASE_URL"])
+    async with AsyncSession(engine, expire_on_commit=False) as session:
+        context = await seed_context(session)
+        context.assignment.status = "completed"
+        context.assignment.completed_at = NOW
+        venue = Venue(
+            company_id=context.company.id,
+            name="Synthetic linked venue",
+            code=f"venue-{__import__('uuid').uuid4().hex[:12]}",
+            status="active",
+            meta={},
+        )
+        session.add(venue)
+        await session.flush()
+        membership_id = await session.scalar(
+            select(EmployeeAssignment.id).where(
+                EmployeeAssignment.employee_profile_id == context.profile.id,
+                EmployeeAssignment.status == "active",
+            )
+        )
+        session.add(
+            AssignmentVenue(
+                assignment_id=membership_id,
+                venue_id=venue.id,
+                company_id=context.company.id,
+            )
+        )
+        await session.flush()
+
+        service = AssessmentManagementService(session)
+        employees = await service.list_employees(
+            context.account.id,
+            context.company.id,
+            NOW,
+            q=None,
+            limit=50,
+            after=None,
+            include_venue_ids=True,
+        )
+        assert employees[0]["venue_ids"] == [venue.id]
+        assert employees[0]["venue_required"] is False
+        service._require_manage = AsyncMock(return_value={venue.id})
+        venue_scoped_employees = await service.list_employees(
+            context.account.id,
+            context.company.id,
+            NOW,
+            q=None,
+            limit=50,
+            after=None,
+            include_venue_ids=True,
+        )
+        assert venue_scoped_employees[0]["venue_ids"] == [venue.id]
+        assert venue_scoped_employees[0]["venue_required"] is True
+        result = await service.start_manager_measurement(
+            StartManagerMeasurement(
+                account_id=context.account.id,
+                company_id=context.company.id,
+                subject_employee_profile_id=context.profile.id,
+                template_version_id=context.version.id,
+                venue_id=venue.id,
+                now=NOW,
+            )
+        )
+        resumed = await service.start_manager_measurement(
+            StartManagerMeasurement(
+                account_id=context.account.id,
+                company_id=context.company.id,
+                subject_employee_profile_id=context.profile.id,
+                template_version_id=context.version.id,
+                venue_id=venue.id,
+                now=NOW,
+            )
+        )
+        assert resumed["id"] == result["id"]
+        assignment = await session.get(AssessmentAssignment, result["assignment_id"])
+        assert assignment.venue_id == venue.id
+        assert assignment.purpose == "manager_measurement"
+        assert await session.scalar(
+            select(func.count())
+            .select_from(AssessmentAttempt)
+            .where(AssessmentAttempt.assignment_id == assignment.id)
+        ) == 1
         await session.rollback()
     await engine.dispose()
 

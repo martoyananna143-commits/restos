@@ -61,6 +61,8 @@ class EmployeeSummary(StrictModel):
     display_name: str
     position_title: str | None
     status: Literal["active"]
+    venue_ids: list[UUID] | None = None
+    venue_required: bool | None = None
 
 
 class TemplateVersionSummary(StrictModel):
@@ -199,7 +201,12 @@ def _controlled(error: Exception) -> HTTPException:
     )
 
 
-@router.get("/employees", response_model=list[EmployeeSummary], responses=ERRORS)
+@router.get(
+    "/employees",
+    response_model=list[EmployeeSummary],
+    response_model_exclude_none=True,
+    responses=ERRORS,
+)
 async def list_management_employees(
     company_id: UUID,
     response: Response,
@@ -210,6 +217,7 @@ async def list_management_employees(
     q: Annotated[str | None, Query(max_length=100)] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     after: UUID | None = None,
+    include_venue_ids: bool = False,
 ) -> list[dict[str, Any]]:
     _no_store(response)
     try:
@@ -220,6 +228,7 @@ async def list_management_employees(
             q=q,
             limit=limit,
             after=after,
+            include_venue_ids=include_venue_ids,
         )
     except Exception as error:
         raise _controlled(error) from error

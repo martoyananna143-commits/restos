@@ -108,6 +108,47 @@ def test_openapi_has_exact_seven_typed_operations():
         assert schema.get("$ref") or schema.get("items", {}).get("$ref")
 
 
+def test_employee_venue_projection_is_explicit_and_old_client_shape_is_stable(
+    monkeypatch,
+):
+    venue_id = uuid4()
+
+    class Service:
+        def __init__(self, _session):
+            pass
+
+        async def list_employees(self, *_args, include_venue_ids=False, **_kwargs):
+            value = {
+                "employee_profile_id": uuid4(),
+                "display_name": "Synthetic employee",
+                "position_title": "Synthetic position",
+                "status": "active",
+            }
+            if include_venue_ids:
+                value["venue_ids"] = [venue_id]
+                value["venue_required"] = False
+            return [value]
+
+    monkeypatch.setattr(
+        account_assessment_management, "AssessmentManagementService", Service
+    )
+    http, _, _ = make_client()
+    company_id = uuid4()
+    old_shape = http.get(
+        f"/api/v1/account/companies/{company_id}/assessment-management/employees"
+    )
+    assert old_shape.status_code == 200
+    assert "venue_ids" not in old_shape.json()[0]
+
+    compatible = http.get(
+        f"/api/v1/account/companies/{company_id}/assessment-management/employees"
+        "?include_venue_ids=true"
+    )
+    assert compatible.status_code == 200
+    assert compatible.json()[0]["venue_ids"] == [str(venue_id)]
+    assert compatible.json()[0]["venue_required"] is False
+
+
 def test_public_schemas_exclude_answers_pii_and_scoring_fields():
     _, _, app = make_client()
     schemas = app.openapi()["components"]["schemas"]

@@ -94,8 +94,13 @@ class AssessmentManagementService:
         q: str | None,
         limit: int,
         after: UUID | None,
+        include_venue_ids: bool = False,
     ) -> list[dict[str, Any]]:
         venue_scope = await self._require_read(account_id, company_id, now)
+        venue_required = False
+        if include_venue_ids:
+            venue_scope = await self._require_manage(account_id, company_id, now)
+            venue_required = venue_scope is not None
         if after is not None and not await self._employee_cursor_exists(
             company_id, after, now, venue_scope
         ):
@@ -134,12 +139,52 @@ class AssessmentManagementService:
                 )
             )
         rows = (await self._session.execute(statement)).all()
+        employee_ids = {profile.id for profile, _position in rows}
+        venue_rows = []
+        if include_venue_ids and employee_ids:
+            venue_rows = (
+                await self._session.execute(
+                    select(
+                        EmployeeAssignment.employee_profile_id,
+                        AssignmentVenue.venue_id,
+                    )
+                    .join(
+                        AssignmentVenue,
+                        (AssignmentVenue.assignment_id == EmployeeAssignment.id)
+                        & (AssignmentVenue.company_id == EmployeeAssignment.company_id),
+                    )
+                    .where(
+                        EmployeeAssignment.company_id == company_id,
+                        EmployeeAssignment.employee_profile_id.in_(employee_ids),
+                        EmployeeAssignment.status == "active",
+                        EmployeeAssignment.deleted_at.is_(None),
+                        EmployeeAssignment.starts_at <= now,
+                        or_(
+                            EmployeeAssignment.ends_at.is_(None),
+                            EmployeeAssignment.ends_at > now,
+                        ),
+                    )
+                )
+            ).all()
+        venue_ids_by_employee: dict[UUID, set[UUID]] = {}
+        for employee_id, venue_id in venue_rows:
+            venue_ids_by_employee.setdefault(employee_id, set()).add(venue_id)
         return [
             {
                 "employee_profile_id": profile.id,
                 "display_name": profile.full_name,
                 "position_title": position.name,
                 "status": "active",
+                **(
+                    {
+                        "venue_ids": sorted(
+                            venue_ids_by_employee.get(profile.id, set()), key=str
+                        ),
+                        "venue_required": venue_required,
+                    }
+                    if include_venue_ids
+                    else {}
+                ),
             }
             for profile, position in rows
         ]
