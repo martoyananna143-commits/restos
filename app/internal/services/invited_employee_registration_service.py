@@ -90,7 +90,7 @@ class RegisterInvitedEmployee:
     invitation_code: str
     phone_verification_challenge_id: UUID
     phone: str
-    display_name: str
+    display_name: str | None
     password: str
     app_instance_id: UUID
     platform: str
@@ -112,6 +112,9 @@ class RegisteredInvitedEmployee:
     session_id: UUID
     refresh_token: str
     display_name: str
+    company_name: str
+    position_name: str
+    venue_names: tuple[str, ...]
 
 
 class InvitedEmployeeRegistrationService:
@@ -250,7 +253,7 @@ class InvitedEmployeeRegistrationService:
             password_hash = self._password_hasher.hash(request.password)
             account = Account(
                 id=account_id,
-                display_name=request.display_name.strip(),
+                display_name=profile.full_name,
                 password_hash=password_hash,
                 pin_hash=None,
                 status="active",
@@ -305,6 +308,7 @@ class InvitedEmployeeRegistrationService:
                     now=request.now,
                 )
             )
+            acceptance = await self._workforce.acceptance_projection(accepted)
             issued = await self._account_sessions.register_device_and_issue_session(
                 RegisterDeviceAndIssueSession(
                     account_id=account_id,
@@ -331,6 +335,9 @@ class InvitedEmployeeRegistrationService:
                 session_id=issued.session_id,
                 refresh_token=issued.refresh_token,
                 display_name=account.display_name,
+                company_name=acceptance.company_name,
+                position_name=acceptance.position_name,
+                venue_names=acceptance.venue_names,
             )
 
     def _validate_input(self, request: RegisterInvitedEmployee) -> str:
@@ -347,10 +354,8 @@ class InvitedEmployeeRegistrationService:
         ):
             if not isinstance(getattr(request, name), UUID):
                 raise InvalidInvitedEmployeeRegistration(f"{name} must be a UUID")
-        if not isinstance(request.display_name, str) or not request.display_name.strip():
-            raise InvalidInvitedEmployeeRegistration("display_name is required")
-        if len(request.display_name.strip()) > 255:
-            raise InvalidInvitedEmployeeRegistration("display_name is too long")
+        if request.display_name is not None and not isinstance(request.display_name, str):
+            raise InvalidInvitedEmployeeRegistration("display_name is invalid")
         if not isinstance(request.password, str) or len(request.password) < 12:
             raise InvalidInvitedEmployeeRegistration(
                 "password must contain at least 12 characters"

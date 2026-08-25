@@ -307,6 +307,9 @@ def test_web_registration_wraps_native_contract_without_exposing_refresh(monkeyp
         access_token_expires_at=NOW + timedelta(minutes=10),
         refresh_token=f"{uuid4()}.{'r' * 43}",
         display_name="Employee",
+        company_name="Synthetic Company",
+        position_name="Synthetic Position",
+        venue_names=("Synthetic Venue",),
     )
 
     async def fake_register(_body, _response, _session):

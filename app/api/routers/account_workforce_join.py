@@ -42,6 +42,9 @@ class AcceptInvitationRequest(StrictModel):
 
 class AcceptInvitationResponse(StrictModel):
     joined: Literal[True]
+    company_name: str
+    position_name: str
+    venue_names: tuple[str, ...]
 
 
 class InvitationJoinErrorDetail(StrictModel):
@@ -81,7 +84,7 @@ async def accept_existing_account_invitation(
         _secret(config.ACCOUNT_AUTH_INVITATION_PEPPER, "INVITATION_PEPPER"),
     )
     try:
-        await service.accept_authenticated(
+        accepted = await service.accept_authenticated(
             AcceptAuthenticatedWorkforceInvitation(
                 account_id=principal.account_id,
                 code=body.invitation_code,
@@ -89,6 +92,7 @@ async def accept_existing_account_invitation(
             ),
             _secret(config.ACCOUNT_AUTH_PHONE_PEPPER, "PHONE_PEPPER"),
         )
+        projection = await service.acceptance_projection(accepted)
         await session.commit()
     except AccountAlreadyMemberOfCompany as error:
         await session.rollback()
@@ -107,4 +111,9 @@ async def accept_existing_account_invitation(
     except Exception:
         await session.rollback()
         raise
-    return AcceptInvitationResponse(joined=True)
+    return AcceptInvitationResponse(
+        joined=True,
+        company_name=projection.company_name,
+        position_name=projection.position_name,
+        venue_names=projection.venue_names,
+    )

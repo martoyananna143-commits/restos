@@ -11,8 +11,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.infra.database.models.account_legal_acceptance import AccountLegalAcceptance
+from app.infra.database.models.access_profile import AccessProfile, AccessProfilePermission
 from app.infra.database.models.employee_assignment import EmployeeAssignment
 from app.infra.database.models.employee_profile import EmployeeProfile
+from app.infra.database.models.position import Position
 from app.internal.services.access_decision_service import AccessDecisionService
 from app.internal.services.account_workforce_onboarding_service import (
     AccountWorkforceOnboardingConflict,
@@ -59,9 +61,46 @@ def joining(session: AsyncSession) -> WorkforceInvitationService:
     )
 
 
+async def invitation_position(session: AsyncSession, company_id):
+    access = AccessProfile(
+        id=uuid4(),
+        company_id=company_id,
+        name="Synthetic Invite Access",
+        code=f"invite-{uuid4().hex[:12]}",
+        description=None,
+        maximum_scope="working_venues",
+        is_system=False,
+        is_active=True,
+        version=1,
+    )
+    session.add(access)
+    await session.flush()
+    session.add(
+        AccessProfilePermission(
+            access_profile_id=access.id,
+            permission_code="venue.view",
+        )
+    )
+    position = Position(
+        id=uuid4(),
+        company_id=company_id,
+        name="Synthetic Invite Position",
+        code=f"invite-position-{uuid4().hex[:12]}",
+        description=None,
+        default_access_profile_id=access.id,
+        default_scope_type="working_venues",
+        is_active=True,
+        sort_order=100,
+    )
+    session.add(position)
+    await session.flush()
+    return position.id
+
+
 async def context(session: AsyncSession):
     account, source = await create_organization(session, "Existing Source")
     target_owner, target = await create_organization(session, "Existing Target")
+    position_id = await invitation_position(session, target.company_id)
     invitation = await onboarding(session).create_invitation(
         CreateAccountWorkforceInvitation(
             target_owner.id,
@@ -69,6 +108,7 @@ async def context(session: AsyncSession):
             uuid4(),
             account.display_name,
             account.phone,
+            position_id,
             target.venue_id,
             NOW + timedelta(seconds=10),
         )
@@ -182,7 +222,13 @@ async def test_ten_worker_create_same_company_phone_has_one_winner():
     async with AsyncSession(engine, expire_on_commit=False) as setup:
         owner, company = await create_organization(setup, "Concurrent Target")
         invited, _ = await create_organization(setup, "Concurrent Existing")
-        owner_id, company_id, venue_id = owner.id, company.company_id, company.venue_id
+        invitation_position_id = await invitation_position(setup, company.company_id)
+        owner_id, company_id, position_id, venue_id = (
+            owner.id,
+            company.company_id,
+            invitation_position_id,
+            company.venue_id,
+        )
         phone = invited.phone
         await setup.commit()
 
@@ -196,6 +242,7 @@ async def test_ten_worker_create_same_company_phone_has_one_winner():
                         uuid4(),
                         "Concurrent Same Phone",
                         phone,
+                        position_id,
                         venue_id,
                         NOW,
                     )

@@ -17,6 +17,10 @@ from app.internal.services.account_access_token_service import CurrentAccountPri
 from app.internal.services.account_workforce_onboarding_service import (
     AccountWorkforceOnboardingForbidden,
 )
+from app.internal.services.employee_invitation_delivery import (
+    EmployeeInvitationDeliveryFailed,
+    EmployeeInvitationDeliveryUnknown,
+)
 
 
 NOW = datetime(2026, 8, 10, tzinfo=timezone.utc)
@@ -26,12 +30,26 @@ class FakeSession:
     def __init__(self):
         self.commits = 0
         self.rollbacks = 0
+        self.sms_sender = FakeInvitationSender()
 
     async def commit(self):
         self.commits += 1
 
     async def rollback(self):
         self.rollbacks += 1
+
+
+class FakeInvitationSender:
+    def __init__(self):
+        self.calls = []
+        self.outcome = "sent"
+
+    async def send_employee_invitation(self, phone, code, expires_in_seconds):
+        self.calls.append((phone, code, expires_in_seconds))
+        if self.outcome == "failed":
+            raise EmployeeInvitationDeliveryFailed("synthetic failure")
+        if self.outcome == "unknown":
+            raise EmployeeInvitationDeliveryUnknown("synthetic timeout")
 
 
 def make_client(monkeypatch):
@@ -66,6 +84,9 @@ def make_client(monkeypatch):
     app.include_router(account_workforce.router)
     app.dependency_overrides[get_current_account_principal] = principal
     app.dependency_overrides[get_account_auth_session] = database
+    app.dependency_overrides[account_workforce.get_sms_sender] = (
+        lambda: session.sms_sender
+    )
     return TestClient(app), session, account_id, app
 
 
@@ -73,13 +94,15 @@ def headers():
     return {"Origin": "https://testserver", "X-RestOS-Web-Session": "1"}
 
 
-def test_openapi_has_two_typed_operations_and_strict_models(monkeypatch):
+def test_openapi_has_four_typed_operations_and_strict_models(monkeypatch):
     _, _, _, app = make_client(monkeypatch)
     paths = app.openapi()["paths"]
     prefix = "/api/v1/account/companies/{company_id}/workforce"
     assert set(path for path in paths if path.startswith(prefix)) == {
         f"{prefix}/venues",
+        f"{prefix}/positions",
         f"{prefix}/invitations",
+        f"{prefix}/invitations/{{invitation_id}}/status",
     }
     create = paths[f"{prefix}/invitations"]["post"]
     assert create["responses"]["200"]["content"]["application/json"]["schema"][
@@ -89,8 +112,16 @@ def test_openapi_has_two_typed_operations_and_strict_models(monkeypatch):
     assert schemas["CreateWorkforceInvitationRequest"]["additionalProperties"] is False
     assert schemas["WorkforceInvitationResponse"]["additionalProperties"] is False
     assert "phone" in schemas["CreateWorkforceInvitationRequest"]["required"]
+    assert "position_id" in schemas["CreateWorkforceInvitationRequest"]["required"]
     serialized = str(schemas["WorkforceInvitationResponse"]).lower()
-    for forbidden in ("phone", "otp", "password", "token", "cookie", "answer"):
+    for forbidden in (
+        "invitation_code",
+        "otp",
+        "password",
+        "token",
+        "cookie",
+        "answer",
+    ):
         assert forbidden not in serialized
 
 
@@ -101,7 +132,12 @@ def test_create_uses_account_company_and_no_store_without_cookie(monkeypatch):
         invitation_id=uuid4(),
         employee_profile_id=uuid4(),
         code="123456",
+        phone="+79991234567",
         expires_at=NOW,
+        delivery_status="delivery_pending",
+        delivery_attempt_count=1,
+        should_send=True,
+        invitation_status="pending",
     )
 
     class Service:
@@ -111,6 +147,10 @@ def test_create_uses_account_company_and_no_store_without_cookie(monkeypatch):
         async def create_invitation(self, command):
             captured.append(command)
             return expected
+
+        async def record_delivery_outcome(self, invitation_id, outcome, now):
+            captured.append((invitation_id, outcome, now))
+            return outcome
 
     monkeypatch.setattr(account_workforce, "AccountWorkforceOnboardingService", Service)
     http, session, account_id, _ = make_client(monkeypatch)
@@ -123,18 +163,116 @@ def test_create_uses_account_company_and_no_store_without_cookie(monkeypatch):
                 "request_id": str(request_id),
                 "employee_name": "Synthetic Employee",
                 "phone": "+79991234567",
+                "position_id": str(uuid4()),
                 "venue_id": None,
             },
             headers=headers(),
         )
-    assert response.status_code == 200 and session.commits == 1
+    assert response.status_code == 200 and session.commits == 2
     assert captured[0].actor_account_id == account_id
     assert captured[0].company_id == company_id
     assert captured[0].request_id == request_id
     assert captured[0].phone == "+79991234567"
-    assert response.json()["invitation_code"] == "123456"
+    assert response.json()["delivery_status"] == "sent"
+    assert response.json()["masked_phone"] == "+7 ••• •••-45-67"
+    assert response.json()["invitation_status"] == "pending"
+    assert "invitation_code" not in response.json()
+    assert session.sms_sender.calls == [("+79991234567", "123456", 1)]
     assert response.headers["cache-control"] == "private, no-store"
     assert "set-cookie" not in response.headers
+
+
+def test_delivery_failure_and_unknown_are_typed_without_code(monkeypatch):
+    expected = SimpleNamespace(
+        created=True,
+        invitation_id=uuid4(),
+        employee_profile_id=uuid4(),
+        code="123456",
+        phone="+79991234567",
+        expires_at=NOW,
+        delivery_status="delivery_pending",
+        delivery_attempt_count=1,
+        should_send=True,
+        invitation_status="pending",
+    )
+
+    class Service:
+        def __init__(self, _session, _invitation_pepper, _phone_pepper):
+            pass
+
+        async def create_invitation(self, _command):
+            return expected
+
+        async def record_delivery_outcome(self, _invitation_id, outcome, _now):
+            return outcome
+
+    monkeypatch.setattr(account_workforce, "AccountWorkforceOnboardingService", Service)
+    http, session, _, _ = make_client(monkeypatch)
+    path = f"/api/v1/account/companies/{uuid4()}/workforce/invitations"
+    payload = {
+        "request_id": str(uuid4()),
+        "employee_name": "Synthetic Employee",
+        "phone": "+79991234567",
+        "position_id": str(uuid4()),
+        "venue_id": None,
+    }
+    with http:
+        session.sms_sender.outcome = "failed"
+        failed = http.post(path, json=payload, headers=headers())
+        session.sms_sender.outcome = "unknown"
+        unknown = http.post(
+            path,
+            json={**payload, "request_id": str(uuid4())},
+            headers=headers(),
+        )
+    assert failed.status_code == 200
+    assert failed.json()["delivery_status"] == "failed"
+    assert unknown.status_code == 200
+    assert unknown.json()["delivery_status"] == "unknown"
+    assert "123456" not in failed.text + unknown.text
+
+
+def test_sent_and_ambiguous_existing_invitation_are_never_resent(monkeypatch):
+    outcomes = iter(("sent", "unknown"))
+
+    class Service:
+        def __init__(self, _session, _invitation_pepper, _phone_pepper):
+            pass
+
+        async def create_invitation(self, _command):
+            outcome = next(outcomes)
+            return SimpleNamespace(
+                created=False,
+                invitation_id=uuid4(),
+                employee_profile_id=uuid4(),
+                code="123456",
+                phone="+79991234567",
+                expires_at=NOW,
+                delivery_status=outcome,
+                delivery_attempt_count=1,
+                should_send=False,
+                invitation_status="pending",
+            )
+
+    monkeypatch.setattr(account_workforce, "AccountWorkforceOnboardingService", Service)
+    http, session, _, _ = make_client(monkeypatch)
+    path = f"/api/v1/account/companies/{uuid4()}/workforce/invitations"
+    payload = {
+        "request_id": str(uuid4()),
+        "employee_name": "Synthetic Employee",
+        "phone": "+79991234567",
+        "position_id": str(uuid4()),
+        "venue_id": None,
+    }
+    with http:
+        sent = http.post(path, json=payload, headers=headers())
+        unknown = http.post(path, json=payload, headers=headers())
+    assert sent.status_code == 200 and sent.json()["delivery_status"] == "sent"
+    assert unknown.status_code == 200
+    assert unknown.json()["delivery_status"] == "unknown"
+    assert session.sms_sender.calls == []
+    assert session.commits == 2
+    assert "123456" not in sent.text + unknown.text
 
 
 def test_list_venues_is_typed_and_permission_scoped(monkeypatch):
@@ -166,6 +304,36 @@ def test_list_venues_is_typed_and_permission_scoped(monkeypatch):
     assert "set-cookie" not in response.headers
 
 
+def test_owner_can_refresh_only_safe_invitation_status(monkeypatch):
+    captured = []
+
+    class Service:
+        def __init__(self, _session, _invitation_pepper, _phone_pepper):
+            pass
+
+        async def invitation_status(self, account_id, company_id, invitation_id, now):
+            captured.append((account_id, company_id, invitation_id, now))
+            return "accepted", "sent"
+
+    monkeypatch.setattr(account_workforce, "AccountWorkforceOnboardingService", Service)
+    http, _, account_id, _ = make_client(monkeypatch)
+    company_id, invitation_id = uuid4(), uuid4()
+    with http:
+        response = http.get(
+            f"/api/v1/account/companies/{company_id}/workforce/invitations/{invitation_id}/status",
+            headers=headers(),
+        )
+    assert response.status_code == 200
+    assert response.json() == {
+        "invitation_status": "accepted",
+        "delivery_status": "sent",
+    }
+    assert captured[0][0:3] == (account_id, company_id, invitation_id)
+    assert response.headers["cache-control"] == "private, no-store"
+    for forbidden in ("code", "phone", "token", "cookie"):
+        assert forbidden not in response.text.lower()
+
+
 def test_unknown_fields_boundary_and_forbidden_are_controlled(monkeypatch):
     class Service:
         def __init__(self, _session, _invitation_pepper, _phone_pepper):
@@ -181,6 +349,7 @@ def test_unknown_fields_boundary_and_forbidden_are_controlled(monkeypatch):
         "request_id": str(uuid4()),
         "employee_name": "Synthetic Employee",
         "phone": "+79991234567",
+        "position_id": str(uuid4()),
         "venue_id": None,
     }
     with http:

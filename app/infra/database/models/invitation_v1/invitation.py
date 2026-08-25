@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     ForeignKeyConstraint,
     Index,
+    Integer,
     LargeBinary,
     String,
     Text,
@@ -62,6 +63,23 @@ class Invitation(Base, TimestampMixin, SoftDeleteMixin):
             name="ck_invitations_status",
         ),
         CheckConstraint(
+            "delivery_status IN ('delivery_pending', 'sent', 'unknown', 'failed')",
+            name="ck_invitations_delivery_status",
+        ),
+        CheckConstraint(
+            "delivery_attempt_count >= 0",
+            name="ck_invitations_delivery_attempt_count",
+        ),
+        CheckConstraint(
+            "delivery_attempt_count = 0 OR delivery_attempted_at IS NOT NULL",
+            name="ck_invitations_delivery_attempted_state",
+        ),
+        CheckConstraint(
+            "((delivery_status = 'sent' AND delivery_sent_at IS NOT NULL) OR "
+            "(delivery_status <> 'sent' AND delivery_sent_at IS NULL))",
+            name="ck_invitations_delivery_sent_state",
+        ),
+        CheckConstraint(
             "octet_length(code_digest) = 32",
             name="ck_invitations_code_digest_length",
         ),
@@ -101,6 +119,7 @@ class Invitation(Base, TimestampMixin, SoftDeleteMixin):
         Index("ix_invitations_company_id", "company_id"),
         Index("ix_invitations_employee_profile_id", "employee_profile_id"),
         Index("ix_invitations_status", "status"),
+        Index("ix_invitations_company_delivery", "company_id", "delivery_status"),
         Index("ix_invitations_expires_at", "expires_at"),
         Index("ix_invitations_created_by_account_id", "created_by_account_id"),
         Index(
@@ -135,6 +154,18 @@ class Invitation(Base, TimestampMixin, SoftDeleteMixin):
     scope_type: Mapped[str] = mapped_column(String(30), nullable=False)
     code_digest: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
+    delivery_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="unknown", server_default="unknown"
+    )
+    delivery_attempt_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    delivery_attempted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    delivery_sent_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_by_account_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("accounts.id", ondelete="RESTRICT"),

@@ -13,6 +13,10 @@ import pytest
 
 from app.api.routers import account_invitation_auth as auth
 from app.infra.sms import SmsAeroSender
+from app.internal.services.employee_invitation_delivery import (
+    EmployeeInvitationDeliveryFailed,
+    EmployeeInvitationDeliveryUnknown,
+)
 from app.internal.services.phone_verification_service import SmsDeliveryFailed
 from app.internal.services.phone_verification_service import (
     PhoneVerificationCodeRequested,
@@ -24,6 +28,7 @@ EMAIL = "api@example.test"
 API_KEY = "test-api-key-not-real"
 SIGN = "SMS Aero"
 BASE_URL = "https://gate.smsaero.test"
+INVITE_URL = "https://pilot.restos.space/#/invite"
 
 
 def sender(handler, timeout=2.0):
@@ -35,6 +40,7 @@ def sender(handler, timeout=2.0):
             api_key=API_KEY,
             sign=SIGN,
             base_url=BASE_URL,
+            invitation_url=INVITE_URL,
             timeout_seconds=timeout,
         ),
         client,
@@ -67,6 +73,77 @@ async def test_request_contract_auth_and_success():
     assert "%40restos.app+%23012345" in body
     assert "012345" in body
     assert API_KEY not in body
+
+
+@pytest.mark.asyncio
+async def test_employee_invitation_copy_and_sign_are_exact(caplog):
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(200, json={"success": True, "data": {"id": 1}})
+
+    adapter, client = sender(handler)
+    with caplog.at_level(logging.DEBUG):
+        await adapter.send_employee_invitation("+79990001122", "012345", 3600)
+    await client.aclose()
+    assert len(requests) == 1
+    body = requests[0].content.decode()
+    assert "sign=SMS+Aero" in body
+    assert "%D0%92%D0%B0%D1%81+%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%81%D0%B8%D0%BB%D0%B8+%D0%B2+RestOS" in body
+    assert "%D0%9A%D0%BE%D0%B4+%D0%BF%D1%80%D0%B8%D0%B3%D0%BB%D0%B0%D1%88%D0%B5%D0%BD%D0%B8%D1%8F%3A+012345" in body
+    assert "https%3A%2F%2Fpilot.restos.space%2F%23%2Finvite" in body
+    assert "012345" not in INVITE_URL
+    persisted_logs = " ".join(record.getMessage() for record in caplog.records)
+    assert "+79990001122" not in persisted_logs
+    assert "012345" not in persisted_logs
+    assert API_KEY not in persisted_logs
+    assert API_KEY not in body
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("response", "error_type"),
+    [
+        (httpx.Response(400, json={"success": False}), EmployeeInvitationDeliveryFailed),
+        (httpx.Response(200, json={"success": False}), EmployeeInvitationDeliveryFailed),
+        (httpx.Response(500, json={"success": False}), EmployeeInvitationDeliveryUnknown),
+        (httpx.Response(200, text="not-json"), EmployeeInvitationDeliveryUnknown),
+    ],
+)
+async def test_employee_invitation_provider_outcomes_are_classified(
+    response, error_type
+):
+    calls = 0
+
+    def handler(_request):
+        nonlocal calls
+        calls += 1
+        return response
+
+    adapter, client = sender(handler)
+    with pytest.raises(error_type) as caught:
+        await adapter.send_employee_invitation("+79990001122", "012345", 3600)
+    await client.aclose()
+    assert calls == 1
+    assert "+79990001122" not in str(caught.value)
+    assert "012345" not in str(caught.value)
+
+
+@pytest.mark.asyncio
+async def test_employee_invitation_timeout_is_unknown_and_not_retried():
+    calls = 0
+
+    def handler(_request):
+        nonlocal calls
+        calls += 1
+        raise httpx.ReadTimeout("synthetic timeout")
+
+    adapter, client = sender(handler)
+    with pytest.raises(EmployeeInvitationDeliveryUnknown):
+        await adapter.send_employee_invitation("+79990001122", "012345", 3600)
+    await client.aclose()
+    assert calls == 1
 
 
 @pytest.mark.asyncio
@@ -132,7 +209,7 @@ async def test_network_failures_are_controlled_without_retry(error):
 
 @pytest.mark.parametrize(
     "field",
-    ["email", "api_key", "sign", "base_url"],
+    ["email", "api_key", "sign", "base_url", "invitation_url"],
 )
 def test_incomplete_adapter_configuration_is_rejected(field):
     values = {
@@ -140,6 +217,7 @@ def test_incomplete_adapter_configuration_is_rejected(field):
         "api_key": API_KEY,
         "sign": SIGN,
         "base_url": BASE_URL,
+        "invitation_url": INVITE_URL,
     }
     values[field] = ""
     with pytest.raises(ValueError, match="configuration is incomplete"):
@@ -162,6 +240,29 @@ def test_adapter_requires_safe_https_base_url(base_url):
             api_key=API_KEY,
             sign=SIGN,
             base_url=base_url,
+            invitation_url=INVITE_URL,
+            timeout_seconds=2.0,
+        )
+
+
+@pytest.mark.parametrize(
+    "invitation_url",
+    [
+        "http://pilot.restos.space/#/invite",
+        "https://pilot.restos.space/#/login",
+        "https://pilot.restos.space/?code=012345#/invite",
+        "https://user:secret@pilot.restos.space/#/invite",
+    ],
+)
+def test_invitation_url_is_dedicated_https_without_code(invitation_url):
+    with pytest.raises(ValueError, match="dedicated HTTPS entry point"):
+        SmsAeroSender(
+            httpx.AsyncClient(),
+            email=EMAIL,
+            api_key=API_KEY,
+            sign=SIGN,
+            base_url=BASE_URL,
+            invitation_url=invitation_url,
             timeout_seconds=2.0,
         )
 
@@ -222,6 +323,7 @@ def factory_client(monkeypatch, provider):
     monkeypatch.setattr(auth.config, "SMS_AERO_API_KEY", API_KEY)
     monkeypatch.setattr(auth.config, "SMS_AERO_SIGN", SIGN)
     monkeypatch.setattr(auth.config, "SMS_AERO_BASE_URL", BASE_URL)
+    monkeypatch.setattr(auth.config, "WEBAPP_BASE_URL", "https://pilot.restos.space")
     monkeypatch.setattr(auth.config, "SMS_HTTP_TIMEOUT_SECONDS", 2.0)
     app = FastAPI()
     auth.configure_account_auth_http_security(app)

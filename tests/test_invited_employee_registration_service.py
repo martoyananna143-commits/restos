@@ -354,7 +354,10 @@ async def test_success_is_complete_secret_safe_and_challenge_one_time(context):
     assignment = await context.session.get(EmployeeAssignment, result.employee_assignment_id)
     device = await context.session.get(AccountDevice, result.device_id)
     stored_session = await context.session.get(AccountSession, result.session_id)
-    assert result.company_id == context.company.id and result.display_name == "Anna Invitee"
+    assert result.company_id == context.company.id and result.display_name == context.profile.full_name
+    assert result.company_name == context.company.name
+    assert result.position_name == context.position.name
+    assert set(result.venue_names) == {context.venue1.name, context.venue2.name}
     assert BcryptPasswordHasher().verify("correct horse battery", account.password_hash)
     assert account.password_hash != "correct horse battery" and PHONE not in repr(identity.__dict__)
     assert identity.identity_type == "phone" and identity.provider == "e164"

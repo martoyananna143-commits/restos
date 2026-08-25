@@ -132,6 +132,13 @@ class AcceptedWorkforceInvitation:
     scope_venue_ids: set[UUID]
 
 
+@dataclass(frozen=True)
+class WorkforceInvitationAcceptanceProjection:
+    company_name: str
+    position_name: str
+    venue_names: tuple[str, ...]
+
+
 class WorkforceInvitationService:
     """Create pending invitations without owning the caller's transaction."""
 
@@ -312,6 +319,52 @@ class WorkforceInvitationService:
                     "account already belongs to this company"
                 ) from error
             raise
+
+    async def acceptance_projection(
+        self, accepted: AcceptedWorkforceInvitation
+    ) -> WorkforceInvitationAcceptanceProjection:
+        """Return the safe terminal projection after invitation acceptance."""
+
+        company_name = (
+            await self._session.execute(
+                select(Company.name).where(
+                    Company.id == accepted.company_id,
+                    Company.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        position_name = (
+            await self._session.execute(
+                select(Position.name).where(
+                    Position.id == accepted.position_id,
+                    Position.company_id == accepted.company_id,
+                    Position.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        venue_ids = accepted.working_venue_ids | accepted.scope_venue_ids
+        venue_names: tuple[str, ...] = ()
+        if venue_ids:
+            venue_names = tuple(
+                (
+                    await self._session.execute(
+                        select(Venue.name)
+                        .where(
+                            Venue.id.in_(venue_ids),
+                            Venue.company_id == accepted.company_id,
+                            Venue.deleted_at.is_(None),
+                        )
+                        .order_by(Venue.name, Venue.id)
+                    )
+                ).scalars()
+            )
+        if company_name is None or position_name is None:
+            raise InvitationNoLongerApplicable("invitation projection is unavailable")
+        return WorkforceInvitationAcceptanceProjection(
+            company_name=company_name,
+            position_name=position_name,
+            venue_names=venue_names,
+        )
 
     async def _require_authenticated_phone_match(
         self,

@@ -184,7 +184,6 @@ def _payload(context):
         "invitation_code": context.invitation_code,
         "phone_verification_challenge_id": str(context.challenge.id),
         "phone": context.phone,
-        "display_name": "Anna Invitee",
         "password": "correct horse battery",
         "app_instance_id": str(context.app_instance_id),
         "platform": "ios",
@@ -221,6 +220,10 @@ async def test_real_web_registration_persists_and_sets_cookie_only(
     assert response.status_code == 200
     body = response.json()
     assert "refresh_token" not in body
+    assert body["display_name"] == context.profile.full_name
+    assert body["company_name"] == context.company.name
+    assert body["position_name"] == context.position.name
+    assert body["venue_names"]
     cookie = response.headers["set-cookie"]
     assert "restos_refresh=" in cookie
     assert "HttpOnly" in cookie and "Path=/api/v1/auth/web" in cookie

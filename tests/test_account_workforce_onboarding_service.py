@@ -1,6 +1,7 @@
 """PostgreSQL tests for Account-only workforce onboarding."""
 
 import asyncio
+from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
 import hmac
@@ -17,6 +18,7 @@ from app.infra.database.models.account import Account, AccountIdentity
 from app.infra.database.models.employee_assignment import EmployeeAssignment
 from app.infra.database.models.employee_profile import EmployeeProfile
 from app.infra.database.models.invitation_v1 import Invitation, InvitationVenue
+from app.infra.database.models.position import Position
 from app.internal.services.account_workforce_onboarding_service import (
     AccountWorkforceOnboardingConflict,
     AccountWorkforceOnboardingForbidden,
@@ -74,7 +76,43 @@ async def owner_company(session: AsyncSession, *, venue: bool = True):
             now=NOW,
         )
     )
-    return account, company
+    access = AccessProfile(
+        id=uuid4(),
+        company_id=company.company_id,
+        name="Synthetic Invitation Access",
+        code=f"invite-{uuid4().hex[:12]}",
+        description=None,
+        maximum_scope="working_venues",
+        is_system=False,
+        is_active=True,
+        version=1,
+    )
+    session.add(access)
+    await session.flush()
+    session.add(
+        AccessProfilePermission(
+            access_profile_id=access.id,
+            permission_code="venue.view",
+        )
+    )
+    position = Position(
+        id=uuid4(),
+        company_id=company.company_id,
+        name="Synthetic Employee Position",
+        code=f"invite-position-{uuid4().hex[:12]}",
+        description=None,
+        default_access_profile_id=access.id,
+        default_scope_type="working_venues" if venue else "self",
+        is_active=True,
+        sort_order=100,
+    )
+    session.add(position)
+    await session.flush()
+    return account, replace(
+        company,
+        position_id=position.id,
+        access_profile_id=access.id,
+    )
 
 
 def command(owner, company, request_id, **changes):
@@ -84,6 +122,7 @@ def command(owner, company, request_id, **changes):
         request_id=request_id,
         employee_name=" Synthetic Employee ",
         phone=f"+7{request_id.int % 10_000_000_000:010d}",
+        position_id=company.position_id,
         venue_id=company.venue_id,
         now=NOW,
     )
@@ -149,7 +188,62 @@ async def test_same_request_is_idempotent_and_code_is_recoverable(db_session):
     assert first.invitation_id == second.invitation_id
     assert first.employee_profile_id == second.employee_profile_id
     assert first.code == second.code
+    assert first.delivery_status == "delivery_pending" and first.should_send is True
+    assert second.delivery_status == "delivery_pending" and second.should_send is False
+    assert first.delivery_attempt_count == second.delivery_attempt_count == 1
     assert after_profiles == before_profiles + 1
+
+
+@pytest.mark.asyncio
+async def test_failed_delivery_allows_one_idempotent_manual_retry(db_session):
+    owner, company = await owner_company(db_session)
+    request_id = uuid4()
+    service = AccountWorkforceOnboardingService(db_session, PEPPER, PHONE_PEPPER)
+    before_profiles = await db_session.scalar(
+        select(func.count()).select_from(EmployeeProfile)
+    )
+    before_invitations = await db_session.scalar(
+        select(func.count()).select_from(Invitation)
+    )
+    first = await service.create_invitation(command(owner, company, request_id))
+    assert await service.record_delivery_outcome(
+        first.invitation_id, "failed", NOW
+    ) == "failed"
+
+    retry = await service.create_invitation(command(owner, company, request_id))
+    concurrent_duplicate = await service.create_invitation(
+        command(owner, company, request_id)
+    )
+
+    assert retry.created is False and retry.should_send is True
+    assert retry.delivery_status == "delivery_pending"
+    assert retry.delivery_attempt_count == 2
+    assert concurrent_duplicate.should_send is False
+    assert concurrent_duplicate.delivery_attempt_count == 2
+    assert await db_session.scalar(
+        select(func.count()).select_from(EmployeeProfile)
+    ) == before_profiles + 1
+    assert await db_session.scalar(
+        select(func.count()).select_from(Invitation)
+    ) == before_invitations + 1
+
+
+@pytest.mark.asyncio
+async def test_unknown_delivery_never_resends(db_session):
+    owner, company = await owner_company(db_session)
+    request_id = uuid4()
+    service = AccountWorkforceOnboardingService(db_session, PEPPER, PHONE_PEPPER)
+    first = await service.create_invitation(command(owner, company, request_id))
+    assert await service.record_delivery_outcome(
+        first.invitation_id, "unknown", NOW
+    ) == "unknown"
+
+    repeated = await service.create_invitation(command(owner, company, request_id))
+
+    assert repeated.created is False
+    assert repeated.delivery_status == "unknown"
+    assert repeated.should_send is False
+    assert repeated.delivery_attempt_count == 1
 
 
 @pytest.mark.asyncio
@@ -167,26 +261,20 @@ async def test_cross_company_actor_is_rejected_without_partial_profile(db_sessio
 
 
 @pytest.mark.asyncio
-async def test_custom_employee_profile_code_is_not_silently_elevated(db_session):
+async def test_owner_position_cannot_be_selected_for_employee_invitation(db_session):
     owner, company = await owner_company(db_session)
-    db_session.add(
-        AccessProfile(
-            id=uuid4(),
-            company_id=company.company_id,
-            name="Custom Employee",
-            code="employee",
-            description=None,
-            maximum_scope="company",
-            is_system=False,
-            is_active=True,
-            version=1,
+    owner_position_id = await db_session.scalar(
+        select(Position.id).where(
+            Position.company_id == company.company_id,
+            Position.code == "owner",
         )
     )
-    await db_session.flush()
-    with pytest.raises(AccountWorkforceOnboardingConflict):
+    with pytest.raises(AccountWorkforceOnboardingInvalid):
         await AccountWorkforceOnboardingService(
             db_session, PEPPER, PHONE_PEPPER
-        ).create_invitation(command(owner, company, uuid4()))
+        ).create_invitation(
+            command(owner, company, uuid4(), position_id=owner_position_id)
+        )
     assert await db_session.scalar(
         select(func.count()).select_from(Invitation).where(
             Invitation.company_id == company.company_id
@@ -219,16 +307,53 @@ async def test_valid_existing_employee_access_profile_with_historical_id_is_reus
         )
     )
     await db_session.flush()
+    historical_position = Position(
+        id=uuid4(),
+        company_id=company.company_id,
+        name="Historical Employee",
+        code=f"historical-{uuid4().hex[:12]}",
+        description=None,
+        default_access_profile_id=historical_access.id,
+        default_scope_type="working_venues",
+        is_active=True,
+        sort_order=110,
+    )
+    db_session.add(historical_position)
+    await db_session.flush()
 
     request_id = uuid4()
     service = AccountWorkforceOnboardingService(db_session, PEPPER, PHONE_PEPPER)
-    first = await service.create_invitation(command(owner, company, request_id))
-    second = await service.create_invitation(command(owner, company, request_id))
+    selected = dict(position_id=historical_position.id)
+    first = await service.create_invitation(command(owner, company, request_id, **selected))
+    second = await service.create_invitation(command(owner, company, request_id, **selected))
     invitation = await db_session.get(Invitation, first.invitation_id)
+    access_count = await db_session.scalar(
+        select(func.count()).select_from(AccessProfile).where(
+            AccessProfile.company_id == company.company_id
+        )
+    )
+    position_count = await db_session.scalar(
+        select(func.count()).select_from(Position).where(
+            Position.company_id == company.company_id
+        )
+    )
+    await service.record_delivery_outcome(first.invitation_id, "failed", NOW)
+    retry = await service.create_invitation(command(owner, company, request_id, **selected))
 
     assert first.created is True and second.created is False
     assert first.invitation_id == second.invitation_id
+    assert retry.should_send is True and retry.delivery_attempt_count == 2
     assert invitation.access_profile_id == historical_access.id
+    assert await db_session.scalar(
+        select(func.count()).select_from(AccessProfile).where(
+            AccessProfile.company_id == company.company_id
+        )
+    ) == access_count
+    assert await db_session.scalar(
+        select(func.count()).select_from(Position).where(
+            Position.company_id == company.company_id
+        )
+    ) == position_count
     assert await db_session.scalar(
         select(func.count()).select_from(EmployeeProfile).where(
             EmployeeProfile.company_id == company.company_id,
@@ -263,6 +388,7 @@ async def test_ten_worker_same_request_has_one_mutation_and_idempotent_results()
         owner, company = await owner_company(setup)
         owner_id = owner.id
         company_id = company.company_id
+        position_id = company.position_id
         venue_id = company.venue_id
         await setup.commit()
 
@@ -277,6 +403,7 @@ async def test_ten_worker_same_request_has_one_mutation_and_idempotent_results()
                     request_id=request_id,
                     employee_name="Concurrent Employee",
                     phone=f"+7{request_id.int % 10_000_000_000:010d}",
+                    position_id=position_id,
                     venue_id=venue_id,
                     now=NOW,
                 )
@@ -287,6 +414,9 @@ async def test_ten_worker_same_request_has_one_mutation_and_idempotent_results()
 
     results = await asyncio.gather(*(worker() for _ in range(10)))
     assert sum(result.created for result in results) == 1
+    assert sum(result.should_send for result in results) == 1
+    assert {result.delivery_status for result in results} == {"delivery_pending"}
+    assert {result.delivery_attempt_count for result in results} == {1}
     assert len({result.invitation_id for result in results}) == 1
     assert len({result.code for result in results}) == 1
     async with AsyncSession(engine) as check:

@@ -18,7 +18,11 @@ from app.infra.database.models.access_profile import (
 )
 from app.infra.database.models.company import Company
 from app.infra.database.models.employee_profile import EmployeeProfile
-from app.infra.database.models.invitation_v1 import Invitation
+from app.infra.database.models.invitation_v1 import (
+    Invitation,
+    InvitationScopeVenue,
+    InvitationVenue,
+)
 from app.infra.database.models.position import Position
 from app.infra.database.models.venue import Venue
 from app.internal.services.access_decision_service import AccessDecisionService
@@ -58,6 +62,7 @@ class CreateAccountWorkforceInvitation:
     request_id: UUID
     employee_name: str
     phone: str
+    position_id: UUID
     venue_id: UUID | None
     now: datetime
 
@@ -68,7 +73,12 @@ class AccountWorkforceInvitationResult:
     invitation_id: UUID
     employee_profile_id: UUID
     code: str
+    phone: str
     expires_at: datetime
+    delivery_status: str
+    delivery_attempt_count: int
+    should_send: bool
+    invitation_status: str
 
 
 class AccountWorkforceOnboardingService:
@@ -126,6 +136,48 @@ class AccountWorkforceOnboardingService:
         ).scalars()
         return [{"venue_id": venue.id, "name": venue.name} for venue in rows]
 
+    async def list_invitation_positions(
+        self, actor_account_id: UUID, company_id: UUID, now: datetime
+    ) -> list[dict[str, object]]:
+        company_access = await self._access.can_in_company(
+            actor_account_id, company_id, "employee.invite", now
+        )
+        venue_ids = await self._access.list_accessible_venue_ids(
+            actor_account_id, company_id, "employee.invite", now
+        )
+        if not company_access and not venue_ids:
+            raise AccountWorkforceOnboardingForbidden("invitation is forbidden")
+        statement = (
+            select(Position, AccessProfile)
+            .join(
+                AccessProfile,
+                (AccessProfile.id == Position.default_access_profile_id)
+                & (AccessProfile.company_id == Position.company_id),
+            )
+            .where(
+                Position.company_id == company_id,
+                Position.is_active.is_(True),
+                Position.deleted_at.is_(None),
+                AccessProfile.is_active.is_(True),
+                AccessProfile.deleted_at.is_(None),
+                AccessProfile.code != "owner",
+            )
+            .order_by(Position.sort_order, Position.name, Position.id)
+        )
+        if not company_access:
+            statement = statement.where(AccessProfile.maximum_scope != "company")
+        rows = (await self._session.execute(statement)).all()
+        return [
+            {
+                "position_id": position.id,
+                "position_name": position.name,
+                "access_profile_name": access_profile.name,
+                "access_scope": position.default_scope_type
+                or access_profile.maximum_scope,
+            }
+            for position, access_profile in rows
+        ]
+
     async def create_invitation(
         self, command: CreateAccountWorkforceInvitation
     ) -> AccountWorkforceInvitationResult:
@@ -140,6 +192,7 @@ class AccountWorkforceOnboardingService:
             command.actor_account_id,
             command.company_id,
             command.request_id,
+            command.position_id,
         ):
             if not isinstance(value, UUID):
                 raise AccountWorkforceOnboardingInvalid("identifiers must be UUIDs")
@@ -167,6 +220,10 @@ class AccountWorkforceOnboardingService:
         ):
             raise AccountWorkforceOnboardingForbidden("invitation is forbidden")
 
+        access_profile, position, scope_type, working_ids, scope_ids = (
+            await self._assignment_contract(command)
+        )
+
         employee_profile_id = uuid5(
             _ID_NAMESPACE,
             f"employee-profile-v1:{command.company_id}:{command.request_id}",
@@ -174,7 +231,16 @@ class AccountWorkforceOnboardingService:
         existing_profile = await self._session.get(EmployeeProfile, employee_profile_id)
         if existing_profile is not None:
             return await self._existing_result(
-                command, existing_profile, employee_profile_id, name, phone
+                command,
+                existing_profile,
+                employee_profile_id,
+                name,
+                phone,
+                access_profile,
+                position,
+                scope_type,
+                working_ids,
+                scope_ids,
             )
 
         incompatible_profile = (
@@ -193,7 +259,6 @@ class AccountWorkforceOnboardingService:
                 "workforce invitation is unavailable"
             )
 
-        access_profile, position = await self._employee_defaults(command.company_id)
         profile = EmployeeProfile(
             id=employee_profile_id,
             company_id=command.company_id,
@@ -245,13 +310,9 @@ class AccountWorkforceOnboardingService:
                     employee_profile_id=employee_profile_id,
                     position_id=position.id,
                     access_profile_id=access_profile.id,
-                    scope_type=(
-                        "working_venues" if command.venue_id is not None else "self"
-                    ),
-                    working_venue_ids=(
-                        (command.venue_id,) if command.venue_id is not None else ()
-                    ),
-                    scope_venue_ids=(),
+                    scope_type=scope_type,
+                    working_venue_ids=working_ids,
+                    scope_venue_ids=scope_ids,
                     now=command.now,
                     ttl=_DEFAULT_TTL,
                 )
@@ -260,12 +321,25 @@ class AccountWorkforceOnboardingService:
             raise AccountWorkforceOnboardingForbidden(
                 "invitation is forbidden"
             ) from error
+        invitation = await self._session.get(Invitation, created.invitation_id)
+        if invitation is None:
+            raise AccountWorkforceOnboardingConflict("invitation is unavailable")
+        invitation.delivery_status = "delivery_pending"
+        invitation.delivery_attempt_count = 1
+        invitation.delivery_attempted_at = command.now
+        invitation.delivery_sent_at = None
+        await self._session.flush()
         return AccountWorkforceInvitationResult(
             created=True,
             invitation_id=created.invitation_id,
             employee_profile_id=employee_profile_id,
             code=created.code,
+            phone=phone,
             expires_at=created.expires_at,
+            delivery_status="delivery_pending",
+            delivery_attempt_count=1,
+            should_send=True,
+            invitation_status="pending",
         )
 
     async def _existing_result(
@@ -275,6 +349,11 @@ class AccountWorkforceOnboardingService:
         profile_id: UUID,
         expected_name: str,
         expected_phone: str,
+        access_profile: AccessProfile,
+        position: Position,
+        scope_type: str,
+        working_ids: tuple[UUID, ...],
+        scope_ids: tuple[UUID, ...],
     ) -> AccountWorkforceInvitationResult:
         if (
             profile.company_id != command.company_id
@@ -293,7 +372,7 @@ class AccountWorkforceOnboardingService:
                     Invitation.employee_profile_id == profile_id,
                     Invitation.created_by_account_id == command.actor_account_id,
                     Invitation.deleted_at.is_(None),
-                )
+                ).with_for_update()
             )
         ).scalar_one_or_none()
         if (
@@ -302,107 +381,150 @@ class AccountWorkforceOnboardingService:
             or invitation.expires_at <= command.now
         ):
             raise AccountWorkforceOnboardingConflict("request_id is unavailable")
+        persisted_working_ids = set(
+            (
+                await self._session.execute(
+                    select(InvitationVenue.venue_id).where(
+                        InvitationVenue.invitation_id == invitation.id
+                    )
+                )
+            ).scalars()
+        )
+        persisted_scope_ids = set(
+            (
+                await self._session.execute(
+                    select(InvitationScopeVenue.venue_id).where(
+                        InvitationScopeVenue.invitation_id == invitation.id
+                    )
+                )
+            ).scalars()
+        )
+        if (
+            invitation.position_id != position.id
+            or invitation.access_profile_id != access_profile.id
+            or invitation.scope_type != scope_type
+            or persisted_working_ids != set(working_ids)
+            or persisted_scope_ids != set(scope_ids)
+        ):
+            raise AccountWorkforceOnboardingConflict("request_id is unavailable")
         code = self._matching_code(command, invitation.code_digest)
         if code is None:
             raise AccountWorkforceOnboardingConflict("request_id is unavailable")
+        should_send = invitation.delivery_status == "failed"
+        if should_send:
+            invitation.delivery_status = "delivery_pending"
+            invitation.delivery_attempt_count += 1
+            invitation.delivery_attempted_at = command.now
+            invitation.delivery_sent_at = None
+            await self._session.flush()
         return AccountWorkforceInvitationResult(
             created=False,
             invitation_id=invitation.id,
             employee_profile_id=profile_id,
             code=code,
+            phone=expected_phone,
             expires_at=invitation.expires_at,
+            delivery_status=invitation.delivery_status,
+            delivery_attempt_count=invitation.delivery_attempt_count,
+            should_send=should_send,
+            invitation_status=invitation.status,
         )
 
-    async def _employee_defaults(
-        self, company_id: UUID
-    ) -> tuple[AccessProfile, Position]:
-        expected_access_id = uuid5(
-            _ID_NAMESPACE, f"employee-access-v1:{company_id}"
-        )
-        access_profile = (
+    async def record_delivery_outcome(
+        self,
+        invitation_id: UUID,
+        outcome: str,
+        now: datetime,
+    ) -> str:
+        """Complete one claimed attempt without reopening an ambiguous outcome."""
+
+        if outcome not in {"sent", "unknown", "failed"}:
+            raise AccountWorkforceOnboardingInvalid("invalid delivery outcome")
+        if now.tzinfo is None or now.utcoffset() is None:
+            raise AccountWorkforceOnboardingInvalid("now must be timezone-aware")
+        invitation = (
             await self._session.execute(
-                select(AccessProfile).where(
-                    AccessProfile.company_id == company_id,
-                    AccessProfile.code == "employee",
-                    AccessProfile.is_active.is_(True),
-                    AccessProfile.deleted_at.is_(None),
+                select(Invitation)
+                .where(
+                    Invitation.id == invitation_id,
+                    Invitation.deleted_at.is_(None),
                 )
+                .with_for_update()
             )
         ).scalar_one_or_none()
-        if access_profile is None:
-            access_profile = AccessProfile(
-                id=expected_access_id,
-                company_id=company_id,
-                name="Сотрудник",
-                code="employee",
-                description="Базовый доступ сотрудника",
-                maximum_scope="working_venues",
-                is_system=True,
-                is_active=True,
-                version=1,
-            )
-            self._session.add(access_profile)
-            await self._session.flush()
-        elif (
-            not access_profile.is_system
-            or access_profile.maximum_scope != "working_venues"
-        ):
-            raise AccountWorkforceOnboardingConflict(
-                "employee access profile is incompatible"
-            )
-        permissions = set(
-            (
-                await self._session.execute(
-                    select(AccessProfilePermission.permission_code).where(
-                        AccessProfilePermission.access_profile_id == access_profile.id
-                    )
-                )
-            ).scalars()
-        )
-        if permissions - {"venue.view"}:
-            raise AccountWorkforceOnboardingConflict(
-                "employee access profile is incompatible"
-            )
-        if "venue.view" not in permissions:
-            self._session.add(
-                AccessProfilePermission(
-                    access_profile_id=access_profile.id,
-                    permission_code="venue.view",
-                )
-            )
-            await self._session.flush()
+        if invitation is None:
+            raise AccountWorkforceOnboardingConflict("invitation is unavailable")
+        if invitation.delivery_status != "delivery_pending":
+            return invitation.delivery_status
+        invitation.delivery_status = outcome
+        invitation.delivery_sent_at = now if outcome == "sent" else None
+        await self._session.flush()
+        return outcome
 
-        expected_position_id = uuid5(
-            _ID_NAMESPACE, f"employee-position-v1:{company_id}"
-        )
-        position = (
+    async def _assignment_contract(
+        self, command: CreateAccountWorkforceInvitation
+    ) -> tuple[AccessProfile, Position, str, tuple[UUID, ...], tuple[UUID, ...]]:
+        row = (
             await self._session.execute(
-                select(Position).where(
-                    Position.company_id == company_id,
-                    Position.code == "employee",
+                select(Position, AccessProfile)
+                .join(
+                    AccessProfile,
+                    (AccessProfile.id == Position.default_access_profile_id)
+                    & (AccessProfile.company_id == Position.company_id),
+                )
+                .where(
+                    Position.id == command.position_id,
+                    Position.company_id == command.company_id,
                     Position.is_active.is_(True),
                     Position.deleted_at.is_(None),
+                    AccessProfile.is_active.is_(True),
+                    AccessProfile.deleted_at.is_(None),
+                    AccessProfile.code != "owner",
+                )
+            )
+        ).one_or_none()
+        if row is None:
+            raise AccountWorkforceOnboardingInvalid("position is unavailable")
+        position, access_profile = row
+        scope_type = position.default_scope_type or access_profile.maximum_scope
+        if scope_type not in {"self", "working_venues", "explicit_venues", "company"}:
+            raise AccountWorkforceOnboardingInvalid("position scope is unavailable")
+        if command.venue_id is None and scope_type in {"working_venues", "explicit_venues"}:
+            raise AccountWorkforceOnboardingInvalid("position requires a venue")
+        working_ids = (command.venue_id,) if command.venue_id is not None else ()
+        scope_ids = (
+            (command.venue_id,)
+            if command.venue_id is not None and scope_type == "explicit_venues"
+            else ()
+        )
+        return access_profile, position, scope_type, working_ids, scope_ids
+
+    async def invitation_status(
+        self,
+        actor_account_id: UUID,
+        company_id: UUID,
+        invitation_id: UUID,
+        now: datetime,
+    ) -> tuple[str, str]:
+        if not await self._access.can_in_company(
+            actor_account_id, company_id, "employee.invite", now
+        ):
+            raise AccountWorkforceOnboardingForbidden("invitation is forbidden")
+        invitation = (
+            await self._session.execute(
+                select(Invitation).where(
+                    Invitation.id == invitation_id,
+                    Invitation.company_id == company_id,
+                    Invitation.created_by_account_id == actor_account_id,
+                    Invitation.deleted_at.is_(None),
                 )
             )
         ).scalar_one_or_none()
-        if position is None:
-            position = Position(
-                id=expected_position_id,
-                company_id=company_id,
-                name="Сотрудник",
-                code="employee",
-                description=None,
-                default_access_profile_id=access_profile.id,
-                is_active=True,
-                sort_order=100,
-            )
-            self._session.add(position)
-            await self._session.flush()
-        elif position.default_access_profile_id != access_profile.id:
-            raise AccountWorkforceOnboardingConflict(
-                "employee position is incompatible"
-            )
-        return access_profile, position
+        if invitation is None:
+            raise AccountWorkforceOnboardingInvalid("invitation is unavailable")
+        if invitation.status not in {"pending", "accepted"}:
+            raise AccountWorkforceOnboardingInvalid("invitation is unavailable")
+        return invitation.status, invitation.delivery_status
 
     def _candidate_codes(
         self, command: CreateAccountWorkforceInvitation

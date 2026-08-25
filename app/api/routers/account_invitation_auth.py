@@ -106,6 +106,13 @@ class UnconfiguredSmsSender:
     async def send_verification_code(self, **_: object) -> None:
         raise SmsProviderUnavailable("SMS provider is not configured")
 
+    async def send_employee_invitation(self, **_: object) -> None:
+        from app.internal.services.employee_invitation_delivery import (
+            EmployeeInvitationDeliveryFailed,
+        )
+
+        raise EmployeeInvitationDeliveryFailed("invitation delivery failed")
+
 
 class PublicError(BaseModel):
     code: str
@@ -139,7 +146,7 @@ class RegistrationRequest(BaseModel):
     invitation_code: str = Field(min_length=6, max_length=6, pattern=r"^[0-9]{6}$")
     phone_verification_challenge_id: UUID
     phone: str = Field(min_length=8, max_length=32)
-    display_name: str = Field(min_length=1, max_length=255)
+    display_name: str | None = Field(default=None, max_length=255)
     password: str = Field(min_length=12, max_length=72)
     app_instance_id: UUID
     platform: str
@@ -182,6 +189,9 @@ class RegistrationResponse(BaseModel):
     token_type: str = "bearer"
     refresh_token: str
     display_name: str
+    company_name: str
+    position_name: str
+    venue_names: tuple[str, ...]
 
 
 class WebRegistrationResponse(BaseModel):
@@ -195,6 +205,9 @@ class WebRegistrationResponse(BaseModel):
     expires_at: datetime
     token_type: str = "bearer"
     display_name: str
+    company_name: str
+    position_name: str
+    venue_names: tuple[str, ...]
 
 
 async def get_account_auth_session():
@@ -226,6 +239,7 @@ def get_sms_sender(request: Request) -> SmsSender:
             api_key=config.SMS_AERO_API_KEY,
             sign=config.SMS_AERO_SIGN,
             base_url=config.SMS_AERO_BASE_URL,
+            invitation_url=f"{config.WEBAPP_BASE_URL.rstrip('/')}/#/invite",
             timeout_seconds=config.SMS_HTTP_TIMEOUT_SECONDS,
         )
     except ValueError as error:
@@ -724,4 +738,7 @@ async def register_web(
         access_token=native.access_token,
         expires_at=native.access_token_expires_at,
         display_name=native.display_name,
+        company_name=native.company_name,
+        position_name=native.position_name,
+        venue_names=native.venue_names,
     )

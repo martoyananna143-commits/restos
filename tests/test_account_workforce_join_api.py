@@ -1,6 +1,7 @@
 """Strict API declaration and boundary tests for existing Account joins."""
 
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from uuid import uuid4
 
 from fastapi import FastAPI
@@ -95,6 +96,14 @@ def test_accept_binds_authenticated_account_and_is_no_store(monkeypatch):
 
         async def accept_authenticated(self, request, phone_pepper):
             captured.append((request, phone_pepper))
+            return SimpleNamespace()
+
+        async def acceptance_projection(self, _accepted):
+            return SimpleNamespace(
+                company_name="Synthetic Company",
+                position_name="Synthetic Position",
+                venue_names=("Synthetic Venue",),
+            )
 
     monkeypatch.setattr(
         account_workforce_join, "WorkforceInvitationService", Service
@@ -106,7 +115,12 @@ def test_accept_binds_authenticated_account_and_is_no_store(monkeypatch):
             json={"invitation_code": "123456"},
             headers=headers(),
         )
-    assert response.status_code == 200 and response.json() == {"joined": True}
+    assert response.status_code == 200 and response.json() == {
+        "joined": True,
+        "company_name": "Synthetic Company",
+        "position_name": "Synthetic Position",
+        "venue_names": ["Synthetic Venue"],
+    }
     assert captured[0][0].account_id == account_id
     assert captured[0][0].code == "123456"
     assert session.commits == 1 and session.rollbacks == 0

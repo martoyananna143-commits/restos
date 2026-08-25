@@ -228,6 +228,20 @@ async def create_venue(session, owner, company, label="Second", request_id=None)
 
 async def join_employee(session, owner, company, venue_id, label="Employee"):
     account = await register_account(session, f"{label} {uuid4().hex[:6]}")
+    position = await OrganizationWorkflowService(
+        session, invitation_pepper=INVITATION_PEPPER
+    ).create_position(
+        CreatePosition(
+            actor_account_id=owner.id,
+            company_id=company.company_id,
+            request_id=uuid4(),
+            name=f"{label} Position {uuid4().hex[:6]}",
+            description=None,
+            access_preset=("employee_venue" if venue_id is not None else "employee_unassigned"),
+            sort_order=100,
+            now=NOW + timedelta(seconds=4),
+        )
+    )
     request_id = uuid4()
     invited = await AccountWorkforceOnboardingService(
         session, INVITATION_PEPPER, PHONE_PEPPER
@@ -238,6 +252,7 @@ async def join_employee(session, owner, company, venue_id, label="Employee"):
             request_id,
             account.display_name,
             f"+7988{request_id.int % 10_000_000:07d}",
+            position["position_id"],
             venue_id,
             NOW + timedelta(seconds=5),
         )

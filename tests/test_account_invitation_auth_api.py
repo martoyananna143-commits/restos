@@ -355,6 +355,9 @@ def test_register_success_returns_only_public_result(monkeypatch):
         session_id=uuid4(),
         refresh_token="selector.secret",
         display_name="Анна",
+        company_name="Synthetic Company",
+        position_name="Synthetic Position",
+        venue_names=("Synthetic Venue",),
     )
 
     class Service:
@@ -387,6 +390,7 @@ def test_register_success_returns_only_public_result(monkeypatch):
         "account_id", "employee_profile_id", "employee_assignment_id",
         "company_id", "device_id", "session_id", "access_token",
         "access_token_expires_at", "token_type", "refresh_token", "display_name",
+        "company_name", "position_name", "venue_names",
     }
     assert session.commits == 1
     assert response.headers["cache-control"] == "no-store"
